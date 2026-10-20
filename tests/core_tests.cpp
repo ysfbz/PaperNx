@@ -33,6 +33,9 @@ int main() {
     assert(detectFormat("book.EPUB") == Format::Epub);
     assert(detectFormat("doc.pdf") == Format::Pdf);
     assert(detectFormat("document.PDF") == Format::Pdf);
+    assert(detectFormat("Comic.CBZ") == Format::Cbz);
+    assert(detectFormat("Comic.cbz") == Format::Cbz);
+    assert(detectFormat("Comic.cbr") == Format::Unsupported);
     assert(detectFormat("notes.txt") == Format::Unsupported);
     assert(detectFormat("image.png") == Format::Unsupported);
 
@@ -109,6 +112,13 @@ int main() {
     }
     const auto scanned = scan(root);
     assert(scanned.size() == 2);
+    { // Scanner can discover CBZ archives without extracting any user files.
+        std::ofstream(root / "nested" / "Comic_10.CBZ") << "scanner-only fixture";
+        const auto withComics = scan(root);
+        assert(withComics.size() == 3);
+        assert(std::any_of(withComics.begin(), withComics.end(), [](const Book &b){return b.format == Format::Cbz;}));
+        fs::remove(root / "nested" / "Comic_10.CBZ");
+    }
     assert(scan(root / "nonexistent").empty());
 
     // Search with Turkish matching
