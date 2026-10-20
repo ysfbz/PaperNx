@@ -250,6 +250,7 @@ Format detectFormat(const fs::path &path) {
     }
     if (ext == ".epub") return Format::Epub;
     if (ext == ".pdf") return Format::Pdf;
+    if (ext == ".cbz") return Format::Cbz;
     return Format::Unsupported;
 }
 
