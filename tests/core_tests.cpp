@@ -73,6 +73,23 @@ int main() {
         }
     }
 
+    // Both analog sticks have independent repeat/deadzone state, and triggers do
+    // not accidentally navigate menus.
+    {
+        ControllerNavigator navigator;
+        int dx = 99, dy = 99;
+        assert(navigator.processAxis(2, 26000, dx, dy) && dx == 1 && dy == 0);
+        assert(!navigator.processAxis(2, 26000, dx, dy) && dx == 0 && dy == 0);
+        assert(!navigator.processAxis(2, 0, dx, dy));
+        assert(navigator.processAxis(2, -26000, dx, dy) && dx == -1);
+        assert(navigator.processAxis(3, -26000, dx, dy) && dy == -1);
+        assert(navigator.processAxis(0, 26000, dx, dy) && dx == 1);
+        assert(navigator.processAxis(1, 26000, dx, dy) && dy == 1);
+        assert(!navigator.processAxis(4, 32767, dx, dy) && dx == 0 && dy == 0);
+        assert(!navigator.processAxis(5, 32767, dx, dy) && dx == 0 && dy == 0);
+        assert(!navigator.processAxis(3, 12000, dx, dy));
+    }
+
     // 3. UTF-8 Safe Truncation
     std::string turkishText = "İstanbul'da Bir Çiçek";
     // "İstanbul" is 9 bytes in UTF-8: İ (2 bytes) + s,t,a,n,b,u,l (7 bytes)
