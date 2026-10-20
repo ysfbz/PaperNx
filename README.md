@@ -5,7 +5,7 @@
 <h1 align="center">PaperNX</h1>
 
 <p align="center">
-  <strong>Native, offline EPUB, PDF, and CBZ reader for the Nintendo Switch.</strong>
+  <strong>Native, offline EPUB, PDF, CBZ and CBR reader for the Nintendo Switch.</strong>
 </p>
 
 <p align="center">
@@ -68,7 +68,7 @@ All books, comic archives, cover art caches, reading progress, and personal read
 ```text
 sdmc:/switch/PaperNX/
 ├── PaperNX.nro          # Application binary with embedded fonts & assets
-├── books/               # Place your EPUB, PDF, and CBZ files here
+├── books/               # Place your EPUB, PDF, CBZ and CBR files here
 └── fonts/               # Bundled fonts and OFL notice (also embedded in the NRO)
 ```
 
@@ -143,6 +143,8 @@ docker compose run --rm desktop bash scripts/verify-v04.sh sanitizers
 
 PaperNX is free software developed by **Yusuf Buzrul with AI assistance** and licensed under the **[GNU Affero General Public License v3.0 (AGPL-3.0)](LICENSE)**.
 
+Code origins and redistribution obligations, including components incorporated from community contributions, are documented in [docs/LICENSES.md](docs/LICENSES.md).
+
 This software includes third-party libraries and fonts licensed under permissive and copyleft open-source terms (MuPDF, libnx, SDL2, SDL2_ttf, FreeType, HarfBuzz, libjpeg-turbo, libpng, zlib, and Noto fonts). Third-party license notices are archived in [`PaperNX-licenses-v0.9.1.zip`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.1/PaperNX-licenses-v0.9.1.zip) and under `third-party-licenses/`.
 
 ---
@@ -154,7 +156,7 @@ This software includes third-party libraries and fonts licensed under permissive
 
 ### Genel Bakış
 
-**PaperNX**, Nintendo Switch için modern C++17, C11, SDL2 ve MuPDF kullanılarak geliştirilmiş, **yerel ve tamamen çevrimdışı bir EPUB, PDF ve CBZ okuyucudur**. Joy-Con kumandaları konsoldan ayrılmış durumdayken rahatça kitap ve çizgi roman okuyabilmeniz amacıyla dokunmatik odaklı olarak tasarlanmıştır.
+**PaperNX**, Nintendo Switch için modern C++17, C11, SDL2 ve MuPDF kullanılarak geliştirilmiş, **yerel ve tamamen çevrimdışı bir EPUB, PDF, CBZ ve CBR okuyucudur**. Joy-Con kumandaları konsoldan ayrılmış durumdayken rahatça kitap ve çizgi roman okuyabilmeniz amacıyla dokunmatik odaklı olarak tasarlanmıştır.
 
 Tüm kitaplarınız, çizgi roman arşivleriniz, kapak önbelleğiniz, okuma geçmişiniz ve okuma günlüğü istatistikleriniz yalnızca microSD kartınızda saklanır. Kullanıcı hesabı, bulut bağlantısı veya web tarayıcı motoru gerektirmez.
 
@@ -164,7 +166,8 @@ Tüm kitaplarınız, çizgi roman arşivleriniz, kapak önbelleğiniz, okuma ge�
 ### Temel Özellikler
 
 - **Dokunmatik Odaklı Ergonomi:** Tüm eylemler doğrudan ve hassas dokunmatik hedeflerle yönetilir (56px minimum dokunmatik alan). Kumandalar isteğe bağlı kısayol olarak desteklenir.
-- **CBZ Çizgi Roman Desteği:** MuPDF altyapısıyla harici bağımlılık veya gereksiz kod yükü getirmeden `.cbz` arşivlerini doğrudan okuma. Çizgi roman çizimlerini bozmayan orijinal RGB renklendirme.
+- **CBZ ve CBR Çizgi Roman Desteği:** CBZ (ZIP), CBR (RAR4/RAR5 ve solid arşivler) açma; doğal sayfa sıralaması, ComicInfo metadata ve orijinal çizim renklerinin korunması. RAR desteğinde libarchive/unarr kullanılır.
+- **İnteraktif Sayfa Çevirme ve Seri Gezintisi:** Sayfalı EPUB/PDF/CBZ/CBR için dokunmaya duyarlı 3D page curl; çizgi romanları seri kartlarında toplama, üç sekmeli sayfa gezgini, küçük resim önizlemeleri ve hızlı sayfa seçimi.
 - **Doğal Sayısal Sıralama:** Cilt ve sayı numaralarını doğru sıralayan taşma korumalı `compareNatural` algoritması (Örn: Cilt 2, Cilt 10'dan önce gelir).
 - **Gelişmiş Kumanda ve Ekran Yönü Uyumu:** Dikey modlarda ekrana göre yönlenen analog kaydırma ve menü gezintisi; okuyucuda doğrudan sayfa çeviren D-pad kontrolleri; tetik tuşlarının kazara menü değiştirmesini önleyen koruma.
 - **Gerçek Dikey Sürekli EPUB Kaydırma:** Sahte sayfa hissi olmadan akıcı dikey piksel kaydırma, ayarlanabilir momentum ve pürüzsüz bölüm geçişleri. Klasik sayfalı yatay okuma modu da eksiksiz korunur.
@@ -179,7 +182,7 @@ Tüm kitaplarınız, çizgi roman arşivleriniz, kapak önbelleğiniz, okuma ge�
 
 1. Güncel sürüm arşivini [`PaperNX-switch-v0.9.1.zip`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.1/PaperNX-switch-v0.9.1.zip) indirin.
 2. Arşivi Switch microSD kartınızın ana dizinine (`sdmc:/`) çıkartın.
-3. `.epub`, `.pdf` ve `.cbz` dosyalarınızı `sdmc:/switch/PaperNX/books/` dizinine yerleştirin.
+3. `.epub`, `.pdf`, `.cbz` ve `.cbr` dosyalarınızı `sdmc:/switch/PaperNX/books/` dizinine yerleştirin.
 4. Homebrew Menu üzerinden **PaperNX** uygulamasını başlatın.
 
 ### Dokunmatik ve Kumanda Kısayolları
@@ -190,14 +193,14 @@ Tüm temel özellikler dokunmatik ekran üzerinden doğrudan yönetilebilir. Fiz
 |---|---|---|
 | **Hızlı Menü / İşlemler** | Sağ üstteki `+` butonuna dokunun | <kbd>+</kbd> (Plus) |
 | **Kitap Açma** | Kitap kartına veya gezgindeki satıra dokunun | <kbd>A</kbd> |
-| **Sayfa Çevirme (Sayfalı EPUB/PDF/CBZ)** | Sağ/sol %30 kenara dokunun veya kaydırın | <kbd>L</kbd> / <kbd>R</kbd> veya Yön Tuşları Sol / Sağ |
+| **Sayfa Çevirme (Sayfalı EPUB/PDF/CBZ/CBR)** | Sağ/sol %30 kenara dokunun veya kaydırın | <kbd>L</kbd> / <kbd>R</kbd> veya Yön Tuşları Sol / Sağ |
 | **Sürekli EPUB Kaydırma** | Dikey olarak yukarı / aşağı sürükleyin | Sağ Çubuk veya Yön Tuşları Yukarı / Aşağı |
 | **Araç Çubuğunu Göster/Gizle** | Ekranın ortasına dokunun | <kbd>A</kbd> |
 | **Okuma Ayarları (Aa)** | `+` → *Okuma ayarları* | <kbd>X</kbd> |
 | **Uygulama Görünümü ve Dil** | `+` → *Uygulama görünümü* | <kbd>Y</kbd> |
 | **İçindekiler** | `+` → *İçindekiler* | <kbd>-</kbd> (Minus) |
 | **Yer İmleri** | `+` → *Yer imleri* | <kbd>ZL</kbd> / Sol Omuz |
-| **PDF/CBZ Yakınlaştırma ve Kaydırma** | Çubukta −/+, büyütülmüş sayfayı sürükleyin | <kbd>ZL</kbd> / <kbd>ZR</kbd>; Sol Çubuk |
+| **PDF/CBZ/CBR Yakınlaştırma ve Kaydırma** | Çubukta −/+, büyütülmüş sayfayı sürükleyin | <kbd>ZL</kbd> / <kbd>ZR</kbd>; Sol Çubuk |
 | **Favorilere Ekleme** | Kitap kartındaki yıldıza dokunun | Sol Çubuk Tıklama (<kbd>L3</kbd>) |
 | **Kitaplığa Dönüş** | `+` → *Kitaplığa dön* | <kbd>B</kbd> |
 | **Uygulamadan Çıkış** | `+` → *PaperNX’ten çık* | <kbd>Home</kbd> / <kbd>B</kbd> (ana ekranda) |

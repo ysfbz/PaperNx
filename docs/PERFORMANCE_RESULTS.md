@@ -32,3 +32,7 @@ Current engineering improvements:
 - Background metadata extraction for cached covers without UI thread blocking (bounded to 2 updates per frame).
 
 Note: Desktop SDL software renderer timings measure CPU event-to-present return and do not include physical Switch touchscreen scanning, physical display scanout, or micro-SD latency. Physical hardware latency and feel remain **UNVERIFIED** until on-device acceptance testing.
+
+## v0.9.1 comic and page-curl performance evidence
+
+The current v0.9.1 source adds RAR4/RAR5/solid archive reading, texture reuse for comic zoom/pan, page curl snapshots and background page-preview generation. **No comparable p50/p95/worst CBZ or CBR decode/open times, interactive curl frame-time distribution, or physical-Switch RAM/FPS measurements have been published in this file.** Accordingly these metrics remain **UNVERIFIED**, not zero-latency or an inferred performance improvement. The historic figures above refer to an earlier desktop software-renderer baseline; do not treat them as measurements of the v0.9.1 release. See [release verification](RELEASE_REPORT.md), [physical acceptance](DEVICE_TEST_PLAN.md) and [known limitations](KNOWN_ISSUES.md).

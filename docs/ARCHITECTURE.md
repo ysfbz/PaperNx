@@ -5,7 +5,7 @@ Bu doküman mimari tasarım kararlarını ve sistem bileşenlerini içerir. Gün
 PaperNX çevrimdışı, bellek tasarruflu bir C++17 uygulamasıdır:
 - `src/main.cpp`: SDL olay döngüsü, ekran durum makinesi, dokunmatik hareketler ve kumanda yönlendirme ayrıştırması.
 - `src/core.cpp`: Dosya tarama, meta veri ayrıştırma, doğal alfabetik/sayısal sıralama (`compareNatural`) ve kalıcı veri depoları.
-- `src/mupdf_bridge.c`: C11 izolasyon sınırında MuPDF API entegrasyonu (`fz_try`/`fz_catch`), bellek havuzu denetimi, EPUB, PDF ve CBZ arşiv işleme.
+- `src/mupdf_bridge.c`: C11 izolasyon sınırında MuPDF API entegrasyonu (`fz_try`/`fz_catch`), bellek havuzu denetimi, EPUB/PDF belge entegrasyonu ve çizgi roman köprüsü.
 - `src/typography.cpp`: SDL_ttf metin dizimi ve font önbellekleme.
 - `src/page_cache.cpp`: LRU doku (texture) yaşam döngüsü ve bellek bütçesi yönetimi.
 
@@ -35,3 +35,7 @@ Tüm kalıcı depolar (`progress.txt`, `catalog.txt`, `reading-stats.txt`) FNV-1
 - **Desktop & Sanitizers:** CMake 3.16+, Ninja, Clang/GCC (ASan/UBSan destekli).
 - **Nintendo Switch:** devkitA64 / libnx, Cortex-A57 optimizasyonları, pozisyondan bağımsız yürütme (PIE) ve AArch64 ELF/NRO paketleme.
 
+
+### Kod kökeni / telif
+
+Yeni çizgi roman, sayfa kıvrılması ve önizleme modüllerinin bir bölümü, [rtk19/PaperNx](https://github.com/rtk19/PaperNx) forkundaki kaynaklarla birebir eşleşmektedir; bu bileşenler yalnızca fikir esinlenmesi olarak tanımlanmamalıdır. Orijinal PaperNX geliştiricisi, fork katkısı ve vendored unarr telif/lisans bildirimlerinin ayrıntıları [LICENSES.md](LICENSES.md) belgesindedir. Bu dokümantasyon açıklaması kaynak kodu veya yayımlanmış NRO'yu değiştirmez.

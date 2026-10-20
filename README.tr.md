@@ -5,7 +5,7 @@
 <h1 align="center">PaperNX — Türkçe Dokümantasyon</h1>
 
 <p align="center">
-  <strong>Nintendo Switch için yerel, çevrimdışı EPUB, PDF ve CBZ okuyucu.</strong>
+  <strong>Nintendo Switch için yerel, çevrimdışı EPUB, PDF, CBZ ve CBR okuyucu.</strong>
 </p>
 
 <p align="center">
@@ -21,7 +21,7 @@
 
 ## Genel Bakış
 
-**PaperNX**, Nintendo Switch için modern C++17, C11, SDL2 ve MuPDF kullanılarak sıfırdan geliştirilmiş, **yerel ve tamamen çevrimdışı bir doküman ve çizgi roman okuyucusudur**. Joy-Con kumandaları konsoldan ayrılmış durumdayken bile tek elle ya da masaüstü modunda rahatça kitap ve çizgi roman okuyabilmeniz amacıyla dokunmatik öncelikli olarak tasarlanmıştır.
+**PaperNX**, Nintendo Switch için modern C++17, C11, SDL2 ve MuPDF kullanılarak geliştirilmiş, **yerel ve tamamen çevrimdışı bir doküman ve çizgi roman okuyucusudur**. Joy-Con kumandaları konsoldan ayrılmış durumdayken bile tek elle ya da masaüstü modunda rahatça kitap ve çizgi roman okuyabilmeniz amacıyla dokunmatik öncelikli olarak tasarlanmıştır.
 
 Tüm kitaplarınız, çizgi roman arşivleriniz, kapak önbelleğiniz, okuma geçmişiniz ve okuma günlüğü istatistikleriniz yalnızca konsolunuzun microSD kartında saklanır. Kullanıcı hesabı, bulut bağlantısı, telemetri veya web tarayıcı motoru gerektirmez.
 
@@ -68,7 +68,7 @@ Tüm kitaplarınız, çizgi roman arşivleriniz, kapak önbelleğiniz, okuma ge�
 ```text
 sdmc:/switch/PaperNX/
 ├── PaperNX.nro          # Uygulama ikili dosyası (fontlar ve assetler gömülüdür)
-├── books/               # EPUB, PDF ve CBZ kitaplarınızı buraya koyun
+├── books/               # EPUB, PDF, CBZ ve CBR kitaplarınızı buraya koyun
 └── fonts/               # Font dosyaları ve OFL lisans metni
 ```
 
@@ -87,14 +87,14 @@ Yeni `PaperNX.nro` dosyasını `sdmc:/switch/PaperNX/PaperNX.nro` üzerine kopya
 |---|---|---|
 | **Hızlı Menü / İşlemler** | Sağ üstteki `+` butonuna dokunun | <kbd>+</kbd> (Plus) |
 | **Kitap Açma** | Kitap kartına veya gezgindeki satıra dokunun | <kbd>A</kbd> |
-| **Sayfa Çevirme (Sayfalı EPUB/PDF/CBZ)** | Sağ/sol %30 kenara dokunun veya kaydırın | <kbd>L</kbd> / <kbd>R</kbd> veya Yön Tuşları Sol / Sağ |
+| **Sayfa Çevirme (Sayfalı EPUB/PDF/CBZ/CBR)** | Sağ/sol %30 kenara dokunun veya kaydırın | <kbd>L</kbd> / <kbd>R</kbd> veya Yön Tuşları Sol / Sağ |
 | **Sürekli EPUB Kaydırma** | Dikey olarak yukarı / aşağı sürükleyin | Sağ Çubuk veya Yön Tuşları Yukarı / Aşağı |
 | **Araç Çubuğunu Göster/Gizle** | Ekranın ortasına dokunun | <kbd>A</kbd> |
 | **Okuma Ayarları (Aa)** | `+` → *Okuma ayarları* | <kbd>X</kbd> |
 | **Uygulama Görünümü ve Dil** | `+` → *Uygulama görünümü* | <kbd>Y</kbd> |
 | **İçindekiler** | `+` → *İçindekiler* | <kbd>-</kbd> (Minus) |
 | **Yer İmleri** | `+` → *Yer imleri* | <kbd>ZL</kbd> / Sol Omuz |
-| **PDF/CBZ Yakınlaştırma ve Kaydırma** | Çubukta −/+, büyütülmüş sayfayı sürükleyin | <kbd>ZL</kbd> / <kbd>ZR</kbd>; Sol veya Sağ Çubuk |
+| **PDF/CBZ/CBR Yakınlaştırma ve Kaydırma** | Çubukta −/+, büyütülmüş sayfayı sürükleyin | <kbd>ZL</kbd> / <kbd>ZR</kbd>; Sol veya Sağ Çubuk |
 | **Favorilere Ekleme** | Kitap kartındaki yıldıza dokunun | Sol Çubuk Tıklama (<kbd>L3</kbd>) |
 | **Kitaplığa Dönüş** | `+` → *Kitaplığa dön* | <kbd>B</kbd> |
 | **Uygulamadan Çıkış** | `+` → *PaperNX’ten çık* | <kbd>Home</kbd> / <kbd>B</kbd> (ana ekranda) |
@@ -125,5 +125,5 @@ docker compose run --rm desktop bash scripts/verify-sanitizers.sh
 - Yusuf Buzrul tarafından yapay zekâ desteğiyle geliştirilmiştir.
 - GitHub: [@ysfbz](https://github.com/ysfbz) ([https://github.com/ysfbz](https://github.com/ysfbz))  
 - Depo: [https://github.com/ysfbz/PaperNx](https://github.com/ysfbz/PaperNx)
-- Lisans: [GNU AGPL-3.0](LICENSE)
+- Lisans: [GNU AGPL-3.0](LICENSE); kaynak kökeni ve üçüncü taraf bildirimleri: [docs/LICENSES.md](docs/LICENSES.md)
 

@@ -4,7 +4,7 @@ Not every limitation here is a defect. This document distinguishes implemented b
 
 ## P1 — Real Nintendo Switch hardware validation
 
-The published v0.9.1 NRO has **35/35 physical-device acceptance checks marked UNVERIFIED** in [DEVICE_TEST_PLAN.md](DEVICE_TEST_PLAN.md). Priority cases: Joy-Con-detached touch, both portrait modes and touch mapping, PDF/CBZ gestures, restart and sleep/resume, docked/handheld transitions, controller reconnect, SD card write resilience and Unicode glyph rendering. Passing native desktop tests and producing AArch64 NRO binaries do not substitute for real-device physical acceptance testing.
+The published v0.9.1 NRO has **38/38 physical-device acceptance checks marked UNVERIFIED** in [DEVICE_TEST_PLAN.md](DEVICE_TEST_PLAN.md). Priority cases: Joy-Con-detached touch, both portrait modes and touch mapping, PDF/CBZ/CBR gestures, restart and sleep/resume, docked/handheld transitions, controller reconnect, SD card write resilience and Unicode glyph rendering. Passing native desktop tests and producing AArch64 NRO binaries do not substitute for real-device physical acceptance testing.
 
 ## Known implementation constraints
 
@@ -31,3 +31,7 @@ See [Roadmap](PRODUCT_ROADMAP_2026.md) for future candidate milestones.
 ## Evidence
 
 [Verified Automated Tests](TEST_RESULTS.md) · [Current Release Report](RELEASE_REPORT.md) · [Hardware Acceptance Checklist](DEVICE_TEST_PLAN.md).
+
+## Verification and attribution notes
+
+The repository currently records 38 physical Switch acceptance checks as UNVERIFIED; that does not assert the application is defective. Rare archive-specific page-turn latency and memory pressure can only be characterized with repeatable on-device measurements; desktop tests and static code review establish neither a user-visible freeze nor its absence. For incorporated upstream-fork code and third-party obligations see [LICENSES.md](LICENSES.md).

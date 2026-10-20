@@ -26,7 +26,7 @@ visible through fallback groups. Embedded multi-author/subject values are stored
 as display strings.
 
 In v0.9.1, natural numeric sorting (`compareNatural`) is implemented across the
-catalog, correctly ordering titles, series, volume numbers, and CBZ page numbers
+catalog, correctly ordering titles, series, volume numbers, and comic (CBZ/CBR) page numbers
 (e.g., "Vol 2" precedes "Vol 10").
 
 Collections have stable IDs and names. Names compare with Turkish Unicode case
@@ -47,7 +47,7 @@ be reversed in Browse Library → Hidden Books. It never deletes the source.
 Permanent deletion requires a separate confirmation showing the filename and
 source path. Cancellation is the initial focused action. The backend refuses an
 unconfirmed request and validates the selection against a fresh scanner snapshot,
-current size, ID and modification time. It requires a regular EPUB, PDF, or CBZ
+current size, ID and modification time. It requires a regular EPUB, PDF, CBZ, or CBR
 file inside the configured library/browser root, rejects traversal, symlinks at
 every path component, directories and unsupported configuration files. Native
 `sdmc:/` prefixes use the shared component inspection helper, avoiding host-style

@@ -17,7 +17,7 @@ Security updates and bug fixes are provided for the following releases:
 - **No Network Connectivity:** PaperNX does not open TCP/UDP sockets, perform HTTP/HTTPS requests, or communicate with external servers.
 - **No Cloud Services or Accounts:** No personal identifiers, credentials, or telemetry data are collected or transmitted.
 - **MicroSD Scope:** Application state is stored under `sdmc:/switch/PaperNX/data/`. The built-in browser can open user-selected documents from other permitted directories on the SD card; PaperNX does not claim strict OS-level filesystem sandboxing.
-- **Memory-safety testing:** The v0.9.0 release-preparation report records AddressSanitizer and UndefinedBehaviorSanitizer test passes. Tests reduce risk but cannot certify that all malformed documents or device-specific execution paths are vulnerability-free.
+- **Memory-safety testing:** The v0.9.0 historical release-preparation report and the v0.9.1 repository test report record AddressSanitizer and UndefinedBehaviorSanitizer checks. Tests reduce risk but cannot certify that all malformed documents or device-specific execution paths are vulnerability-free.
 
 ---
 

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.9.1] - 2026-10-20
 
+### Documentation clarification (main branch, after binary re-release)
+- Corrected current NRO digest references and the 38-item physical Switch acceptance checklist; no device PASS claims were added.
+- Aligned comic formats, controls, roadmap and source provenance with the shipped CBR/page-curl implementation. The existing v0.9.1 tag and assets remain unchanged by this documentation-only commit.
+
 ### Added
 - **Full CBR & Enhanced CBZ Comic Book Engine:**
   - Built-in reader support for `.cbz` (ZIP) and `.cbr` (RAR4, RAR5, and solid archives via vendored `unarr` decoder).

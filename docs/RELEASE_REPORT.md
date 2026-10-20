@@ -42,8 +42,14 @@ Fresh test executions in local Docker containers yielded the following results:
 | Core Release Suite | PASS, 7/7 | `build-core-release` CTest test suite |
 | Switch AArch64 ELF, NRO, NACP, Icon, RomFS | PASS | `scripts/verify-switch.sh` (`PaperNX.elf`, `PaperNX.nro`) |
 | Minimal ZIP & Separate License ZIP | PASS | `scripts/verify_distribution.py` |
-| Physical Nintendo Switch (35 checks) | **UNVERIFIED** | [Device test plan](DEVICE_TEST_PLAN.md) |
+| Physical Nintendo Switch (38 checks) | **UNVERIFIED** | [Device test plan](DEVICE_TEST_PLAN.md) |
 
 The repository [Makefile](../Makefile) specifies NACP title `PaperNX`, author `Yusuf Buzrul`, version `0.9.1` and icon `assets/branding/PaperNX-icon-switch.jpg`. The verifier checks AArch64 ELF/NRO0 and embedded RomFS fonts (NotoSans Regular/SemiBold, NotoSerif and OFL notice). The Switch ZIP ships `switch/PaperNX/PaperNX.nro`, bundled fonts and an empty `books/` placeholder; the license notices are a **separate ZIP**. No user `data/` or `logs/` is installed, eliminating user data overwrite risk.
 
 **Physical acceptance:** Real Switch operation, touch/portrait, sleep/resume, controller reconnection and media failure remain **UNVERIFIED**. See [BUILD_SWITCH.md](BUILD_SWITCH.md), [TEST_RESULTS.md](TEST_RESULTS.md), and [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
+
+## Documentation-only reconciliation and source attribution
+
+The `main` documentation now consistently refers to the 38-item physical Switch checklist; all checks are still UNVERIFIED in the recorded evidence. The currently published executable retains SHA256 `f411daf2e02f5483ab49563295ea7832ca3e9b0455f433b7c8bfe6db909fced1`; the old `2e376f...` hash above is kept only as historical early-v0.9.1 provenance. The v0.9.1 binary/tag/ZIP/license assets are unaffected by later documentation commits.
+
+Several comic/archive and page-curl sources are **byte-identical** to files in [rtk19/PaperNx](https://github.com/rtk19/PaperNx), maintained by **Refael Bar (@rtk19)**. These constitute incorporated community code, not merely independently recreated ideas. Retain original PaperNX author credit, fork contributor attribution, AGPL-3.0 obligations, and the distinct vendored [unarr notices](LICENSES.md). See the [source provenance and licensing record](LICENSES.md). This correct wording is supplied for the GitHub Release description as well; a documentation commit alone does not edit that description.

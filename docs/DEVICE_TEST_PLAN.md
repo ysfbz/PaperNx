@@ -1,6 +1,6 @@
 # PaperNX v0.9.1 — Physical Switch acceptance checklist
 
-Target the **v0.9.1 NRO release binary** (`PaperNX.nro`, SHA256: `2e376f54500497d3fe8e06319af53238dd34c2d01a774df40c97747213e530b5`). Record Switch model, firmware, Homebrew Menu launch mode (Applet vs Title Override), installed NRO hash, language, and sample books. Every check below remains **UNVERIFIED** for v0.9.1 pending actual physical device execution. Automated desktop tests and cross-compilation passes do not constitute physical hardware pass evidence.
+Target the **v0.9.1 NRO release binary** (`PaperNX.nro`, SHA256: `f411daf2e02f5483ab49563295ea7832ca3e9b0455f433b7c8bfe6db909fced1`). Record Switch model, firmware, Homebrew Menu launch mode (Applet vs Title Override), installed NRO hash, language, and sample books. All **38** checks below remain **UNVERIFIED** in the repository's recorded device acceptance matrix; individually observed user trials are not substituted for documented test evidence. Automated desktop tests and cross-compilation passes do not constitute physical hardware pass evidence.
 
 | # | Check | Result |
 |---|---|---|
@@ -29,18 +29,22 @@ Target the **v0.9.1 NRO release binary** (`PaperNX.nro`, SHA256: `2e376f54500497
 | 23 | Confirm deletion of a deliberately disposable copy inside books root; test failure error | UNVERIFIED |
 | 24 | Stable fallback cover and aspect-fitted real artwork | UNVERIFIED |
 | 25 | Global/per-book preferences survive restart; reset inheritance | UNVERIFIED |
-| 26 | Restore progress/bookmarks; Page Flip returns exact logical location | UNVERIFIED |
+| 26 | Interactive page curl (commit/cancel/hold), restore progress/bookmarks, restart and correct logical reading position | UNVERIFIED |
 | 27 | Stats exclude idle/menu/sleep; goal persists; ETA absent until real evidence | UNVERIFIED |
 | 28 | Continuous EPUB vertical scroll and chapter boundaries | UNVERIFIED |
-| 29 | Large EPUB/PDF, image-heavy chapter, cold/warm covers and memory | UNVERIFIED |
+| 29 | Large EPUB/PDF/CBZ/CBR, image-heavy pages, rapid flip/zoom and cold/warm covers; observe frame pacing and memory | UNVERIFIED |
 | 30 | Clean exit, sleep/resume, disconnect/reconnect; no white flash/data loss | UNVERIFIED |
 | 31 | Clockwise portrait: correct rotation, all touch targets, menus and PDF/EPUB fit | UNVERIFIED |
 | 32 | Counterclockwise portrait: inverse touch alignment, pagination, continuous scroll | UNVERIFIED |
 | 33 | Orientation restart persistence and explicit return to landscape, docked resolution | UNVERIFIED |
 | 34 | All nine paper presets, background/text swatches, cancel/defaults, contrast warning | UNVERIFIED |
 | 35 | Off/Soft/Natural texture readability; images unaffected | UNVERIFIED |
-| 36 | CBZ Comic Reader: natural page ordering, original RGB rendering, thumbnail extraction, 16 MiB memory bounds | UNVERIFIED |
+| 36 | CBZ/CBR reader: real RAR4/RAR5/solid archives, natural page order, ComicInfo, large covers, zoom/theme and bounded memory | UNVERIFIED |
 | 37 | Controller Ergonomics: D-pad Left/Right direct page turns in portrait mode; right stick analog pan | UNVERIFIED |
 | 38 | Natural Numeric Sorting: Volumes 1, 2... 10 sort in true numeric order across library and series | UNVERIFIED |
 
-Never use a valuable original for deletion testing. First back up `books/` and `data/`; copy a disposable EPUB/PDF/CBZ into the allowed books root. Test cancel first, then explicit confirmation. Shelf deletion must leave book files intact. The public v0.9.1 Release exists, but **real-device acceptance has not been demonstrated**; do not describe it as hardware-validated until the matrix and any P0 failures have been resolved.
+Never use a valuable original for deletion testing. First back up `books/` and `data/`; copy a disposable EPUB/PDF/CBZ/CBR into the allowed books root. Test cancel first, then explicit confirmation. Shelf deletion must leave book files intact. The public v0.9.1 Release exists, but **real-device acceptance has not been demonstrated**; do not describe it as hardware-validated until the matrix and any P0 failures have been resolved.
+
+## Evidence for a physical PASS
+
+For each executed check, capture console model, firmware, Homebrew launch mode, SHA256 of the installed NRO, sample file characteristics, steps, observed result, date and any failure trace/video. Do not change an UNVERIFIED result solely on the basis of desktop tests, cross-compilation or an informal use report. This documentation-only update does not imply that the hardware matrix was executed.

@@ -45,7 +45,7 @@ switch/
       OFL.txt
 ```
 
-Extract the Switch ZIP to the microSD root (`sdmc:/`), put EPUB, PDF, and CBZ comic books in `sdmc:/switch/PaperNX/books/`, and open PaperNX from Homebrew Menu. On upgrade, back up `books/` and `data/` first. The distribution does not overwrite existing user databases or bookmarks. License/SDK notices ship separately in `PaperNX-licenses-v0.9.1.zip`.
+Extract the Switch ZIP to the microSD root (`sdmc:/`), put EPUB, PDF, CBZ and CBR comic books in `sdmc:/switch/PaperNX/books/`, and open PaperNX from Homebrew Menu. On upgrade, back up `books/` and `data/` first. The distribution does not overwrite existing user databases or bookmarks. License/SDK notices ship separately in `PaperNX-licenses-v0.9.1.zip`.
 
 ## Optional desktop regression runs
 
@@ -57,4 +57,4 @@ docker compose run --rm desktop bash scripts/verify-v04.sh native
 docker compose run --rm desktop bash scripts/verify-v04.sh sanitizers
 ```
 
-Desktop tests are not a substitute for [35 real-device checks](DEVICE_TEST_PLAN.md). See [release artifact hashes](RELEASE_REPORT.md).
+Desktop tests are not a substitute for [38 real-device checks](DEVICE_TEST_PLAN.md). See [release artifact hashes](RELEASE_REPORT.md).

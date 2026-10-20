@@ -23,6 +23,8 @@
 
 Fresh local automated verification confirms portable 7/7, native desktop 19/19 (including native CBZ/CBR rendering, page curl tests, series tests, and full UI workflow), and sanitizer (ASan/UBSan) 19/19 test suites passing, plus verified cross-compiled AArch64 NRO and distribution package metadata. See [TEST_RESULTS.md](TEST_RESULTS.md).
 
-**Physical Nintendo Switch acceptance remains UNVERIFIED for all 35 checks** in [DEVICE_TEST_PLAN.md](DEVICE_TEST_PLAN.md). Desktop simulation cannot establish real touchscreen latency, portrait touch mapping, controller reconnect, suspend/resume or microSD durability. The public Release is labelled a normal release, but the GitHub release flag does not imply hardware certification.
+**Physical Nintendo Switch acceptance remains UNVERIFIED for all 38 checks** in [DEVICE_TEST_PLAN.md](DEVICE_TEST_PLAN.md). Desktop simulation cannot establish real touchscreen latency, portrait touch mapping, controller reconnect, suspend/resume or microSD durability. The public Release is labelled a normal release, but the GitHub release flag does not imply hardware certification.
 
 See [KNOWN_ISSUES.md](KNOWN_ISSUES.md), [BUILD_SWITCH.md](BUILD_SWITCH.md), [RELEASE_REPORT.md](RELEASE_REPORT.md) and [PRODUCT_ROADMAP_2026.md](PRODUCT_ROADMAP_2026.md). Earlier v0.3/v0.4 branches and deleted reports are historical and not active release targets.
+
+**Documentation correction:** The physical matrix has 38 numbered scenarios, not 35. The v0.9.1 release artifacts and tagged source were not rebuilt or retagged by this correction. Incorporated community modules and associated licensing are recorded in [LICENSES.md](LICENSES.md).
