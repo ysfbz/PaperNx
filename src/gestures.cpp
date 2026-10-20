@@ -7,6 +7,12 @@
 #ifndef SDL_CONTROLLER_AXIS_LEFTY
 #define SDL_CONTROLLER_AXIS_LEFTY 1
 #endif
+#ifndef SDL_CONTROLLER_AXIS_RIGHTX
+#define SDL_CONTROLLER_AXIS_RIGHTX 2
+#endif
+#ifndef SDL_CONTROLLER_AXIS_RIGHTY
+#define SDL_CONTROLLER_AXIS_RIGHTY 3
+#endif
 
 namespace papernx {
 
@@ -87,42 +93,33 @@ ControllerNavigator::ControllerNavigator() {
     auto now = std::chrono::steady_clock::now();
     lastTickX_ = now - std::chrono::milliseconds(220);
     lastTickY_ = now - std::chrono::milliseconds(220);
+    lastTickRightX_ = lastTickX_;
+    lastTickRightY_ = lastTickY_;
 }
 
 bool ControllerNavigator::processAxis(int axis, int value, int &outDeltaX, int &outDeltaY) {
     outDeltaX = 0;
     outDeltaY = 0;
-    const int DEADZONE = 12000;
-    const int REPEAT_MS = 220;
-
-    auto now = std::chrono::steady_clock::now();
-
-    if (std::abs(value) <= DEADZONE) {
-        if (axis == SDL_CONTROLLER_AXIS_LEFTX) lastTickX_ = now - std::chrono::milliseconds(REPEAT_MS);
-        if (axis == SDL_CONTROLLER_AXIS_LEFTY) lastTickY_ = now - std::chrono::milliseconds(REPEAT_MS);
+    constexpr int deadzone = 12000;
+    constexpr int repeatMs = 220;
+    std::chrono::steady_clock::time_point *last = nullptr;
+    bool horizontal = false;
+    switch(axis) {
+        case SDL_CONTROLLER_AXIS_LEFTX: last=&lastTickX_; horizontal=true; break;
+        case SDL_CONTROLLER_AXIS_LEFTY: last=&lastTickY_; break;
+        case SDL_CONTROLLER_AXIS_RIGHTX: last=&lastTickRightX_; horizontal=true; break;
+        case SDL_CONTROLLER_AXIS_RIGHTY: last=&lastTickRightY_; break;
+        default: return false; // Ignore triggers and unsupported axes.
+    }
+    const auto now = std::chrono::steady_clock::now();
+    if(value >= -deadzone && value <= deadzone) {
+        *last = now - std::chrono::milliseconds(repeatMs);
         return false;
     }
-
-    if (axis == SDL_CONTROLLER_AXIS_LEFTX) {
-        if (std::abs(value) > DEADZONE) {
-            auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastTickX_).count();
-            if (diff >= REPEAT_MS) {
-                outDeltaX = (value > 0) ? 1 : -1;
-                lastTickX_ = now;
-                return true;
-            }
-        }
-    } else if (axis == SDL_CONTROLLER_AXIS_LEFTY) {
-        if (std::abs(value) > DEADZONE) {
-            auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastTickY_).count();
-            if (diff >= REPEAT_MS) {
-                outDeltaY = (value > 0) ? 1 : -1;
-                lastTickY_ = now;
-                return true;
-            }
-        }
-    }
-    return false;
+    if (now - *last < std::chrono::milliseconds(repeatMs)) return false;
+    (horizontal ? outDeltaX : outDeltaY) = value > 0 ? 1 : -1;
+    *last = now;
+    return true;
 }
 
 } // namespace papernx

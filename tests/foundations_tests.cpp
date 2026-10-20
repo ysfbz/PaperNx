@@ -9,6 +9,10 @@ int main() {
     for(int o=0;o<3;++o) {
         DisplayTransform t{1280,720,o};
         assert(t.logicalWidth()==(o?720:1280));
+        auto direction=t.vectorToLogical(1,0);
+        assert(direction == (o==0?std::pair<int,int>{1,0}:o==1?std::pair<int,int>{0,-1}:std::pair<int,int>{0,1}));
+        auto up=t.vectorToLogical(0,-1);
+        assert(up == (o==0?std::pair<int,int>{0,-1}:o==1?std::pair<int,int>{-1,0}:std::pair<int,int>{1,0}));
         for(auto p:{std::pair<float,float>{0,0},{200,350},{1280,720}}) {
             auto l=t.toLogical(p.first,p.second),r=t.toPhysical(l.first,l.second);
             assert(std::abs(r.first-p.first)<.01f && std::abs(r.second-p.second)<.01f);

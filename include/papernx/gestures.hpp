@@ -52,6 +52,8 @@ public:
 private:
     std::chrono::steady_clock::time_point lastTickX_;
     std::chrono::steady_clock::time_point lastTickY_;
+    std::chrono::steady_clock::time_point lastTickRightX_;
+    std::chrono::steady_clock::time_point lastTickRightY_;
 };
 
 } // namespace papernx

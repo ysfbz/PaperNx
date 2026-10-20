@@ -59,7 +59,7 @@ public:
     bool addToCollection(const std::string &book, const std::string &collection);
     bool removeFromCollection(const std::string &book, const std::string &collection);
     // Selection must be a fresh scanner Book. Rejects links, directories, root
-    // escapes, changed identity/size and all formats except EPUB/PDF.
+    // escapes, changed identity/size and formats not supported by the scanner.
     bool validateDeletion(const Book &, const fs::path &allowedRoot, std::string &error) const;
     bool deleteBookFile(const Book &, const fs::path &allowedRoot, bool confirmed, std::string &error);
 private:

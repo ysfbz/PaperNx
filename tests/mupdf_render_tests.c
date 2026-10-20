@@ -90,6 +90,28 @@ int main(int argc, char **argv) {
         printf("[PASS] Bounded embedded metadata and EPUB3 series refinements\n");
     }
 
+    // Native CBZ path: reading directly from ZIP, original RGB image data,
+    // bounded document allocation and clean rejection of truncated archives.
+    {
+        char err[256] = {0};
+        PxDocument *comic = px_document_open_limited(
+            "tests/fixtures/generated/two-pages.cbz", 320, 480, 18.0f,
+            "", err, sizeof(err), 16u * 1024u * 1024u);
+        assert(comic != NULL);
+        assert(!px_document_is_epub(comic));
+        assert(px_document_pages(comic) == 2);
+        PxImage image = {0};
+        assert(px_document_render(comic, 0, 320, 480, &image, err, sizeof(err)));
+        assert(image.rgb && image.width > 0 && image.height > 0);
+        px_image_free(&image);
+        px_document_close(comic);
+        PxDocument *corrupt = px_document_open_limited(
+            "tests/fixtures/generated/corrupt.cbz", 320, 480, 18.0f,
+            "", err, sizeof(err), 16u * 1024u * 1024u);
+        assert(corrupt == NULL);
+        printf("[PASS] CBZ ZIP document with two PNG pages; damaged ZIP rejected\n");
+    }
+
     // 2. Real EPUB Document Verification
     {
         char err[256] = {0};

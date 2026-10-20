@@ -2,6 +2,7 @@
 #include "papernx/app_settings.hpp"
 #include "papernx/gestures.hpp"
 #include <cassert>
+#include <algorithm>
 #include <cerrno>
 #include <chrono>
 #include <fstream>
@@ -33,6 +34,9 @@ int main() {
     assert(detectFormat("book.EPUB") == Format::Epub);
     assert(detectFormat("doc.pdf") == Format::Pdf);
     assert(detectFormat("document.PDF") == Format::Pdf);
+    assert(detectFormat("Comic.CBZ") == Format::Cbz);
+    assert(detectFormat("Comic.cbz") == Format::Cbz);
+    assert(detectFormat("Comic.cbr") == Format::Unsupported);
     assert(detectFormat("notes.txt") == Format::Unsupported);
     assert(detectFormat("image.png") == Format::Unsupported);
 
@@ -45,6 +49,50 @@ int main() {
     assert(turkishCaseFold("ÜZÜM") == "üzüm");
     assert(turkishCaseFold("ÇİÇEK") == "çiçek");
     assert(turkishCaseFold("PaperNX Reader") == "papernx reader");
+
+    // Numeric order is stable, case-folded and independent of integer width.
+    assert(compareNatural("Kitap 2", "Kitap 9") < 0);
+    assert(compareNatural("Kitap 9", "Kitap 10") < 0);
+    assert(compareNatural("Kitap 2", "Kitap 02") < 0);
+    assert(compareNatural("KİTAP 10", "kitap 10") == 0);
+    assert(compareNatural("İstanbul 2", "istanbul 11") < 0);
+    assert(compareNatural("Kitap 99999999999999999999999999999999999",
+                          "Kitap 100000000000000000000000000000000000") < 0);
+    assert(compareNatural("Kitap 000000000000000000000000000000000002", "Kitap 3") < 0);
+    assert(compareNatural("Kitap 2 part 3", "Kitap 2 part 11") < 0);
+    assert(compareNatural("Kitap 2", "Kitap 2a") < 0);
+    assert(compareNatural("Kitap 2a", "Kitap 2") > 0);
+    assert(compareNatural("Kitap 2", "Kitap 2") == 0);
+    {
+        std::vector<Book> volumes(3);
+        for (int i = 0; i < 3; ++i) {
+            volumes[i].id = std::to_string(i);
+            volumes[i].path = "/books/Volume" + std::to_string(i == 0 ? 10 : i == 1 ? 2 : 9) + ".epub";
+            volumes[i].title = "Book " + std::to_string(i == 0 ? 10 : i == 1 ? 2 : 9);
+            volumes[i].author = "Author " + std::to_string(i == 0 ? 10 : i == 1 ? 2 : 9);
+        }
+        for (auto mode : {Sort::Title, Sort::Filename, Sort::Author}) {
+            const auto ordered = search(volumes, "", mode);
+            assert(ordered[0].id == "1" && ordered[1].id == "2" && ordered[2].id == "0");
+        }
+    }
+
+    // Both analog sticks have independent repeat/deadzone state, and triggers do
+    // not accidentally navigate menus.
+    {
+        ControllerNavigator navigator;
+        int dx = 99, dy = 99;
+        assert(navigator.processAxis(2, 26000, dx, dy) && dx == 1 && dy == 0);
+        assert(!navigator.processAxis(2, 26000, dx, dy) && dx == 0 && dy == 0);
+        assert(!navigator.processAxis(2, 0, dx, dy));
+        assert(navigator.processAxis(2, -26000, dx, dy) && dx == -1);
+        assert(navigator.processAxis(3, -26000, dx, dy) && dy == -1);
+        assert(navigator.processAxis(0, 26000, dx, dy) && dx == 1);
+        assert(navigator.processAxis(1, 26000, dx, dy) && dy == 1);
+        assert(!navigator.processAxis(4, 32767, dx, dy) && dx == 0 && dy == 0);
+        assert(!navigator.processAxis(5, 32767, dx, dy) && dx == 0 && dy == 0);
+        assert(!navigator.processAxis(3, 12000, dx, dy));
+    }
 
     // 3. UTF-8 Safe Truncation
     std::string turkishText = "İstanbul'da Bir Çiçek";
@@ -65,6 +113,13 @@ int main() {
     }
     const auto scanned = scan(root);
     assert(scanned.size() == 2);
+    { // Scanner can discover CBZ archives without extracting any user files.
+        std::ofstream(root / "nested" / "Comic_10.CBZ") << "scanner-only fixture";
+        const auto withComics = scan(root);
+        assert(withComics.size() == 3);
+        assert(std::any_of(withComics.begin(), withComics.end(), [](const Book &b){return b.format == Format::Cbz;}));
+        fs::remove(root / "nested" / "Comic_10.CBZ");
+    }
     assert(scan(root / "nonexistent").empty());
 
     // Search with Turkish matching

@@ -11,10 +11,10 @@ namespace fs = std::filesystem;
 
 constexpr const char *APP_TITLE = "PaperNX";
 constexpr const char *APP_AUTHOR = "Yusuf Buzrul";
-constexpr const char *APP_VERSION = "0.9.0";
-constexpr const char *APP_VERSION_FULL = "v0.9.0";
+constexpr const char *APP_VERSION = "0.9.1";
+constexpr const char *APP_VERSION_FULL = "v0.9.1";
 
-enum class Format { Epub, Pdf, Unsupported };
+enum class Format { Epub, Pdf, Cbz, Unsupported };
 enum class Sort { Title, Author, Filename, Modified, LastRead };
 enum class Category { All, ContinueReading, Recent, Favorites, Unread, Completed };
 
@@ -86,6 +86,10 @@ std::vector<Book> scan(const fs::path &root, std::size_t maxBooks = 10000);
 std::string turkishCaseFold(const std::string &s);
 std::string utf8SafeTruncate(const std::string &s, std::size_t maxBytes);
 std::size_t utf8CodepointCount(const std::string &s);
+
+// Overflow-safe natural order for numbered titles, filenames and series volumes.
+// Negative/zero/positive result follows strcmp-style ordering after Turkish case folding.
+int compareNatural(const std::string &left, const std::string &right);
 
 // Categorization & Filtering
 std::vector<Book> filterByCategory(const std::vector<Book> &books, const class ProgressStore &store, Category category);

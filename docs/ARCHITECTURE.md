@@ -1,43 +1,35 @@
-﻿# PaperNX — Mimari notlar
+# PaperNX — Mimari notlar
 
-Bu doküman tarihsel mimari açıklamaları da içerir. Güncel v0.9.0 kapsamı, fiziksel doğrulama durumu ve derleme yönergeleri için [STATUS.md](STATUS.md), [KNOWN_ISSUES.md](KNOWN_ISSUES.md) ve [BUILD_SWITCH.md](BUILD_SWITCH.md) esas alınmalıdır.
+Bu doküman mimari tasarım kararlarını ve sistem bileşenlerini içerir. Güncel v0.9.1 sürümü, fiziksel doğrulama durumu ve derleme yönergeleri için [STATUS.md](STATUS.md), [KNOWN_ISSUES.md](KNOWN_ISSUES.md) ve [BUILD_SWITCH.md](BUILD_SWITCH.md) belgeleri esas alınmalıdır.
 
-PaperNX çevrimdışı C++17 uygulamasıdır. `main.cpp` SDL olaylarını ve ekran durumlarını yönetir;
-`core.cpp` kitap tarama/arama ve kayıtları; `gestures.cpp` dokunma ve çubuk tekrarlarını;
-`typography.cpp` SDL_ttf metinlerini; `page_cache.cpp` texture sahipliğini yönetir.
-`mupdf_bridge.c` C11 sınırı MuPDF fz_try/fz_catch temizleme yollarını içerir.
+PaperNX çevrimdışı, bellek tasarruflu bir C++17 uygulamasıdır:
+- `src/main.cpp`: SDL olay döngüsü, ekran durum makinesi, dokunmatik hareketler ve kumanda yönlendirme ayrıştırması.
+- `src/core.cpp`: Dosya tarama, meta veri ayrıştırma, doğal alfabetik/sayısal sıralama (`compareNatural`) ve kalıcı veri depoları.
+- `src/mupdf_bridge.c`: C11 izolasyon sınırında MuPDF API entegrasyonu (`fz_try`/`fz_catch`), bellek havuzu denetimi, EPUB, PDF ve CBZ arşiv işleme.
+- `src/typography.cpp`: SDL_ttf metin dizimi ve font önbellekleme.
+- `src/page_cache.cpp`: LRU doku (texture) yaşam döngüsü ve bellek bütçesi yönetimi.
 
-## Belge ve konum
+## Belge ve Konum Yönetimi
 
-Her açık belge kendi sınırlı allocator'ına ve MuPDF context'ine sahiptir. Thumbnail worker
-ayrı belge/context açar. SDL texture oluşturma ve silme ana thread üzerinde kalır.
-Kapatmada worker join edilir, belge/font/cache bırakılır, ardından renderer/window kapanır.
+Her açık belge kendi sınırlı allocator'ına ve izole MuPDF context'ine sahiptir.
+- **EPUB:** ZIP/XML ayrıştırma ile nav/cover meta verileri okunur. CSS/tema değişiminde sayfalama yeniden hesaplanır; mantıksal bölüm ve metin karakter sıra numarası saklanır (`PAPERNX-5`).
+- **PDF:** Viewport boyutuna göre ölçeklenen dinamik raster dokular kullanılır (maksimum 4096 px). Bütünleşik filtreler (sepya/ters çevirme) sayfa piksellerine uygulanır.
+- **CBZ (Çizgi Roman / Manga):** MuPDF ZIP arşiv API'si (`fz_open_archive`) üzerinden okunur. Arşiv içindeki resim dosyaları doğal sayısal sıralama (`compareNatural`) ile dizilir. Her sayfa orijinal RGB renk uzayında, metin/kağıt filtresi uygulanmadan ve 16 MiB'lık sıkı bellek güvenlik sınırıyla işlenir. İlk sayfa otomatik olarak kapak küçük resmi (thumbnail) olarak çıkarılır.
 
-EPUB3 nav ve cover-image/EPUB2 cover metadata ZIP/XML API ile okunur; NCX native
-outline fallback olarak kalır. URI'ler MuPDF ile çözülür. CSS değişiminde belge yeniden
-oluşturulur, TOC ve render cache geçersizleştirilir. Tüm EPUB yüzeyi tema arka planıyla temizlenir;
-PDF görüntüleri EPUB CSS/renk dönüşümüne sokulmaz.
+## Doğal Sayısal Sıralama (Natural Sort)
 
-MuPDF 1.23.11 EPUB bookmark'ları HTML nesnelerine bağlıdır; ham değerleri süreçler arasında
-saklamak güvenli değildir. Bridge bunun yerine sürüm işaretli bölüm/oran konumu saklar.
-Bu düzen değişiminde yaklaşık konumdur; CFI veya karakter çapası değildir. Eski ham
-bookmark'lar reddedilir; sayfa sayısı ve toplam ilerleme oranı fallback olarak kullanılır.
+Kitaplık taramasında ve CBZ sayfa diziliminde standart `strcmp` yerine taşma korumalı doğal sayısal sıralama (`compareNatural`) kullanılır. Bu sayede "Bölüm 2", "Bölüm 10"dan önce doğru sırayla listelenir; çok ciltli seriler ve sayısal adlandırılmış çizgi roman sayfaları alfabetik karmaşa olmadan sıralanır.
 
-## Kalıcılık
+## Kumanda ve Yönlendirme Ayrıştırması
 
-CHECKSUM başlığı FNV-1a payload bütünlüğünü doğrular; güvenlik/imza mekanizması değildir.
-PAPERNX-3, PAPERNX-2 alanlarına kitabın yol/başlık/yazar bilgisini ekler. V1/V2 okunur.
-Bozuk tekil satırlar atlanır; dosya checksum kontrolü zayıflatılmaz. `.bak`, `.bak.old`
-ve `.tmp` sırayla kurtarma adaylarıdır. Temp flush/fsync ve byte doğrulamasından sonra
-geçerli primary yedeklenir. Başarısız yazmada dirty korunur ve 3 saniye sonra denenir.
+Ekran saat yönünde veya tersinde dikey moda (Portrait) döndürüldüğünde, menüler ve kütüphane ızgarası görsel ekran yönünü takip eder. Ancak okuyucu modunda D-pad Sol/Sağ ve L/R omuz tuşları doğrudan mantıksal sayfa değiştirme işlemi yürütür; böylece dikey tutuşta sayfa geçişleri dikey kaydırmaya (pan) dönüşmez.
 
-Belge kimliği yol ve boyuta bağlıdır; yeniden adlandırma/taşıma otomatik eşleşmez.
-Tema, düzen ve birden fazla yer imi kayıtla döner; dosya taramasıyla bulunmayan ama
-kaydı geçerli olan dış klasör kitapları yeniden kütüphaneye alınır.
+## Kalıcılık ve Veri Güvenliği
 
-## Derleme
+Tüm kalıcı depolar (`progress.txt`, `catalog.txt`, `reading-stats.txt`) FNV-1a checksum korumalıdır. Dosya yazma işlemleri önce `.tmp` dosyasına yapılıp fsync ile diske yazılır, byte doğrulaması yapıldıktan sonra eski dosya `.bak` olarak yedeklenip atomik olarak yer değiştirilir.
 
-CMake taşınabilir core ve masaüstü hedeflerini; Makefile devkitA64/libnx NRO hedefini kurar.
-MuPDF 1.23.11 kaynak SHA256 değeri sabittir. SDL_ttf ve MuPDF ortak sistem HarfBuzz/FreeType
-kullanır; uyumsuz iki statik font engine kopyası bağlanmaz. Docker tarifleri, doğrulama
-betikleri ve PR testleri aynı kaynakları kullanır. Hardware matrisi ayrı tutulur.
+## Derleme Sistemi
+
+- **Desktop & Sanitizers:** CMake 3.16+, Ninja, Clang/GCC (ASan/UBSan destekli).
+- **Nintendo Switch:** devkitA64 / libnx, Cortex-A57 optimizasyonları, pozisyondan bağımsız yürütme (PIE) ve AArch64 ELF/NRO paketleme.
+

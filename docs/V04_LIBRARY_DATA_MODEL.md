@@ -1,4 +1,4 @@
-# PaperNX catalogue and reading statistics — v0.4-origin model incorporated in v0.9.0
+# PaperNX catalogue and reading statistics — updated for v0.9.1
 
 The catalog lives in `data/catalog.txt`; reading statistics live in
 `data/reading-stats.txt`. Neither file replaces or migrates `data/progress.txt`.
@@ -23,7 +23,11 @@ The cache fingerprint is source byte size plus modification timestamp. Opening a
 document refreshes embedded metadata. Explicit user values take precedence; a
 stale embedded cache is ignored. Unknown authors and uncategorized books remain
 visible through fallback groups. Embedded multi-author/subject values are stored
-as display strings; individually normalized multi-value filtering is deferred.
+as display strings.
+
+In v0.9.1, natural numeric sorting (`compareNatural`) is implemented across the
+catalog, correctly ordering titles, series, volume numbers, and CBZ page numbers
+(e.g., "Vol 2" precedes "Vol 10").
 
 Collections have stable IDs and names. Names compare with Turkish Unicode case
 folding to avoid duplicate shelves. Renaming retains memberships; removing a
@@ -33,8 +37,7 @@ can belong to up to 32 collections. Up to 256 collections can be created.
 Book identity retains the existing path-plus-size hash. Same-title books do not
 collide merely because their titles match. Moving or renaming files does not yet
 carry metadata to the new path automatically; content-addressed identity and
-moved-file reconciliation remain deferred. Series index and date-added fields
-are not yet separately indexed.
+moved-file reconciliation remain deferred.
 
 ## Removal and permanent deletion
 
@@ -44,10 +47,10 @@ be reversed in Browse Library → Hidden Books. It never deletes the source.
 Permanent deletion requires a separate confirmation showing the filename and
 source path. Cancellation is the initial focused action. The backend refuses an
 unconfirmed request and validates the selection against a fresh scanner snapshot,
-current size, ID and modification time. It requires a regular EPUB/PDF inside the
-configured library/browser root, rejects traversal, symlinks at every path
-component, directories and unsupported configuration files. Native `sdmc:/`
-prefixes use the shared component inspection helper, avoiding host-style
+current size, ID and modification time. It requires a regular EPUB, PDF, or CBZ
+file inside the configured library/browser root, rejects traversal, symlinks at
+every path component, directories and unsupported configuration files. Native
+`sdmc:/` prefixes use the shared component inspection helper, avoiding host-style
 `absolute()` prefix corruption. Filesystem errors are surfaced to the user.
 
 After deletion, the visible catalog entry is removed; progress and metadata remain

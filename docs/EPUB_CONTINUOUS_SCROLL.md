@@ -1,6 +1,6 @@
-# EPUB continuous scrolling — historical v0.3 development notes (feature included in v0.9.0)
+# EPUB continuous scrolling — historical v0.3 development notes (feature included in v0.9.1)
 
-Originally implemented on the historical `codex/epub-continuous-scroll` branch based on Reader v2. The statement that no merge or release had occurred was true **at that earlier checkpoint**. The continuous-scroll feature is now part of v0.9.0. Below, old build output paths and benchmark values are archival, not current installation instructions; see [BUILD_SWITCH.md](BUILD_SWITCH.md) and [RELEASE_REPORT.md](RELEASE_REPORT.md).
+Originally implemented on the historical `codex/epub-continuous-scroll` branch based on Reader v2. The continuous-scroll feature is part of v0.9.1. Below, old build output paths and benchmark values are archival, not current installation instructions; see [BUILD_SWITCH.md](BUILD_SWITCH.md) and [RELEASE_REPORT.md](RELEASE_REPORT.md).
 
 ## Touch controls
 

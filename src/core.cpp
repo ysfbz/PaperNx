@@ -195,6 +195,36 @@ std::string turkishCaseFold(const std::string &s) {
     return out;
 }
 
+// Compare entire digit runs without converting them to a fixed-width integer.
+// A shorter significant run is always smaller; identical numbers prefer fewer
+// leading zeros. This remains deterministic for arbitrarily long filenames.
+int compareNatural(const std::string &left, const std::string &right) {
+    const std::string a = turkishCaseFold(left), b = turkishCaseFold(right);
+    const auto digit = [](unsigned char c) { return c >= '0' && c <= '9'; };
+    std::size_t i = 0, j = 0;
+    while (i < a.size() && j < b.size()) {
+        if (digit(static_cast<unsigned char>(a[i])) && digit(static_cast<unsigned char>(b[j]))) {
+            const auto aStart = i, bStart = j;
+            while (i < a.size() && digit(static_cast<unsigned char>(a[i]))) ++i;
+            while (j < b.size() && digit(static_cast<unsigned char>(b[j]))) ++j;
+            auto aSig = aStart, bSig = bStart;
+            while (aSig < i && a[aSig] == '0') ++aSig;
+            while (bSig < j && b[bSig] == '0') ++bSig;
+            const auto aLen = i - aSig, bLen = j - bSig;
+            if (aLen != bLen) return aLen < bLen ? -1 : 1;
+            for (std::size_t k = 0; k < aLen; ++k) {
+                if (a[aSig + k] != b[bSig + k]) return a[aSig + k] < b[bSig + k] ? -1 : 1;
+            }
+            if (i - aStart != j - bStart) return i - aStart < j - bStart ? -1 : 1;
+            continue;
+        }
+        const auto ca = static_cast<unsigned char>(a[i++]);
+        const auto cb = static_cast<unsigned char>(b[j++]);
+        if (ca != cb) return ca < cb ? -1 : 1;
+    }
+    return i == a.size() && j == b.size() ? 0 : i == a.size() ? -1 : 1;
+}
+
 std::string utf8SafeTruncate(const std::string &s, std::size_t maxBytes) {
     if (s.size() <= maxBytes) return s;
     if (maxBytes == 0) return "";
@@ -220,6 +250,7 @@ Format detectFormat(const fs::path &path) {
     }
     if (ext == ".epub") return Format::Epub;
     if (ext == ".pdf") return Format::Pdf;
+    if (ext == ".cbz") return Format::Cbz;
     return Format::Unsupported;
 }
 
@@ -270,7 +301,8 @@ std::vector<Book> scan(const fs::path &root, std::size_t maxBooks) {
     }
 
     std::sort(books.begin(), books.end(), [](const Book &a, const Book &b) {
-        return a.title < b.title;
+        const int order = compareNatural(a.title, b.title);
+        return order ? order < 0 : a.id < b.id;
     });
     return books;
 }
@@ -331,16 +363,15 @@ std::vector<Book> search(const std::vector<Book> &books, const std::string &need
             return a.modified == b.modified ? a.id < b.id : a.modified > b.modified;
         }
         if (sort == Sort::Author) {
-            auto la = turkishCaseFold(a.author), lb = turkishCaseFold(b.author);
-            if (la != lb) return la < lb;
+            const int byAuthor = compareNatural(a.author, b.author);
+            if (byAuthor) return byAuthor < 0;
         }
         if (sort == Sort::Filename) {
-            auto la = turkishCaseFold(fs::path(a.path).filename().string());
-            auto lb = turkishCaseFold(fs::path(b.path).filename().string());
-            return la == lb ? a.id < b.id : la < lb;
+            const int byFile = compareNatural(fs::path(a.path).filename().string(), fs::path(b.path).filename().string());
+            return byFile ? byFile < 0 : a.id < b.id;
         }
-        auto l = turkishCaseFold(a.title), r = turkishCaseFold(b.title);
-        return l == r ? a.id < b.id : l < r;
+        const int byTitle = compareNatural(a.title, b.title);
+        return byTitle ? byTitle < 0 : a.id < b.id;
     });
 
     return result;

@@ -1,6 +1,6 @@
-# PaperNX v0.9.0 — Physical Switch acceptance checklist
+# PaperNX v0.9.1 — Physical Switch acceptance checklist
 
-Target the [published v0.9.0 NRO](https://github.com/ysfbz/PaperNx/releases/tag/v0.9.0) (GitHub-reported SHA256: `9020d67962b5dda01b7da2405a5d023631e47e3a4e3be96662e4a48ad292b9ef`). Record Switch model, firmware, Homebrew Menu launch mode, installed NRO hash, language and sample books. Every check below remains **UNVERIFIED** for v0.9.0 pending actual device execution. Earlier v0.3 videos and desktop simulations are not v0.9.0 hardware pass evidence.
+Target the **v0.9.1 NRO release binary** (`PaperNX.nro`, SHA256: `2e376f54500497d3fe8e06319af53238dd34c2d01a774df40c97747213e530b5`). Record Switch model, firmware, Homebrew Menu launch mode (Applet vs Title Override), installed NRO hash, language, and sample books. Every check below remains **UNVERIFIED** for v0.9.1 pending actual physical device execution. Automated desktop tests and cross-compilation passes do not constitute physical hardware pass evidence.
 
 | # | Check | Result |
 |---|---|---|
@@ -39,5 +39,8 @@ Target the [published v0.9.0 NRO](https://github.com/ysfbz/PaperNx/releases/tag/
 | 33 | Orientation restart persistence and explicit return to landscape, docked resolution | UNVERIFIED |
 | 34 | All nine paper presets, background/text swatches, cancel/defaults, contrast warning | UNVERIFIED |
 | 35 | Off/Soft/Natural texture readability; images unaffected | UNVERIFIED |
+| 36 | CBZ Comic Reader: natural page ordering, original RGB rendering, thumbnail extraction, 16 MiB memory bounds | UNVERIFIED |
+| 37 | Controller Ergonomics: D-pad Left/Right direct page turns in portrait mode; right stick analog pan | UNVERIFIED |
+| 38 | Natural Numeric Sorting: Volumes 1, 2... 10 sort in true numeric order across library and series | UNVERIFIED |
 
-Never use a valuable original for deletion testing. First back up `books/` and `data/`; copy a disposable EPUB/PDF into the allowed books root. Test cancel first, then explicit confirmation. Shelf deletion must leave book files intact. The public v0.9.0 Release exists, but **real-device acceptance has not been demonstrated**; do not describe it as hardware-validated until the matrix and any P0 failures have been resolved.
+Never use a valuable original for deletion testing. First back up `books/` and `data/`; copy a disposable EPUB/PDF/CBZ into the allowed books root. Test cancel first, then explicit confirmation. Shelf deletion must leave book files intact. The public v0.9.1 Release exists, but **real-device acceptance has not been demonstrated**; do not describe it as hardware-validated until the matrix and any P0 failures have been resolved.

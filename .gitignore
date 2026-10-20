@@ -13,6 +13,7 @@ __pycache__/
 *.sha256
 *.log
 *.ppm
+/tests/fixtures/generated/
 .DS_Store
 
 

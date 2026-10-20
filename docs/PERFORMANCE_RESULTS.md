@@ -1,6 +1,6 @@
-# PaperNX — Historical v0.4 desktop performance measurements
+# PaperNX — Historical desktop performance measurements
 
-**Not a v0.9.0 physical Switch benchmark.** These v0.4-era values are retained for engineering comparison. The original measurement artifact `verification/v04-ui-latency.json` and older v0.3 reports were removed from the tracked repository; the raw samples are no longer independently reviewable here.
+**Not a v0.9.1 physical Switch benchmark.** These baseline values are retained for engineering comparison. The original measurement artifact `verification/v04-ui-latency.json` and older v0.3 reports were removed from the tracked repository; the raw samples are no longer independently reviewable here.
 
 Reported 32-iteration Docker SDL software-renderer CPU event-to-present-return measurements:
 

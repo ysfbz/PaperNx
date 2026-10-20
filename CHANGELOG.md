@@ -5,6 +5,31 @@ All notable changes to **PaperNX** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.1] - 2026-10-20
+
+### Added
+- **CBZ Comic Book Engine:** Built-in reader support for comic book archives (`.cbz`) powered directly by MuPDF without introducing new runtime dependencies or binary bloat.
+  - Automatic comic page recognition and fast ZIP stream decoding.
+  - Pure RGB rendering without destructive paper/ink inversions or synthetic texture overlays, preserving comic artwork integrity.
+  - Bounded memory allocation (16 MiB archive safety limit) with fail-safe rejection of truncated or corrupt archives.
+  - Complete library discovery, cover thumbnail extraction from page 0, file browser detection, and catalog metadata handling for `.cbz` files.
+- **Overflow-Safe Natural Numeric Sorting:** Implemented `compareNatural` for titles, authors, series, and filenames. Multi-digit runs are compared deterministically (e.g., Volume 2 precedes Volume 10) regardless of number length, without integer overflow risk.
+- **Rotated Display Controller Ergonomics:**
+  - Independent repeat, deadzone, and state tracking for both Left and Right analog sticks.
+  - Trigger axes (ZL/ZR) excluded from inadvertent directional menu triggers.
+  - Analog stick panning for zoomed PDFs and comics dynamically matches the active display orientation (Landscape, Portrait CW, Portrait CCW).
+  - UI focus navigation on rotated screens follows visual screen directions.
+  - Direct digital D-pad and shoulder page turns remain intuitive and uninterrupted across orientations.
+- **Catalog & File Management Enhancements:** Added CBZ format badge and metadata display in book inspection sheet, guarded file deletion support for CBZ, and updated fallback cover designs with distinct CBZ styling.
+
+### Fixed
+- **Reader D-Pad Page Turning:** Fixed a controller routing regression where D-pad Right/Left in rotated portrait modes triggered vertical panning instead of advancing/reversing pages.
+- **Cover Artwork Format Display:** Fixed fallback cover renderer and catalog detail modals displaying "EPUB" for CBZ format documents.
+- **Test Suite Logging:** Corrected escaped newline string in native MuPDF integration test output.
+
+### Changed
+- **Version Alignment:** Standardized application version across `core.hpp`, `CMakeLists.txt`, `Makefile`, NACP metadata, packaging tools, and documentation to `0.9.1` (`v0.9.1`).
+
 ---
 
 ## [0.9.0] - 2026-10-19

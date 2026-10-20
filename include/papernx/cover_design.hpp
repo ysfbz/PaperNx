@@ -22,13 +22,13 @@ inline void fallbackCover(SDL_Renderer *r,Typography &type,SDL_Rect bounds,const
     SDL_RenderDrawLine(r,box.x+spine.w+2,box.y+4,box.x+spine.w+2,box.y+box.h-5);
     const int inset=std::max(10,box.w/11),width=box.w-inset*2;
     if(box.h>140) {
-        type.renderText(r,type.smallFont(),book.format==Format::Pdf?"PDF EDITION":"EPUB EDITION",box.x+inset,box.y+14,accent,width);
+        type.renderText(r,type.smallFont(),book.format==Format::Pdf?"PDF EDITION":book.format==Format::Cbz?"CBZ COMIC":"EPUB EDITION",box.x+inset,box.y+14,accent,width);
         SDL_RenderDrawLine(r,box.x+inset,box.y+42,box.x+box.w-inset,box.y+42);
         type.renderWrapped(r,type.buttonFont(),book.title,{box.x+inset,box.y+54,width,std::max(28,box.h-120)},ink);
         if(!book.author.empty())type.renderText(r,type.smallFont(),book.author,box.x+inset,box.y+box.h-54,ink,width);
         type.renderText(r,type.smallFont(),state==CoverState::Loading?"...":state==CoverState::Failed?"LOCAL EDITION":"PaperNX",box.x+inset,box.y+box.h-28,accent,width);
     } else {
-        type.renderText(r,type.smallFont(),book.format==Format::Pdf?"PDF":"EPUB",box.x+inset,box.y+box.h/2-8,ink,width);
+        type.renderText(r,type.smallFont(),book.format==Format::Pdf?"PDF":book.format==Format::Cbz?"CBZ":"EPUB",box.x+inset,box.y+box.h/2-8,ink,width);
     }
 }
 }
