@@ -46,6 +46,33 @@ int main() {
     assert(turkishCaseFold("ÇİÇEK") == "çiçek");
     assert(turkishCaseFold("PaperNX Reader") == "papernx reader");
 
+    // Numeric order is stable, case-folded and independent of integer width.
+    assert(compareNatural("Kitap 2", "Kitap 9") < 0);
+    assert(compareNatural("Kitap 9", "Kitap 10") < 0);
+    assert(compareNatural("Kitap 2", "Kitap 02") < 0);
+    assert(compareNatural("KİTAP 10", "kitap 10") == 0);
+    assert(compareNatural("İstanbul 2", "istanbul 11") < 0);
+    assert(compareNatural("Kitap 99999999999999999999999999999999999",
+                          "Kitap 100000000000000000000000000000000000") < 0);
+    assert(compareNatural("Kitap 000000000000000000000000000000000002", "Kitap 3") < 0);
+    assert(compareNatural("Kitap 2 part 3", "Kitap 2 part 11") < 0);
+    assert(compareNatural("Kitap 2", "Kitap 2a") < 0);
+    assert(compareNatural("Kitap 2a", "Kitap 2") > 0);
+    assert(compareNatural("Kitap 2", "Kitap 2") == 0);
+    {
+        std::vector<Book> volumes(3);
+        for (int i = 0; i < 3; ++i) {
+            volumes[i].id = std::to_string(i);
+            volumes[i].path = "/books/Volume" + std::to_string(i == 0 ? 10 : i == 1 ? 2 : 9) + ".epub";
+            volumes[i].title = "Book " + std::to_string(i == 0 ? 10 : i == 1 ? 2 : 9);
+            volumes[i].author = "Author " + std::to_string(i == 0 ? 10 : i == 1 ? 2 : 9);
+        }
+        for (auto mode : {Sort::Title, Sort::Filename, Sort::Author}) {
+            const auto ordered = search(volumes, "", mode);
+            assert(ordered[0].id == "1" && ordered[1].id == "2" && ordered[2].id == "0");
+        }
+    }
+
     // 3. UTF-8 Safe Truncation
     std::string turkishText = "İstanbul'da Bir Çiçek";
     // "İstanbul" is 9 bytes in UTF-8: İ (2 bytes) + s,t,a,n,b,u,l (7 bytes)
