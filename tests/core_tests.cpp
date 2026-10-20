@@ -2,6 +2,7 @@
 #include "papernx/app_settings.hpp"
 #include "papernx/gestures.hpp"
 #include <cassert>
+#include <algorithm>
 #include <cerrno>
 #include <chrono>
 #include <fstream>
