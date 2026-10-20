@@ -276,7 +276,7 @@ public:
             }
 
             if (controller_) {
-                for (int axis = SDL_CONTROLLER_AXIS_LEFTX; axis <= SDL_CONTROLLER_AXIS_LEFTY; ++axis) {
+                for (int axis = SDL_CONTROLLER_AXIS_LEFTX; axis <= SDL_CONTROLLER_AXIS_RIGHTY; ++axis) {
                     int dx = 0, dy = 0;
                     if (controllerNav_.processAxis(axis, SDL_GameControllerGetAxis(controller_, static_cast<SDL_GameControllerAxis>(axis)), dx, dy))
                         handleAnalog(dx, dy);
@@ -2135,10 +2135,19 @@ private:
         if(!settingsEditing_)queueStyleChange();else dirty_=true;
     }
 
+    std::pair<int,int> orientedControllerDirection(int dx,int dy) const {
+        return DisplayTransform{1280,720,appSettings_.get().displayOrientation}.vectorToLogical(dx,dy);
+    }
     void handleAnalog(int dx,int dy) {
+        const auto direction = orientedControllerDirection(dx,dy);
         if(screen_==ScreenState::Reader && !quickMenu_ && doc_ && !px_document_is_epub(doc_)) {
-            pdfPanX_+=dx*40; pdfPanY_+=dy*40; clampPdfPan(); dirty_=true;
-        } else handleDirectional(dx,dy);
+            pdfPanX_+=direction.first*40; pdfPanY_+=direction.second*40;
+            clampPdfPan(); dirty_=true;
+        } else handleDirectional(direction.first,direction.second);
+    }
+    void handleControllerDirectional(int dx,int dy) {
+        const auto direction=orientedControllerDirection(dx,dy);
+        handleDirectional(direction.first,direction.second);
     }
     int settingsRows() const { const int rows[]={6,4,8,6,5,8}; return rows[aaTab_]; }
     bool numericSetting() const { return (aaTab_==0 && (aaRow_==0 || aaRow_==2 || aaRow_==3)) ||
@@ -2324,15 +2333,19 @@ private:
             if (match(SDLK_x, SDL_CONTROLLER_BUTTON_X)) { journalUI_.openExport(); dirty_ = true; return; }
             if (match(SDLK_y, SDL_CONTROLLER_BUTTON_Y)) { journal_.interaction(SDL_GetTicks()); dirty_ = true; return; }
         }
-        // Page turns
+        // Keyboard follows logical axes; controller D-pad follows the rotated screen.
+        auto navigate = [&](int dx,int dy) {
+            if(pad) handleControllerDirectional(dx,dy);
+            else handleDirectional(dx,dy);
+        };
         if (match(SDLK_RIGHT, SDL_CONTROLLER_BUTTON_DPAD_RIGHT) || match(SDLK_PAGEDOWN, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER)) {
-            handleDirectional(1, 0);
+            navigate(1, 0);
         } else if (match(SDLK_LEFT, SDL_CONTROLLER_BUTTON_DPAD_LEFT) || match(SDLK_PAGEUP, SDL_CONTROLLER_BUTTON_LEFTSHOULDER)) {
-            handleDirectional(-1, 0);
+            navigate(-1, 0);
         } else if (match(SDLK_DOWN, SDL_CONTROLLER_BUTTON_DPAD_DOWN)) {
-            handleDirectional(0, 1);
+            navigate(0, 1);
         } else if (match(SDLK_UP, SDL_CONTROLLER_BUTTON_DPAD_UP)) {
-            handleDirectional(0, -1);
+            navigate(0, -1);
         }
 
         // Shortcuts
