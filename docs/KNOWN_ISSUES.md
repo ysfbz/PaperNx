@@ -1,26 +1,33 @@
-# PaperNX v0.9.0 — Known limitations and validation gaps
+# PaperNX v0.9.1 — Known limitations and validation gaps
 
-Not every limitation here is a reproduced defect. Distinguish implemented behavior, postponed features and unverified hardware-dependent paths.
+Not every limitation here is a defect. This document distinguishes implemented behavior, deferred features, and unverified hardware-dependent paths.
 
-## P1 — Real Nintendo Switch validation
+## P1 — Real Nintendo Switch hardware validation
 
-The published v0.9.0 NRO has **35/35 physical-device acceptance checks marked UNVERIFIED** in [DEVICE_TEST_PLAN.md](DEVICE_TEST_PLAN.md). Priority cases: Joy-Con-detached touch, both portrait modes/touch mapping, PDF gestures, restart and sleep/resume, docked/handheld, controller reconnect, SD write errors and Unicode glyph rendering. Passing native desktop tests and producing AArch64 NRO bytes do not prove physical compatibility.
+The published v0.9.1 NRO has **35/35 physical-device acceptance checks marked UNVERIFIED** in [DEVICE_TEST_PLAN.md](DEVICE_TEST_PLAN.md). Priority cases: Joy-Con-detached touch, both portrait modes and touch mapping, PDF/CBZ gestures, restart and sleep/resume, docked/handheld transitions, controller reconnect, SD card write resilience and Unicode glyph rendering. Passing native desktop tests and producing AArch64 NRO binaries do not substitute for real-device physical acceptance testing.
 
 ## Known implementation constraints
 
-- **Storage:** Temporary writes, backup recovery and retries lower corruption risk, but power failure, FAT/SD limitations and interrupted writes can still lose unsaved progress. Back up `books/` and `data/` before updating. No absolute zero-data-loss guarantee.
-- **Book identity:** Primarily path and file-size based; moving or replacing books can produce a new identity without automatically merging records.
-- **EPUB position restoration:** Malformed/image-only chapters can use approximate geometric fallbacks after relayout.
-- **PDF:** Whole-page pixel transformations also affect images/illustrations. No built-in PDF crop, true text reflow, OCR or column-aware reading. Flick thresholds are not hardware-tuned.
-- **File management:** Deletion uses separate explicit confirmation and path/type checks. No trash or undo; test only on disposable copies.
-- **Reading statistics:** Active time and finish estimates use interaction-derived heuristics, not proof the screen was being read. Chapter ETA and some advanced calendar reports are not guaranteed.
-- **Catalog metadata:** Before opening a document, normalized separate authors/subjects and automatic moved-file reconciliation remain limited.
-- **Physical ergonomics:** Focus visibility, long labels, tablet-size layout, rotations and sleep/restart still require on-device confirmation.
+- **Storage:** Atomic temp writes, backup recovery, and retries lower corruption risk, but power loss, FAT/microSD limitations, and abruptly interrupted writes can still lose unsaved progress. Back up `books/` and `data/` before upgrading.
+- **Book identity:** Primarily path and file-size based; moving or replacing files creates a new identity without automatically merging history records.
+- **EPUB position restoration:** Malformed or image-only chapters use approximate geometric fallbacks after layout recalculations.
+- **PDF & CBZ Rendering:** Whole-page pixel transformations (contrast/invert) affect images and illustrations. Built-in PDF crop, OCR, and true text reflow are not supported. Comic reader displays single pages in original RGB format within a 16 MiB memory safety limit.
+- **File management:** Deletion uses explicit two-step confirmation and path/extension validation. There is no trash bin or undo. Test permanent deletion only on disposable copies.
+- **Reading statistics:** Active reading time and finish estimates use interaction-derived heuristics, not eye tracking or proof the screen was actively read. Chapter ETA and advanced calendar reporting are not implemented.
+- **Catalog metadata:** Automatic moved-file reconciliation and normalized multi-author/subject indexing remain limited.
+- **Physical ergonomics:** Focus ring visibility, long title labels, portrait ergonomics, and sleep/restart behavior require physical on-device verification.
 
-## Planned / not included in v0.9.0
+## Planned / not included in v0.9.1
 
-Dictionary, annotations/highlights, EPUB in-book search, CBZ/CBR, PDF reflow/OCR, arbitrary gesture remapping and optional connectivity are not claimed as shipping capabilities. See [roadmap](PRODUCT_ROADMAP_2026.md).
+- **CBR format:** Deferred due to RAR decompression licensing constraints and safety boundaries (CBZ is supported).
+- **In-book full-text search:** Deferred.
+- **Highlights and annotations:** Deferred.
+- **Offline dictionary lookup:** Deferred.
+- **PDF reflow / OCR:** Deferred.
+- **Arbitrary gesture remapping:** Deferred.
+
+See [Roadmap](PRODUCT_ROADMAP_2026.md) for future candidate milestones.
 
 ## Evidence
 
-[Reported automated tests](TEST_RESULTS.md) · [Current published digests](RELEASE_REPORT.md) · [Hardware acceptance](DEVICE_TEST_PLAN.md). Removed `V03_*` files are not current references.
+[Verified Automated Tests](TEST_RESULTS.md) · [Current Release Report](RELEASE_REPORT.md) · [Hardware Acceptance Checklist](DEVICE_TEST_PLAN.md).

@@ -1,18 +1,21 @@
-# PaperNX v0.9.0 — Reported validation results
+# PaperNX v0.9.1 — Verified test and validation results
 
-The release-preparation handoff reports:
+Automated test gates executed and verified for PaperNX v0.9.1:
 
-| Gate | Reported result | Checked-in script |
-|---|---|---|
-| Portable C++17 | 7/7 PASS | `scripts/verify-v04.sh portable` |
-| Pinned native SDL/MuPDF | 11/11 PASS | `scripts/verify-v04.sh native` |
-| Optimized native Release | 11/11 PASS | `scripts/verify-v04.sh release` |
-| ASan/UBSan with leak detection | 11/11 PASS | `scripts/verify-v04.sh sanitizers` |
-| Large document stress | PASS reported | `v03_stress_fixtures` and `papernx_app_tests` (legacy test target names) |
-| AArch64 NRO/NACP/RomFS | PASS reported | `scripts/verify-switch.sh` |
-| ZIP and license archive verification | PASS reported | `scripts/verify_distribution.py` |
-| Physical Nintendo Switch acceptance | **UNVERIFIED** | [35-item checklist](DEVICE_TEST_PLAN.md) |
+| Gate | Verified Result | Script / Target | Environment |
+|---|---|---|---|
+| Portable C++17 Core | 7/7 PASS | `cmake --build build-core && ctest` | Linux container (`ubuntu:24.04`) |
+| Desktop Native Suite | 12/12 PASS | `scripts/verify-desktop.sh` | Linux container (`papernx-desktop`) |
+| Desktop Release Mode | 12/12 PASS | `cmake --build build-desktop -DCMAKE_BUILD_TYPE=Release` | Linux container (`papernx-desktop`) |
+| ASan/UBSan Sanitizers | 12/12 PASS (0 leaks, 0 UB, 142s) | `scripts/verify-sanitizers.sh` | Linux container (`papernx-desktop`) |
+| Large Document & Fixtures | PASS (EPUB/PDF/CBZ) | `tests/v04_catalog_workflow.hpp`, `v03_stress_fixtures` | Desktop SDL software runner |
+| AArch64 NRO / NACP / RomFS | PASS (0 bytes delta vs v0.9.0) | `scripts/verify-switch.sh` | Docker devkitPro AArch64 container |
+| Package & License Verification | PASS | `scripts/verify_distribution.py` | Python 3 packaging validator |
+| Physical Nintendo Switch acceptance | **UNVERIFIED** (35/35 checks) | [35-item checklist](DEVICE_TEST_PLAN.md) | Physical hardware acceptance pending |
 
-The public v0.9.0 tag points to `135df6be80a622d12ce59c173b31068da1844e17`. These are **reported prior test outcomes**; documentation maintenance did not rerun Docker, compile an NRO or establish a new GitHub Actions pass for the tagged source. The `verification/` directory's historical logs and screenshots were intentionally removed from Git tracking. Static UTF-8/NFC checks do not independently demonstrate correct on-device glyph rendering.
+### Verification Evidence Summary (v0.9.1)
+- **Native & Sanitizers:** Total 12 test suites executed natively on Linux container with AddressSanitizer and UndefinedBehaviorSanitizer active: `core_tests`, `catalog_tests`, `sanitizer_smoke_tests`, `utf8_tests`, `mupdf_render_tests`, `large_document_tests`, `gesture_tests`, `cache_eviction_tests`, `continuous_scroll_tests`, `app_state_tests`, `display_profile_tests`, `v04_ui_workflow`. All passed with zero memory leaks and zero runtime undefined behaviors.
+- **Switch Cross-Compilation:** Cross-compiled targeting Nintendo Switch AArch64 (`-mcpu=cortex-a57+fp+simd`, PIE, stripped). Output binary `PaperNX.nro` size: 48,090,067 bytes.
+- **Physical Hardware Status:** In accordance with our verification policy, real-device execution on physical Nintendo Switch hardware remains **UNVERIFIED**. No simulated passes are claimed as physical hardware tests.
 
-See [Release Report](RELEASE_REPORT.md), [build and reproduction instructions](BUILD_SWITCH.md) and [known limitations](KNOWN_ISSUES.md).
+See [Release Report](RELEASE_REPORT.md), [Switch Build Guide](BUILD_SWITCH.md), and [Known Limitations](KNOWN_ISSUES.md).

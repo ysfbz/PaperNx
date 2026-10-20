@@ -109,7 +109,7 @@ int main(int argc, char **argv) {
             "tests/fixtures/generated/corrupt.cbz", 320, 480, 18.0f,
             "", err, sizeof(err), 16u * 1024u * 1024u);
         assert(corrupt == NULL);
-        printf("[PASS] CBZ ZIP document with two PNG pages; damaged ZIP rejected\\n");
+        printf("[PASS] CBZ ZIP document with two PNG pages; damaged ZIP rejected\n");
     }
 
     // 2. Real EPUB Document Verification

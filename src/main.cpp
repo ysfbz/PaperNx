@@ -2339,15 +2339,18 @@ private:
             if (match(SDLK_x, SDL_CONTROLLER_BUTTON_X)) { journalUI_.openExport(); dirty_ = true; return; }
             if (match(SDLK_y, SDL_CONTROLLER_BUTTON_Y)) { journal_.interaction(SDL_GetTicks()); dirty_ = true; return; }
         }
-        // Keyboard follows logical axes; controller D-pad follows the rotated screen.
+        // Page turns and navigation: in reader, D-pad/shoulders turn pages and scroll directly.
+        // Outside reader (menus/library), controller D-pad follows the rotated screen orientation.
         auto navigate = [&](int dx,int dy) {
-            if(pad) handleControllerDirectional(dx,dy);
+            if(pad && (screen_ != ScreenState::Reader || quickMenu_)) handleControllerDirectional(dx,dy);
             else handleDirectional(dx,dy);
         };
         if (match(SDLK_RIGHT, SDL_CONTROLLER_BUTTON_DPAD_RIGHT) || match(SDLK_PAGEDOWN, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER)) {
-            navigate(1, 0);
+            if (pad && key == SDL_CONTROLLER_BUTTON_RIGHTSHOULDER) handleDirectional(1, 0);
+            else navigate(1, 0);
         } else if (match(SDLK_LEFT, SDL_CONTROLLER_BUTTON_DPAD_LEFT) || match(SDLK_PAGEUP, SDL_CONTROLLER_BUTTON_LEFTSHOULDER)) {
-            navigate(-1, 0);
+            if (pad && key == SDL_CONTROLLER_BUTTON_LEFTSHOULDER) handleDirectional(-1, 0);
+            else navigate(-1, 0);
         } else if (match(SDLK_DOWN, SDL_CONTROLLER_BUTTON_DPAD_DOWN)) {
             navigate(0, 1);
         } else if (match(SDLK_UP, SDL_CONTROLLER_BUTTON_DPAD_UP)) {

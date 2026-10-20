@@ -28,13 +28,13 @@ Work originating in v0.4 (shared reader chrome, settings/focus, PDF/EPUB gesture
 | Moon+: page preferences / auto-scroll | Page defaults existing; auto-scroll DEFERRED | Configurable speed, pause on modal/touch/suspend, stable continuous anchors, bounded frame work |
 | BOOX: OCR | DEFERRED | Offline engine/language data licensing, CPU/RAM/storage/latency benchmark on real Switch, cancellation and results quality |
 | BOOX: column-aware PDF navigation | DEFERRED | Bounded geometric analysis/manual columns, no false text reflow claim, portrait/history consistency |
-| BOOX: CBZ manga/spreads/direction | DEFERRED | ZIP traversal/bomb limits, bounded decoded dimensions, image order, corrupt archive tests, direction preference |
+| BOOX: CBZ manga/spreads/direction | Basic single-page CBZ implemented in v0.9.1; spreads DEFERRED | MuPDF ZIP decoding, natural numeric page sorting, 16 MiB image limits, original RGB rendering, corrupt archive handling; two-page spread mode and RTL direction preference DEFERRED |
 | BOOX: CBR | DEFERRED | RAR decoder licensing/maintenance and same bounded archive safety gates; not advertised as supported |
 | Apple Books: goals/calendar/completion timeline | Basic daily goal/date model; richer reports DEFERRED | Real active minutes, local date handling, timezone changes, restart recovery; no invented streaks/history |
 | Apple Books: annual statistics | DEFERRED | Real retained dates/sessions, clear corrections/export; avoid unnecessary reader clutter |
-| Calibre: metadata tags/series compatibility/export | Text overlays implemented; interchange DEFERRED | Versioned bounded schema, Unicode roundtrip, import preview/backup and conflict resolution |
+| Calibre: metadata tags/series compatibility/export | Text overlays and natural numeric sorting implemented; interchange DEFERRED | Versioned bounded schema, natural numeric sorting for titles/series/volumes, Unicode roundtrip, import preview/backup |
 | Calibre: OPDS/wireless | DEFERRED | Optional explicit opt-in; bounded requests, transport security, no mandatory server/account; SD remains usable offline |
 
 Performance policy: renderer-thread SDL texture work only; MuPDF ownership explicit; bounded page/cover queues, 32 MiB/512-entry cover disk cache; never rasterize a complete book. Dictionary/OCR/AI/TTS datasets are separate license, CPU, RAM and storage gates. Generative inference is not assumed feasible on Switch. Benchmark p50/p95/worst on the target hardware before promotion.
 
-Safety policy: preserve books and progress; metadata remains a sidecar. Keep migration backups. Recoverable flushed replacement reduces interruption risk but is not a guarantee of FAT power-loss durability. No telemetry, cloud login, browser engine or mandatory network dependency. v0.9.0 is publicly available, but any claim of hardware-validated stability still requires physical acceptance.
+Safety policy: preserve books and progress; metadata remains a sidecar. Keep migration backups. Recoverable flushed replacement reduces interruption risk but is not a guarantee of FAT power-loss durability. No telemetry, cloud login, browser engine or mandatory network dependency. v0.9.1 is publicly available, but any claim of hardware-validated stability still requires physical acceptance.

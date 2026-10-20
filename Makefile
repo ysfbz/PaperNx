@@ -57,7 +57,7 @@ ICON := assets/branding/PaperNX-icon-switch.jpg
 
 APP_TITLE	:=	PaperNX
 APP_AUTHOR	:=	Yusuf Buzrul
-APP_VERSION	:=	0.9.0
+APP_VERSION	:=	0.9.1
 
 #---------------------------------------------------------------------------------
 # options for code generation

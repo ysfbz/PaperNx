@@ -5,12 +5,12 @@
 <h1 align="center">PaperNX</h1>
 
 <p align="center">
-  <strong>Native, offline EPUB and PDF reader for the Nintendo Switch.</strong>
+  <strong>Native, offline EPUB, PDF, and CBZ reader for the Nintendo Switch.</strong>
 </p>
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-AGPL_3.0-blue.svg" alt="AGPL-3.0 License"></a>
-  <a href="https://github.com/ysfbz/PaperNx/releases/tag/v0.9.0"><img src="https://img.shields.io/badge/Release-v0.9.0-brightgreen.svg" alt="Release v0.9.0"></a>
+  <a href="https://github.com/ysfbz/PaperNx/releases/tag/v0.9.1"><img src="https://img.shields.io/badge/Release-v0.9.1-brightgreen.svg" alt="Release v0.9.1"></a>
   <img src="https://img.shields.io/badge/Platform-Nintendo_Switch-e60012.svg" alt="Platform Nintendo Switch">
   <img src="https://img.shields.io/badge/Language-C%2B%2B17%20%2F%20C11-00599C.svg" alt="Language C++17 / C11">
   <img src="https://img.shields.io/badge/GUI-SDL2-black.svg" alt="GUI SDL2">
@@ -21,9 +21,9 @@
 
 ## Overview
 
-**PaperNX** is a native, lightweight, and fully offline document reader built specifically for the Nintendo Switch using modern C++17, C11, SDL2, and MuPDF. Designed from the ground up for comfortable handheld reading with Joy-Con controllers detached, PaperNX delivers a fluid touchscreen-first reading experience.
+**PaperNX** is a native, lightweight, and fully offline document and comic reader built specifically for the Nintendo Switch using modern C++17, C11, SDL2, and MuPDF. Designed from the ground up for comfortable handheld reading with Joy-Con controllers detached, PaperNX delivers a fluid touchscreen-first reading experience.
 
-All books, cover art caches, reading progress, and personal reading journal statistics stay strictly on your microSD card. No user account, no cloud telemetry, and no browser engines are required.
+All books, comic archives, cover art caches, reading progress, and personal reading journal statistics stay strictly on your microSD card. No user account, no cloud telemetry, and no browser engines are required.
 
 > [!NOTE]
 > **Default Language:** PaperNX starts in **English** by default. Full **Turkish** localization is built-in and can be selected at any time via **Settings → Application → Language** (`+` button or <kbd>Y</kbd>). Your choice is saved and persists across app restarts.
@@ -33,8 +33,11 @@ All books, cover art caches, reading progress, and personal reading journal stat
 ## Key Features
 
 - **Touchscreen-First Ergonomics:** Every navigation and reading action has a direct, responsive touch target (56px minimum touch targets with visual feedback). Joy-Con and Pro Controller buttons remain supported as optional shortcuts.
+- **CBZ Comic Book Support:** Built-in reader engine for `.cbz` comic book archives powered directly by MuPDF without adding bloat or external dependencies. Renders high-fidelity original RGB imagery without destructive paper/ink recoloring or synthetic textures.
 - **Continuous Vertical EPUB Scrolling:** Smooth pixel-by-pixel vertical scrolling with momentum, sensitivity adjustments, and seamless chapter transitions with logical anchor tracking. Traditional paginated horizontal reading mode is also fully supported.
 - **Robust PDF Engine:** Powered by MuPDF 1.23.11 with fit-to-width, fit-to-page, touch drag-to-pan, zoom, and non-destructive document color filters (Original, Dark, Sepia, Invert).
+- **Overflow-Safe Natural Sorting:** Deterministic numeric ordering for book titles, volumes, authors, and filenames (e.g., Volume 2 before Volume 10) regardless of number length.
+- **Display Orientation & Controller Ergonomics:** Left and right analog sticks have independent deadzones and repeat rates. Trigger axes (ZL/ZR) are guarded against menu navigation misfires, while analog panning dynamically rotates to match portrait screen orientations.
 - **Unified Paper Appearance:** Choose from nine natural paper color presets (e.g., Pure White, Warm Book, Classic Sepia, Cream, Charcoal, Midnight Dark). The library, navigation chrome, menus, and EPUB viewer share a coordinated palette.
 - **Bilingual UI:** Native English and Turkish interface translations. Book titles, table of contents, and document contents remain in their authentic original language.
 - **Persistent Bounded Cover Cache:** 150×210 RGB24 thumbnail cache bounded to 32 MiB / 512 entries with file stat validation, CRC integrity checks, automatic recovery, and immediate vector placeholder fallbacks.
@@ -47,15 +50,15 @@ All books, cover art caches, reading progress, and personal reading journal stat
 
 ### Clean Install
 
-1. Download the release archive [`PaperNX-switch-v0.9.0.zip`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.0/PaperNX-switch-v0.9.0.zip).
+1. Download the release archive [`PaperNX-switch-v0.9.1.zip`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.1/PaperNX-switch-v0.9.1.zip).
 2. Extract the archive directly to the root of your Switch microSD card (`sdmc:/`).
-3. Place your `.epub` and `.pdf` files into `sdmc:/switch/PaperNX/books/` (or use the built-in file browser to access any directory).
+3. Place your `.epub`, `.pdf`, and `.cbz` files into `sdmc:/switch/PaperNX/books/` (or use the built-in file browser to access any directory).
 4. Launch **PaperNX** from the Homebrew Menu.
 
 ```text
 sdmc:/switch/PaperNX/
 ├── PaperNX.nro          # Application binary with embedded fonts & assets
-├── books/               # Place your EPUB and PDF books here
+├── books/               # Place your EPUB, PDF, and CBZ files here
 └── fonts/               # Bundled fonts and OFL notice (also embedded in the NRO)
 ```
 
@@ -109,10 +112,10 @@ cd PaperNx
 docker compose run --rm switch bash scripts/verify-switch.sh
 ```
 
-The resulting artifacts are written to `dist/v0.9.0/`:
+The resulting artifacts are written to `dist/v0.9.1/`:
 - `PaperNX.nro`: Nintendo Switch executable with embedded RomFS assets
-- `PaperNX-switch-v0.9.0.zip`: Clean microSD distribution package
-- `PaperNX-licenses-v0.9.0.zip`: Open-source license documentation
+- `PaperNX-switch-v0.9.1.zip`: Clean microSD distribution package
+- `PaperNX-licenses-v0.9.1.zip`: Open-source license documentation
 
 ### Build & Test on Desktop (Linux / macOS / WSL)
 
@@ -130,7 +133,7 @@ docker compose run --rm desktop bash scripts/verify-v04.sh sanitizers
 
 PaperNX is free software developed by **Yusuf Buzrul with AI assistance** and licensed under the **[GNU Affero General Public License v3.0 (AGPL-3.0)](LICENSE)**.
 
-This software includes third-party libraries and fonts licensed under permissive and copyleft open-source terms (MuPDF, libnx, SDL2, SDL2_ttf, FreeType, HarfBuzz, libjpeg-turbo, libpng, zlib, and Noto fonts). Third-party license notices are archived in [`PaperNX-licenses-v0.9.0.zip`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.0/PaperNX-licenses-v0.9.0.zip) and under `third-party-licenses/`.
+This software includes third-party libraries and fonts licensed under permissive and copyleft open-source terms (MuPDF, libnx, SDL2, SDL2_ttf, FreeType, HarfBuzz, libjpeg-turbo, libpng, zlib, and Noto fonts). Third-party license notices are archived in [`PaperNX-licenses-v0.9.1.zip`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.1/PaperNX-licenses-v0.9.1.zip) and under `third-party-licenses/`.
 
 ---
 
@@ -141,9 +144,9 @@ This software includes third-party libraries and fonts licensed under permissive
 
 ### Genel Bakış
 
-**PaperNX**, Nintendo Switch için modern C++17, C11, SDL2 ve MuPDF kullanılarak geliştirilmiş, **yerel ve tamamen çevrimdışı bir EPUB ve PDF okuyucudur**. Joy-Con kumandaları konsoldan ayrılmış durumdayken rahatça kitap okuyabilmeniz amacıyla dokunmatik odaklı olarak tasarlanmıştır.
+**PaperNX**, Nintendo Switch için modern C++17, C11, SDL2 ve MuPDF kullanılarak geliştirilmiş, **yerel ve tamamen çevrimdışı bir EPUB, PDF ve CBZ okuyucudur**. Joy-Con kumandaları konsoldan ayrılmış durumdayken rahatça kitap ve çizgi roman okuyabilmeniz amacıyla dokunmatik odaklı olarak tasarlanmıştır.
 
-Tüm kitaplarınız, kapak önbelleğiniz, okuma geçmişiniz ve okuma günlüğü istatistikleriniz yalnızca microSD kartınızda saklanır. Kullanıcı hesabı, bulut bağlantısı veya web tarayıcı motoru gerektirmez.
+Tüm kitaplarınız, çizgi roman arşivleriniz, kapak önbelleğiniz, okuma geçmişiniz ve okuma günlüğü istatistikleriniz yalnızca microSD kartınızda saklanır. Kullanıcı hesabı, bulut bağlantısı veya web tarayıcı motoru gerektirmez.
 
 > [!NOTE]
 > **Varsayılan Dil:** PaperNX temiz kurulumda varsayılan olarak **İngilizce** başlar. Eksiksiz **Türkçe** arayüz desteği dahili olarak mevcuttur ve **Ayarlar → Uygulama → Dil** (`+` butonu veya <kbd>Y</kbd>) üzerinden istendiğinde seçilebilir. Tercihiniz kaydedilir ve yeniden başlatmalarda korunur.
@@ -151,6 +154,9 @@ Tüm kitaplarınız, kapak önbelleğiniz, okuma geçmişiniz ve okuma günlüğ
 ### Temel Özellikler
 
 - **Dokunmatik Odaklı Ergonomi:** Tüm eylemler doğrudan ve hassas dokunmatik hedeflerle yönetilir (56px minimum dokunmatik alan). Kumandalar isteğe bağlı kısayol olarak desteklenir.
+- **CBZ Çizgi Roman Desteği:** MuPDF altyapısıyla harici bağımlılık veya gereksiz kod yükü getirmeden `.cbz` arşivlerini doğrudan okuma. Çizgi roman çizimlerini bozmayan orijinal RGB renklendirme.
+- **Doğal Sayısal Sıralama:** Cilt ve sayı numaralarını doğru sıralayan taşma korumalı `compareNatural` algoritması (Örn: Cilt 2, Cilt 10'dan önce gelir).
+- **Gelişmiş Kumanda ve Ekran Yönü Uyumu:** Dikey modlarda ekrana göre yönlenen analog kaydırma ve menü gezintisi; okuyucuda doğrudan sayfa çeviren D-pad kontrolleri; tetik tuşlarının kazara menü değiştirmesini önleyen koruma.
 - **Gerçek Dikey Sürekli EPUB Kaydırma:** Sahte sayfa hissi olmadan akıcı dikey piksel kaydırma, ayarlanabilir momentum ve pürüzsüz bölüm geçişleri. Klasik sayfalı yatay okuma modu da eksiksiz korunur.
 - **Güçlü PDF Motoru:** MuPDF 1.23.11 tabanlı; genişliğe/sayfaya sığdırma, serbest kaydırma, yakınlaştırma ve belge renk filtreleri (Orijinal, Koyu, Sepya, Ters).
 - **Bütünleşik Kâğıt Görünümü:** Dokuz doğal kâğıt teması (Beyaz, Kitap Kâğıdı, Klasik Sepya, Krem, Koyu Kömür, Gece vb.). Kitaplık, araç çubukları ve okuma pencereleri ortak renk paletini paylaşır.
@@ -161,9 +167,9 @@ Tüm kitaplarınız, kapak önbelleğiniz, okuma geçmişiniz ve okuma günlüğ
 
 ### Kurulum
 
-1. Güncel sürüm arşivini [`PaperNX-switch-v0.9.0.zip`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.0/PaperNX-switch-v0.9.0.zip) indirin.
+1. Güncel sürüm arşivini [`PaperNX-switch-v0.9.1.zip`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.1/PaperNX-switch-v0.9.1.zip) indirin.
 2. Arşivi Switch microSD kartınızın ana dizinine (`sdmc:/`) çıkartın.
-3. `.epub` ve `.pdf` kitaplarınızı `sdmc:/switch/PaperNX/books/` dizinine yerleştirin.
+3. `.epub`, `.pdf` ve `.cbz` dosyalarınızı `sdmc:/switch/PaperNX/books/` dizinine yerleştirin.
 4. Homebrew Menu üzerinden **PaperNX** uygulamasını başlatın.
 
 ### Dokunmatik ve Kumanda Kısayolları
@@ -174,21 +180,21 @@ Tüm temel özellikler dokunmatik ekran üzerinden doğrudan yönetilebilir. Fiz
 |---|---|---|
 | **Hızlı Menü / İşlemler** | Sağ üstteki `+` butonuna dokunun | <kbd>+</kbd> (Plus) |
 | **Kitap Açma** | Kitap kartına veya gezgindeki satıra dokunun | <kbd>A</kbd> |
-| **Sayfa Çevirme (Sayfalı EPUB)** | Sağ/sol %30 kenara dokunun veya kaydırın | <kbd>L</kbd> / <kbd>R</kbd> veya Yön Tuşları Sol / Sağ |
+| **Sayfa Çevirme (Sayfalı EPUB/PDF/CBZ)** | Sağ/sol %30 kenara dokunun veya kaydırın | <kbd>L</kbd> / <kbd>R</kbd> veya Yön Tuşları Sol / Sağ |
 | **Sürekli EPUB Kaydırma** | Dikey olarak yukarı / aşağı sürükleyin | Sağ Çubuk veya Yön Tuşları Yukarı / Aşağı |
 | **Araç Çubuğunu Göster/Gizle** | Ekranın ortasına dokunun | <kbd>A</kbd> |
 | **Okuma Ayarları (Aa)** | `+` → *Okuma ayarları* | <kbd>X</kbd> |
 | **Uygulama Görünümü ve Dil** | `+` → *Uygulama görünümü* | <kbd>Y</kbd> |
 | **İçindekiler** | `+` → *İçindekiler* | <kbd>-</kbd> (Minus) |
 | **Yer İmleri** | `+` → *Yer imleri* | <kbd>ZL</kbd> / Sol Omuz |
-| **PDF Yakınlaştırma ve Kaydırma** | Çubukta −/+, büyütülmüş sayfayı sürükleyin | <kbd>ZL</kbd> / <kbd>ZR</kbd>; Sol Çubuk |
+| **PDF/CBZ Yakınlaştırma ve Kaydırma** | Çubukta −/+, büyütülmüş sayfayı sürükleyin | <kbd>ZL</kbd> / <kbd>ZR</kbd>; Sol Çubuk |
 | **Favorilere Ekleme** | Kitap kartındaki yıldıza dokunun | Sol Çubuk Tıklama (<kbd>L3</kbd>) |
 | **Kitaplığa Dönüş** | `+` → *Kitaplığa dön* | <kbd>B</kbd> |
 | **Uygulamadan Çıkış** | `+` → *PaperNX’ten çık* | <kbd>Home</kbd> / <kbd>B</kbd> (ana ekranda) |
 
 ### Lisans ve Telif Hakkı
 
-PaperNX, **Yusuf Buzrul** tarafından yapay zekâ desteğiyle geliştirilmiştir ve **[GNU Affero General Public License v3.0 (AGPL-3.0)](LICENSE)** kapsamında lisanslanmıştır. Kullanılan üçüncü taraf kütüphanelerin lisansları `PaperNX-licenses-v0.9.0.zip` içinde sunulmaktadır.
+PaperNX, **Yusuf Buzrul** tarafından yapay zekâ desteğiyle geliştirilmiştir ve **[GNU Affero General Public License v3.0 (AGPL-3.0)](LICENSE)** kapsamında lisanslanmıştır. Kullanılan üçüncü taraf kütüphanelerin lisansları `PaperNX-licenses-v0.9.1.zip` içinde sunulmaktadır.
 
 - Yusuf Buzrul tarafından yapay zekâ desteğiyle geliştirilmiştir.
 - Geliştirici profili: [https://github.com/ysfbz](https://github.com/ysfbz)
