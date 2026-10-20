@@ -7,6 +7,12 @@ struct DisplayTransform {
     int physicalWidth{1280}, physicalHeight{720}, orientation{0};
     int logicalWidth() const { return orientation ? physicalHeight : physicalWidth; }
     int logicalHeight() const { return orientation ? physicalWidth : physicalHeight; }
+    // Apply the orientation once to a controller direction (translation has no effect).
+    std::pair<int,int> vectorToLogical(int x,int y) const {
+        if(orientation==1) return {y,-x};
+        if(orientation==2) return {-y,x};
+        return {x,y};
+    }
     std::pair<float,float> toLogical(float x,float y) const {
         if(orientation==1) return {y,float(physicalWidth)-x};
         if(orientation==2) return {float(physicalHeight)-y,x};
