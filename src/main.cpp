@@ -355,6 +355,7 @@ private:
     // Reader state
     PxDocument *doc_{nullptr};
     std::string currentBookId_;
+    Format currentBookFormat_{Format::Unsupported};
     int currentPage_{0};
     int pageCount_{0};
     float scrollY_{0}, scrollVelocity_{0};
@@ -1092,6 +1093,7 @@ private:
         scrollY_ = scrollVelocity_ = 0;
         extraStyle_ = p;
         currentBookId_ = b.id;
+        currentBookFormat_ = b.format;
         journalTitle_ = b.title;journalAuthor_ = b.author;
         auto fp = computeBookFingerprint(b.path, b.bytes);
         journal_.registerBookAlias(b.id, fp, b.title, b.author);
@@ -1114,6 +1116,7 @@ private:
         if (!doc_) {
             coversPaused_=false; queueCv_.notify_one();
             currentBookId_.clear();
+            currentBookFormat_ = Format::Unsupported;
             currentErrorMessage_ = std::string("Kitap açılamadı: ") + err;
             logMessage(currentErrorMessage_);
             screen_ = ScreenState::Library;
@@ -1195,6 +1198,7 @@ private:
             px_document_close(doc_);
             doc_ = nullptr;
         }
+        currentBookFormat_ = Format::Unsupported;
         tocEntries_.clear();
         updateVisibleBooks();
         screen_ = ScreenState::Library;
@@ -1473,10 +1477,12 @@ private:
             key = PageCache::makeEpubKey(currentBookId_,pageIdx,style.fontSize,style.theme,
                                          style.lineHeight,style.margin,style.textAlign,w,h,style.fontFamily);
         } else {
-            const auto color=palette();
-            key = PageCache::makePdfKey(currentBookId_, pageIdx, pdfZoom_, pdfPanX_, pdfPanY_, w, h)
-                + ":paper:" + std::to_string((int(color.bg.r)<<16)|(int(color.bg.g)<<8)|color.bg.b)
-                + ":ink:" + std::to_string((int(color.fg.r)<<16)|(int(color.fg.g)<<8)|color.fg.b);
+            key = PageCache::makePdfKey(currentBookId_, pageIdx, pdfZoom_, pdfPanX_, pdfPanY_, w, h);
+            if (currentBookFormat_ == Format::Pdf) {
+                const auto color=palette();
+                key += ":paper:" + std::to_string((int(color.bg.r)<<16)|(int(color.bg.g)<<8)|color.bg.b)
+                    + ":ink:" + std::to_string((int(color.fg.r)<<16)|(int(color.fg.g)<<8)|color.fg.b);
+            }
         }
 
         if(px_document_is_epub(doc_))key+=":paper:"+std::to_string(appSettings_.get().paperTexture);
@@ -1500,12 +1506,12 @@ private:
         }
 
         if (ok && img.rgb) {
-            if (!px_document_is_epub(doc_)) {
+            if (currentBookFormat_ == Format::Pdf) {
                 const auto color=palette();
                 const unsigned paper=(unsigned(color.bg.r)<<16)|(unsigned(color.bg.g)<<8)|color.bg.b;
                 const unsigned ink=(unsigned(color.fg.r)<<16)|(unsigned(color.fg.g)<<8)|color.fg.b;
                 px_image_apply_reading_colors(&img,paper,ink);
-            } else {const auto style=presentedStyle();auto bg=readingColor(style.backgroundColor,g_palettes[style.theme].bg);applyPaperTexture(img.rgb,img.width,img.height,img.stride,(bg.r<<16)|(bg.g<<8)|bg.b,appSettings_.get().paperTexture);}
+            } else if (currentBookFormat_ == Format::Epub) {const auto style=presentedStyle();auto bg=readingColor(style.backgroundColor,g_palettes[style.theme].bg);applyPaperTexture(img.rgb,img.width,img.height,img.stride,(bg.r<<16)|(bg.g<<8)|bg.b,appSettings_.get().paperTexture);}
             tex = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STATIC, img.width, img.height);
             if (tex) {
                 if (SDL_UpdateTexture(tex, nullptr, img.rgb, img.stride) != 0) {
@@ -1551,7 +1557,7 @@ private:
                 browserEntries_.push_back({entry.path(), true, 0});
             } else if (entry.is_regular_file(ec)) {
                 auto fmt = detectFormat(entry.path().string());
-                if (fmt == Format::Epub || fmt == Format::Pdf) {
+                if (fmt != Format::Unsupported) {
                     browserEntries_.push_back({entry.path(), false, entry.file_size(ec)});
                 }
             }
@@ -2575,7 +2581,7 @@ private:
 
             drawCover(b,{40,y+6,66,92},pal);
             typography_->renderText(renderer_,typography_->uiFont(),b.title,126,y+14,pal.fg,w-310);
-            typography_->renderText(renderer_,typography_->smallFont(),b.author.empty()?ui::label(b.format==Format::Pdf?"PDF kitap":"EPUB kitap"):b.author,126,y+49,pal.muted,w-330);
+            typography_->renderText(renderer_,typography_->smallFont(),b.author.empty()?ui::label(b.format==Format::Pdf?"PDF kitap":b.format==Format::Cbz?"CBZ çizgi roman":"EPUB kitap"):b.author,126,y+49,pal.muted,w-330);
             typography_->drawProgressBar(renderer_,126,y+82,w-350,5,float(p.fraction),pal.cardBorder,pal.accent);
             typography_->renderText(renderer_,typography_->smallFont(),ui::label("%")+std::to_string(int(p.fraction*100)),w-192,y+44,pal.muted);
             ui::favorite(renderer_,{w-116,y+24,64,56},pal,p.favorite);
