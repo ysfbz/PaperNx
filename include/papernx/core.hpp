@@ -87,6 +87,10 @@ std::string turkishCaseFold(const std::string &s);
 std::string utf8SafeTruncate(const std::string &s, std::size_t maxBytes);
 std::size_t utf8CodepointCount(const std::string &s);
 
+// Overflow-safe natural order for numbered titles, filenames and series volumes.
+// Negative/zero/positive result follows strcmp-style ordering after Turkish case folding.
+int compareNatural(const std::string &left, const std::string &right);
+
 // Categorization & Filtering
 std::vector<Book> filterByCategory(const std::vector<Book> &books, const class ProgressStore &store, Category category);
 std::vector<Book> search(const std::vector<Book> &books, const std::string &needle, Sort sort = Sort::Title);
