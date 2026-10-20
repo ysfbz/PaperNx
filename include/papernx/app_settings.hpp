@@ -14,6 +14,7 @@ struct AppPreferences {
     int displayOrientation{0}; // landscape, clockwise, counterclockwise
     bool preservePdfZoom{true};
     bool shoulderPageTurns{true};
+    bool pageCurlAnimation{true};
     int paperTexture{0}; // off, soft, natural; EPUB canvas only
     std::string defaultBrowserPath;
 };

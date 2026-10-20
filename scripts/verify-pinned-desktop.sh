@@ -17,6 +17,7 @@ make -C build-mupdf-desktop/mupdf-1.23.11-source -j4 build=release OUT=build/pap
 cp -r build-mupdf-desktop/mupdf-1.23.11-source/include/mupdf prefix-mupdf-desktop/include/
 cp build-mupdf-desktop/mupdf-1.23.11-source/build/papernx-system-fonts/libmupdf{,-third}.a prefix-mupdf-desktop/lib/
 python3 tests/generate_fixtures.py
+python3 tests/generate_comic_fixtures.py
 cmake -S . -B build-pinned -G Ninja -DPAPERNX_NATIVE=ON -DBUILD_TESTING=ON -DMUPDF_PREFIX="$root/prefix-mupdf-desktop"
 cmake --build build-pinned --parallel 4
 ctest --test-dir build-pinned --output-on-failure

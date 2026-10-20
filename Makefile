@@ -48,9 +48,9 @@ include $(DEVKITPRO)/libnx/switch_rules
 #---------------------------------------------------------------------------------
 TARGET := PaperNX
 BUILD := build-switch
-SOURCES := src
+SOURCES := src third_party/unarr/common third_party/unarr/rar third_party/unarr/lzmasdk
 DATA :=
-INCLUDES	:=	include $(MUPDF_PREFIX)/include
+INCLUDES	:=	include third_party/unarr $(MUPDF_PREFIX)/include
 ROMFS	:=	romfs
 
 ICON := assets/branding/PaperNX-icon-switch.jpg
@@ -67,7 +67,7 @@ ARCH	:=	-march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
 CFLAGS	:=	-g -Wall -O2 -ffunction-sections -fdata-sections \
 			$(ARCH) $(DEFINES)
 
-CFLAGS	+=	-D__SWITCH__ -D_POSIX_C_SOURCE=200809L $(INCLUDE) `sdl2-config --cflags`
+CFLAGS	+=	-D__SWITCH__ -D_POSIX_C_SOURCE=200809L -DUSE_CUSTOM_ALLOCATOR $(INCLUDE) `sdl2-config --cflags`
 
 CXXFLAGS := $(CFLAGS) -std=c++17 -fno-rtti -fno-exceptions
 CFLAGS += -std=c11
@@ -75,7 +75,7 @@ CFLAGS += -std=c11
 ASFLAGS	:=	-g $(ARCH)
 LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map) -Wl,--gc-sections
 
-LIBS := -Wl,--start-group -lSDL2_ttf -lmupdf -lharfbuzz -lfreetype -lmupdf-third `sdl2-config --libs` -lbz2 -lpng -ljpeg -lz -Wl,--end-group -lm -lnx
+LIBS := -Wl,--start-group -lSDL2_ttf -lmupdf -lharfbuzz -lfreetype -lmupdf-third -larchive -lwebp -llzma -llz4 -lzstd -lexpat `sdl2-config --libs` -lbz2 -lpng -ljpeg -lz -Wl,--end-group -lm -lnx
 
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing

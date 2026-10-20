@@ -107,7 +107,7 @@ std::string CoverRepository::cacheKey(const Book &book) {
     auto stamp = fs::last_write_time(book.path, ec);
     auto modified = ec ? book.modified : static_cast<std::int64_t>(stamp.time_since_epoch().count());
     const std::string identity = book.path + '\0' + book.id + '\0' +
-        std::to_string(bytes) + ':' + std::to_string(modified);
+        std::to_string(bytes) + ':' + std::to_string(modified) + (isComic(book.format)?":comic-cover-v2":"");
     std::uint64_t a = 14695981039346656037ull, b = 7809847782465536322ull;
     for (unsigned char c : identity) { a = (a ^ c) * 1099511628211ull; b = (b ^ c) * 14029467366897019727ull; }
     std::ostringstream out;

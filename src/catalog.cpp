@@ -29,8 +29,8 @@ bool unpack(const std::string &data, std::vector<std::string> &out) {
 }
 bool safeText(const std::string &s, std::size_t max = 1024) { return s.size() <= max && s.find('\0') == std::string::npos; }
 std::string groupValue(const Book &b, const CatalogEntry &stored, CatalogGroup g) {
-    if(g==CatalogGroup::Formats)return b.format==Format::Pdf?"PDF":b.format==Format::Cbz?"CBZ":"EPUB";
-    auto e=stored;if(e.metadataFingerprint!=std::to_string(b.bytes)+":"+std::to_string(b.modified)){e.sourceAuthor.clear();e.sourceGenre.clear();e.sourceSeries.clear();}
+    if(g==CatalogGroup::Formats)return formatName(b.format);
+    auto e=stored;if(!catalogMetadataCurrent(b,e)){e.sourceAuthor.clear();e.sourceGenre.clear();e.sourceSeries.clear();e.sourceSeriesIndex.clear();}
     if (g == CatalogGroup::Authors) return e.author.empty() ? (e.sourceAuthor.empty()?(b.author.empty() ? "Unknown Author" : b.author):e.sourceAuthor) : e.author;
     if (g == CatalogGroup::Genres) return e.genre.empty() ? (e.sourceGenre.empty()?"Uncategorized":e.sourceGenre) : e.genre;
     return e.series.empty() ? (e.sourceSeries.empty()?"No Series":e.sourceSeries) : e.series;
@@ -88,7 +88,7 @@ bool CatalogStore::save(const ProgressStore::SaveOptions &options) const {
     }
     const bool ok=store.save(options); diagnostic_=store.saveDiagnostic(); return ok;
 }
-Book CatalogStore::apply(Book b) const { const auto e=get(b.id);const bool valid=e.metadataFingerprint==std::to_string(b.bytes)+":"+std::to_string(b.modified);
+Book CatalogStore::apply(Book b) const { const auto e=get(b.id);const bool valid=catalogMetadataCurrent(b,e);
     if(valid&&!e.sourceTitle.empty())b.title=e.sourceTitle;
     if(valid&&!e.sourceAuthor.empty())b.author=e.sourceAuthor;
     if(!e.title.empty())b.title=e.title;

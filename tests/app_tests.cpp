@@ -12,17 +12,28 @@
 
 namespace {
 struct AppTest {
+    // Workflow assertions describe settled pages. Dedicated curl tests exercise
+    // intermediate frames and queued input with the animation still running.
+    static void settlePageTurn(PaperNxApp &app) {
+        while (app.pageTurnAnimation_.active) {
+            app.pageTurnAnimation_.started = SDL_GetTicks() - PaperNxApp::PAGE_TURN_MS;
+            app.tickPageTurn();
+        }
+    }
     static void key(PaperNxApp &app, SDL_Keycode code) {
         SDL_Event e{}; e.type = SDL_KEYDOWN; e.key.keysym.sym = code;
         bool running = true; app.handleEvent(e, running); assert(running);
+        settlePageTurn(app);
     }
     static void pad(PaperNxApp &app, Uint8 button) {
         SDL_Event e{}; e.type = SDL_CONTROLLERBUTTONDOWN; e.cbutton.button = button;
         bool running = true; app.handleEvent(e, running); assert(running);
+        settlePageTurn(app);
     }
     static void finger(PaperNxApp &app, Uint32 type, float x, float y, SDL_FingerID id = 41) {
         SDL_Event e{}; e.type = type; e.tfinger.fingerId = id; e.tfinger.x = x; e.tfinger.y = y;
         bool running = true; app.handleEvent(e, running); assert(running);
+        if (type == SDL_FINGERUP) settlePageTurn(app);
     }
     static void tap(PaperNxApp &app, float x, float y) {
         finger(app, SDL_FINGERDOWN, x, y); finger(app, SDL_FINGERUP, x, y);
@@ -444,7 +455,9 @@ struct AppTest {
         key(app, SDLK_EQUALS); assert(app.pdfZoom_ == 1.25f);
         SDL_Event axis{}; axis.type = SDL_CONTROLLERAXISMOTION;
         axis.caxis.axis = SDL_CONTROLLER_AXIS_TRIGGERRIGHT; axis.caxis.value = 30000;
-        app.handleEvent(axis, running); assert(app.pdfZoom_ == 1.5f);
+        app.handleEvent(axis, running); assert(app.pdfZoom_ == 1.25f);
+        app.controllerInputTick_ = SDL_GetTicks() - 16; app.tickControllerInput(); assert(app.pdfZoom_ > 1.25f && app.pdfZoom_ < 1.3f);
+        axis.caxis.value = 0; app.handleEvent(axis, running);
         app.zoomPdf(5); app.handleAnalog(100000, 100000);
         assert(app.pdfPanX_ >= 0 && app.pdfPanY_ > 0);
         int oldPan = app.pdfPanY_;

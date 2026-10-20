@@ -130,7 +130,11 @@ static void v04UiWorkflow(const fs::path &parent) {
             float oldY=app.scrollY_;physicalFinger(SDL_FINGERDOWN,.5f,.7f);physicalFinger(SDL_FINGERMOTION,.5f,.4f);physicalFinger(SDL_FINGERUP,.5f,.4f);assert(app.scrollY_>oldY || app.currentPage_>0);
             snapshot(app,orientation==1?"v04-portrait-cw-scroll":"v04-portrait-ccw-scroll");app.closeBook();
             auto portraitPdf=*std::find_if(app.books_.begin(),app.books_.end(),[](const Book &b){return b.format==Format::Pdf;});app.openBook(portraitPdf);app.zoomPdf(2);
-            app.currentPage_=0;pad(app,SDL_CONTROLLER_BUTTON_DPAD_RIGHT);assert(app.currentPage_==1);pad(app,SDL_CONTROLLER_BUTTON_DPAD_LEFT);assert(app.currentPage_==0);
+            // Logical page-right is physical down after a clockwise display
+            // rotation, and physical up after a counterclockwise rotation.
+            const auto next=orientation==1?SDL_CONTROLLER_BUTTON_DPAD_DOWN:SDL_CONTROLLER_BUTTON_DPAD_UP;
+            const auto previous=orientation==1?SDL_CONTROLLER_BUTTON_DPAD_UP:SDL_CONTROLLER_BUTTON_DPAD_DOWN;
+            app.currentPage_=0;pad(app,next);assert(app.currentPage_==1);pad(app,previous);assert(app.currentPage_==0);
             physicalFinger(SDL_FINGERDOWN,.5f,.7f);physicalFinger(SDL_FINGERMOTION,.5f,.4f);physicalFinger(SDL_FINGERUP,.5f,.4f);assert(app.pdfPanY_>0);
             SDL_Event pinch{};pinch.type=SDL_MULTIGESTURE;pinch.mgesture.numFingers=2;pinch.mgesture.dDist=.05f;auto physical=transform.toPhysical(w*.25f,h*.7f);pinch.mgesture.x=physical.first/1280;pinch.mgesture.y=physical.second/720;bool running=true;app.handleEvent(pinch,running);assert(app.pdfZoom_>2);
             snapshot(app,orientation==1?"v04-portrait-cw-pdf":"v04-portrait-ccw-pdf");app.closeBook();

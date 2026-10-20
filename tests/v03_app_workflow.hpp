@@ -58,7 +58,14 @@ static void v03WaitLayout(PaperNxApp &app) {
         assert(SDL_GetTicks()<deadline && "Layout worker did not settle within 15 seconds");
     }
 }
+static void v03RevealSeriesIssue(PaperNxApp &app,const std::string &id) {
+    std::optional<Book> representative;
+    for(const auto &shelf:app.seriesShelves_)for(const auto &issue:shelf.second.issues)
+        if(issue.id==id)representative=shelf.second.issues.front();
+    if(representative)assert(app.openSeriesShelf(*representative));
+}
 static void v03OpenLibraryBook(PaperNxApp &app,const std::string &id) {
+    v03RevealSeriesIssue(app,id);
     assert(app.screen_==ScreenState::Library); int w,h; app.getWindowSize(w,h);
     assert(app.viewMode_==ViewMode::Grid); ui::LibraryLayout layout(w);
     const auto found=std::find_if(app.visibleBooks_.begin(),app.visibleBooks_.end(),[&](const Book &b){return b.id==id;});
@@ -104,6 +111,8 @@ static void v03Workflow(const fs::path &parent) {
         v03Tab(app,0); v03Control(app,0); v03Control(app,0); assert(app.currentFontSize_==26);
         app.render(); snapshot(app,"v03-global-settings-preview"); v03CloseSettings(app);
         assert(app.progressStore_.get("PAPERNX_DEFAULTS").theme==2);
+        // Copies of the same series now have one home card; scroll its issues.
+        v03RevealSeriesIssue(app,firstId);
         // Library drag tracks before release and must not open a book.
         finger(app,SDL_FINGERDOWN,.5f,.82f); finger(app,SDL_FINGERMOTION,.5f,.5f);
         assert(app.listScroll_>100 && !app.doc_);
@@ -144,7 +153,7 @@ static void v03Workflow(const fs::path &parent) {
         assert(app.currentPage_==page && std::abs(app.scrollY_-y)<1);
         if(!app.quickMenu_) v03Plus(app);
         v03MenuItem(app,2); assert(app.screen_==ScreenState::TocModal);
-        app.getWindowSize(w,h); v03RectTap(app,{48,152,w-96,56});
+        app.getWindowSize(w,h); v03RectTap(app,app.tocCell(0,w,h));
         assert(app.screen_==ScreenState::Reader && !app.navigationHistory_.empty());
         v03Plus(app);
         auto actions=app.quickActions();

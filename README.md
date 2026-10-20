@@ -33,13 +33,15 @@ All books, comic archives, cover art caches, reading progress, and personal read
 ## Key Features
 
 - **Touchscreen-First Ergonomics:** Every navigation and reading action has a direct, responsive touch target (56px minimum touch targets with visual feedback). Joy-Con and Pro Controller buttons remain supported as optional shortcuts.
-- **CBZ Comic Book Support:** Built-in reader engine for `.cbz` comic book archives powered directly by MuPDF without adding bloat or external dependencies. Renders high-fidelity original RGB imagery without destructive paper/ink recoloring or synthetic textures.
+- **CBZ & CBR Comic Book Support:** Built-in reader engine for `.cbz` (ZIP) and `.cbr` (RAR4, RAR5, and solid archives via vendored `unarr`) comic book archives. Renders high-fidelity original RGB imagery without destructive paper/ink recoloring or synthetic textures, with optional reversible reading palette. Magic-byte container detection gracefully handles misnamed archives.
+- **Interactive 3D Page Curl:** Authentic, physics-driven developable cylinder page curl (`PageCurlRenderer`) tracking finger position, grip height (`anchorY`), vertical drag, paper underside tint, specular highlights, and contact shadows. Works for paginated EPUB, PDF, CBZ, and CBR (including RTL manga and zoomed comic sheets), toggleable via **Settings → Navigation**.
+- **Comic Series Grouping & Multi-Tab Navigation:** Automatically collapses multi-issue comic series (`#1`, `01`, `v01`, `Vol 01`, `ComicInfo.xml`) into unified series shelf cards. 3-tab contents modal (`Chapters`, `All Pages` grid, `Bookmarks`) with background thumbnail rendering, and an interactive footer scrubber with live preview bubble.
 - **Continuous Vertical EPUB Scrolling:** Smooth pixel-by-pixel vertical scrolling with momentum, sensitivity adjustments, and seamless chapter transitions with logical anchor tracking. Traditional paginated horizontal reading mode is also fully supported.
 - **Robust PDF Engine:** Powered by MuPDF 1.23.11 with fit-to-width, fit-to-page, touch drag-to-pan, zoom, and non-destructive document color filters (Original, Dark, Sepia, Invert).
 - **Overflow-Safe Natural Sorting:** Deterministic numeric ordering for book titles, volumes, authors, and filenames (e.g., Volume 2 before Volume 10) regardless of number length.
-- **Display Orientation & Controller Ergonomics:** Left and right analog sticks have independent deadzones and repeat rates. Trigger axes (ZL/ZR) are guarded against menu navigation misfires, while analog panning dynamically rotates to match portrait screen orientations.
-- **Unified Paper Appearance:** Choose from nine natural paper color presets (e.g., Pure White, Warm Book, Classic Sepia, Cream, Charcoal, Midnight Dark). The library, navigation chrome, menus, and EPUB viewer share a coordinated palette.
-- **Bilingual UI:** Native English and Turkish interface translations. Book titles, table of contents, and document contents remain in their authentic original language.
+- **Display Orientation & Controller Ergonomics:** Left and right analog sticks have independent deadzones and repeat rates. Trigger axes (ZL/ZR) provide smooth continuous zooming, while analog panning dynamically rotates to match portrait screen orientations. Visible on-screen "Fit page" pill restores 1.0x view instantly.
+- **Unified Paper Appearance:** Choose from nine natural paper color presets (e.g., Pure White, Warm Book, Classic Sepia, Cream, Charcoal, Midnight Dark). The library, navigation chrome, menus, and comic viewport surround share a coordinated palette.
+- **Bilingual UI:** Native English and Turkish interface translations. Book titles, table of contents, and document contents remain in their authentic original language (Hebrew/BiDi text shaping excluded per project design).
 - **Persistent Bounded Cover Cache:** 150×210 RGB24 thumbnail cache bounded to 32 MiB / 512 entries with file stat validation, CRC integrity checks, automatic recovery, and immediate vector placeholder fallbacks.
 - **Reading Journal & Offline Stats:** Tracks reading minutes, sessions, completion percentages, streaks, and period stats entirely offline on SD card.
 - **Data Protection & Recovery:** Settings and reading records use verified temporary writes, backup/recovery paths and retries to reduce data-loss risk. The installer does not ship user databases. **Back up `books/` and `data/` before upgrading:** sudden power loss and SD failure can still cause loss.
@@ -52,8 +54,16 @@ All books, comic archives, cover art caches, reading progress, and personal read
 
 1. Download the release archive [`PaperNX-switch-v0.9.1.zip`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.1/PaperNX-switch-v0.9.1.zip).
 2. Extract the archive directly to the root of your Switch microSD card (`sdmc:/`).
-3. Place your `.epub`, `.pdf`, and `.cbz` files into `sdmc:/switch/PaperNX/books/` (or use the built-in file browser to access any directory).
+3. Place your `.epub`, `.pdf`, `.cbz`, and `.cbr` files into `sdmc:/switch/PaperNX/books/` (or use the built-in file browser to access any directory).
 4. Launch **PaperNX** from the Homebrew Menu.
+
+#### Verified Release Artifacts (v0.9.1)
+
+| Artifact | Size | SHA256 Checksum |
+|---|---:|---|
+| `PaperNX.nro` | 48.8 MB | `f411daf2e02f5483ab49563295ea7832ca3e9b0455f433b7c8bfe6db909fced1` |
+| `PaperNX-switch-v0.9.1.zip` | 33.6 MB | `898a1f07e4898c164a3e57f17e7af52d7eda553c92f85892aac9bda8eaf249e9` |
+| `PaperNX-licenses-v0.9.1.zip` | 207 KB | `2890920a31aac7293e92c45ae90ef5d18e274df844daf74ef42db3539df8f005` |
 
 ```text
 sdmc:/switch/PaperNX/

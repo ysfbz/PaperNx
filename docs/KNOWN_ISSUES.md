@@ -11,7 +11,7 @@ The published v0.9.1 NRO has **35/35 physical-device acceptance checks marked UN
 - **Storage:** Atomic temp writes, backup recovery, and retries lower corruption risk, but power loss, FAT/microSD limitations, and abruptly interrupted writes can still lose unsaved progress. Back up `books/` and `data/` before upgrading.
 - **Book identity:** Primarily path and file-size based; moving or replacing files creates a new identity without automatically merging history records.
 - **EPUB position restoration:** Malformed or image-only chapters use approximate geometric fallbacks after layout recalculations.
-- **PDF & CBZ Rendering:** Whole-page pixel transformations (contrast/invert) affect images and illustrations. Built-in PDF crop, OCR, and true text reflow are not supported. Comic reader displays single pages in original RGB format within a 16 MiB memory safety limit.
+- **PDF & Comic Rendering:** Whole-page pixel transformations (contrast/invert) affect images and illustrations. Built-in PDF crop, OCR, and true text reflow are not supported. Comic reader supports CBZ (ZIP) and CBR (RAR4/RAR5/Solid) archives in original RGB format within bounded memory budgets (48 MiB image buffer, 100 MP limit).
 - **File management:** Deletion uses explicit two-step confirmation and path/extension validation. There is no trash bin or undo. Test permanent deletion only on disposable copies.
 - **Reading statistics:** Active reading time and finish estimates use interaction-derived heuristics, not eye tracking or proof the screen was actively read. Chapter ETA and advanced calendar reporting are not implemented.
 - **Catalog metadata:** Automatic moved-file reconciliation and normalized multi-author/subject indexing remain limited.
@@ -19,7 +19,7 @@ The published v0.9.1 NRO has **35/35 physical-device acceptance checks marked UN
 
 ## Planned / not included in v0.9.1
 
-- **CBR format:** Deferred due to RAR decompression licensing constraints and safety boundaries (CBZ is supported).
+- **Hebrew language and BiDi text shaping:** Excluded per project design.
 - **In-book full-text search:** Deferred.
 - **Highlights and annotations:** Deferred.
 - **Offline dictionary lookup:** Deferred.

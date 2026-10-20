@@ -114,6 +114,8 @@ inline std::string localizeUiText(const std::string &text, int language) {
         {"Arka plan · Renk paleti","Background · Color palette"},
         {"L/R sayfa kısayolu: Açık","L/R page shortcuts: On"},
         {"L/R sayfa kısayolu: Kapalı","L/R page shortcuts: Off"},
+        {"Sayfa çevirme animasyonu: Açık","Page curl animation: On"},
+        {"Sayfa çevirme animasyonu: Kapalı","Page curl animation: Off"},
         {"Düzen hazırlanıyor...","Preparing layout..."},
         {"Yatay / Dikey","Rotate"},
         {"Bir seçenek seçin","Choose an option"},

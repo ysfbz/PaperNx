@@ -36,7 +36,8 @@ int main() {
     assert(detectFormat("document.PDF") == Format::Pdf);
     assert(detectFormat("Comic.CBZ") == Format::Cbz);
     assert(detectFormat("Comic.cbz") == Format::Cbz);
-    assert(detectFormat("Comic.cbr") == Format::Unsupported);
+    assert(detectFormat("Comic.CBR") == Format::Cbr);
+    assert(detectFormat("Comic.cbr") == Format::Cbr);
     assert(detectFormat("notes.txt") == Format::Unsupported);
     assert(detectFormat("image.png") == Format::Unsupported);
 

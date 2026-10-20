@@ -14,7 +14,10 @@ constexpr const char *APP_AUTHOR = "Yusuf Buzrul";
 constexpr const char *APP_VERSION = "0.9.1";
 constexpr const char *APP_VERSION_FULL = "v0.9.1";
 
-enum class Format { Epub, Pdf, Cbz, Unsupported };
+enum class Format { Epub, Pdf, Cbz, Cbr, Unsupported };
+const char *formatName(Format format);
+inline bool isComic(Format format) { return format==Format::Cbz || format==Format::Cbr; }
+constexpr int COMIC_READING_COLORS=1, COMIC_RIGHT_TO_LEFT=2;
 enum class Sort { Title, Author, Filename, Modified, LastRead };
 enum class Category { All, ContinueReading, Recent, Favorites, Unread, Completed };
 
@@ -90,6 +93,7 @@ std::size_t utf8CodepointCount(const std::string &s);
 // Overflow-safe natural order for numbered titles, filenames and series volumes.
 // Negative/zero/positive result follows strcmp-style ordering after Turkish case folding.
 int compareNatural(const std::string &left, const std::string &right);
+int naturalCompare(const std::string &a, const std::string &b);
 
 // Categorization & Filtering
 std::vector<Book> filterByCategory(const std::vector<Book> &books, const class ProgressStore &store, Category category);

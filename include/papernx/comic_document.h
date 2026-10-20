@@ -1,0 +1,7 @@
+#pragma once
+#include <mupdf/fitz.h>
+#include "papernx/mupdf_bridge.h"
+fz_document *px_open_comic(fz_context *ctx, const char *path);
+int px_comic_cover_page(fz_document *document);
+int px_comic_toc(fz_context *ctx, fz_document *document, PxTocEntry *entries, int capacity);
+int px_comic_page_size(fz_context *ctx, fz_document *document, int page, float *width, float *height);

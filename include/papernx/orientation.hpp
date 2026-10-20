@@ -13,6 +13,11 @@ struct DisplayTransform {
         if(orientation==2) return {-y,x};
         return {x,y};
     }
+    std::pair<float,float> directionToLogical(float x,float y) const {
+        if(orientation==1) return {y,-x};
+        if(orientation==2) return {-y,x};
+        return {x,y};
+    }
     std::pair<float,float> toLogical(float x,float y) const {
         if(orientation==1) return {y,float(physicalWidth)-x};
         if(orientation==2) return {float(physicalHeight)-y,x};

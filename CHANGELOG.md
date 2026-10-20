@@ -8,27 +8,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.9.1] - 2026-10-20
 
 ### Added
-- **CBZ Comic Book Engine:** Built-in reader support for comic book archives (`.cbz`) powered directly by MuPDF without introducing new runtime dependencies or binary bloat.
-  - Automatic comic page recognition and fast ZIP stream decoding.
-  - Pure RGB rendering without destructive paper/ink inversions or synthetic texture overlays, preserving comic artwork integrity.
-  - Bounded memory allocation (16 MiB archive safety limit) with fail-safe rejection of truncated or corrupt archives.
-  - Complete library discovery, cover thumbnail extraction from page 0, file browser detection, and catalog metadata handling for `.cbz` files.
-- **Overflow-Safe Natural Numeric Sorting:** Implemented `compareNatural` for titles, authors, series, and filenames. Multi-digit runs are compared deterministically (e.g., Volume 2 precedes Volume 10) regardless of number length, without integer overflow risk.
+- **Full CBR & Enhanced CBZ Comic Book Engine:**
+  - Built-in reader support for `.cbz` (ZIP) and `.cbr` (RAR4, RAR5, and solid archives via vendored `unarr` decoder).
+  - Magic-byte container sniffing to gracefully detect and load misnamed comic archives.
+  - Pure RGB rendering preserving original comic colors, with optional reversible reading palette.
+  - Strict security and resource limits (no SD temp extraction, reject path traversal/symlinks/encryption, 48 MiB per-image safety cap, 100 MP limit).
+  - ComicInfo.xml metadata extraction (Title, Writer, Series, Number, Genre, Manga direction, FrontCover, Page bookmarks).
+  - Expanded cover worker memory budget (96 MiB) with automatic fallback to subsequent pages if the cover page is damaged.
+- **Interactive 3D Perspective Page Curl (Page Flip):**
+  - Authentic developable cylinder mesh curl (`PageCurlRenderer`) tracking finger contact position, grip height (`anchorY`), vertical drag (`dragY`), underside tint, specular highlight, and contact shadow.
+  - Interactive touch drag-to-turn with physics-based commit/cancel flick thresholds.
+  - Supports paginated EPUB, PDF, CBZ, and CBR (including RTL manga page direction and zoomed sheets).
+  - Persisted user toggle in Settings → Navigation (`pageCurlAnimation`, default on).
+- **Comic Reader Ergonomics & Series Grouping:**
+  - Multi-issue comic series (`#1`, `01`, `v01`, `Vol 01`, `Cilt 01`, `ComicInfo.xml`) collapsed into single series shelf cards in the library.
+  - 3-tab contents modal (`Chapters`, `All Pages` grid, `Bookmarks`) with background thumbnail generation and interactive scrubber preview bubble.
+  - Visible on-screen "Fit page" pill (`Sayfaya sığdır`) when zoomed in, restoring 1.0x view with one tap.
+  - Continuous controller trigger zooming (ZL/ZR) and smooth D-pad/analog stick panning with fractional accumulator.
+- **Overflow-Safe Natural Numeric Sorting:** Implemented `compareNatural` and `naturalCompare` for titles, authors, series, and filenames. Multi-digit runs are compared deterministically regardless of number length, without integer overflow risk.
 - **Rotated Display Controller Ergonomics:**
   - Independent repeat, deadzone, and state tracking for both Left and Right analog sticks.
   - Trigger axes (ZL/ZR) excluded from inadvertent directional menu triggers.
   - Analog stick panning for zoomed PDFs and comics dynamically matches the active display orientation (Landscape, Portrait CW, Portrait CCW).
   - UI focus navigation on rotated screens follows visual screen directions.
   - Direct digital D-pad and shoulder page turns remain intuitive and uninterrupted across orientations.
-- **Catalog & File Management Enhancements:** Added CBZ format badge and metadata display in book inspection sheet, guarded file deletion support for CBZ, and updated fallback cover designs with distinct CBZ styling.
+- **Catalog & File Management Enhancements:** Added CBZ/CBR format badges and metadata display in book inspection sheet, guarded file deletion support for comics, and updated fallback cover designs with distinct comic styling.
 
 ### Fixed
+- **CBZ/CBR Viewport Surround:** Eliminated pure white borders around zoomed and fitted comic pages; outer margins now seamlessly match the active book or global theme (`pal.bg`, e.g., Vintage Sepia, OLED Black).
+- **Zoom & Pan Stutters:** Decoupled GPU page texture uploads from zoom and pan transformations; debounced high-resolution zoom refinements.
+- **Navigation Modal Text Overlap:** Fixed layout in Navigation settings tab (`tab == 3`) where the continuous scroll hint overlapped row 5 by placing the page curl toggle at row 6 and positioning the hint below it.
 - **Reader D-Pad Page Turning:** Fixed a controller routing regression where D-pad Right/Left in rotated portrait modes triggered vertical panning instead of advancing/reversing pages.
-- **Cover Artwork Format Display:** Fixed fallback cover renderer and catalog detail modals displaying "EPUB" for CBZ format documents.
-- **Test Suite Logging:** Corrected escaped newline string in native MuPDF integration test output.
+- **Cover Artwork Format Display:** Fixed fallback cover renderer and catalog detail modals displaying "EPUB" for comic archives.
 
 ### Changed
-- **Version Alignment:** Standardized application version across `core.hpp`, `CMakeLists.txt`, `Makefile`, NACP metadata, packaging tools, and documentation to `0.9.1` (`v0.9.1`).
+- **Version Integrity:** Retained exact target version `v0.9.1` across `core.hpp`, `CMakeLists.txt`, `Makefile`, NACP metadata, packaging tools, and documentation.
+- **Release Assets:** Updated release distribution with verified SHA256 hashes (`PaperNX-switch-v0.9.1.zip`: `898a1f07...`, `PaperNX-licenses-v0.9.1.zip`: `2890920a...`, `PaperNX.nro`: `f411daf2...`).
 
 ---
 

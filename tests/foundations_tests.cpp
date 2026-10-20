@@ -9,13 +9,14 @@ int main() {
     for(int o=0;o<3;++o) {
         DisplayTransform t{1280,720,o};
         assert(t.logicalWidth()==(o?720:1280));
-        auto direction=t.vectorToLogical(1,0);
-        assert(direction == (o==0?std::pair<int,int>{1,0}:o==1?std::pair<int,int>{0,-1}:std::pair<int,int>{0,1}));
-        auto up=t.vectorToLogical(0,-1);
-        assert(up == (o==0?std::pair<int,int>{0,-1}:o==1?std::pair<int,int>{-1,0}:std::pair<int,int>{1,0}));
         for(auto p:{std::pair<float,float>{0,0},{200,350},{1280,720}}) {
             auto l=t.toLogical(p.first,p.second),r=t.toPhysical(l.first,l.second);
             assert(std::abs(r.first-p.first)<.01f && std::abs(r.second-p.second)<.01f);
+        }
+        for(auto d:{std::pair<float,float>{1,0},{-1,0},{0,1},{0,-1},{.3f,-.7f}}) {
+            const auto a=t.toLogical(600,300),b=t.toLogical(600+d.first,300+d.second);
+            const auto direction=t.directionToLogical(d.first,d.second);
+            assert(std::abs(direction.first-(b.first-a.first))<.0001f && std::abs(direction.second-(b.second-a.second))<.0001f);
         }
     }
     assert(classifyPdfGesture({-240,15,1280,230})==PdfGesture::PageNext);

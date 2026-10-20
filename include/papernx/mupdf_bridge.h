@@ -19,6 +19,7 @@ typedef struct PxTocEntry {
     char title[256];
     int page;
     int level;
+    float y; // Link position within an unpaginated chapter; zero for comics.
 } PxTocEntry;
 
 // Lifecycle
@@ -27,6 +28,7 @@ PxDocument *px_document_open_limited(const char *path, int width, int height, fl
 int px_document_pages(PxDocument *doc);
 int px_document_page_size(PxDocument *doc, int page, float *width, float *height);
 int px_document_is_epub(PxDocument *doc);
+int px_document_is_comic(PxDocument *doc);
 // True only for an embedded EPUB cover; PDF thumbnails render page one instead.
 int px_document_has_embedded_cover(PxDocument *doc);
 int px_document_relayout(PxDocument *doc, int width, int height, float em, const char *css, char *error, int capacity);

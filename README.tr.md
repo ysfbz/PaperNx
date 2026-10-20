@@ -33,14 +33,16 @@ Tüm kitaplarınız, çizgi roman arşivleriniz, kapak önbelleğiniz, okuma ge�
 ## Temel Özellikler
 
 - **Dokunmatik Odaklı Ergonomi:** Tüm okuma ve menü eylemleri doğrudan ve hassas dokunmatik hedeflerle yönetilir (minimum 56px dokunmatik alan ve dokunulduğunda görsel basılma tepkisi). Joy-Con ve Pro Controller tuşları isteğe bağlı kısayol olarak tam desteklenir.
-- **CBZ Çizgi Roman Desteği:** MuPDF altyapısıyla hiçbir harici bağımlılık veya gereksiz kod yükü getirmeden `.cbz` arşivlerini doğrudan okuma. Sayfaları 16 MiB sıkı bellek sınırıyla işleme, çizgi roman çizimlerini bozmayan orijinal RGB renklendirme ve ilk sayfadan kapak resmi çıkarma.
+- **CBZ & CBR Çizgi Roman Desteği:** `.cbz` (ZIP) ve `.cbr` (RAR4, RAR5 ve solid arşivler, bütünleşik `unarr` kütüphanesiyle) formatlarında tam çizgi roman okuma desteği. Yanlış adlandırılmış arşivleri sihirli baytlarla algılama, orijinal RGB renklerini koruma, isteğe bağlı geri alınabilir okuma paleti, 48 MiB görsel ve 100 MP piksel güvenlik sınırları.
+- **İnteraktif 3D Sayfa Çevirme (Page Curl):** Fiziksel silindir geometrisiyle çalışan, parmak takip eden, tutuş yüksekliği (`anchorY`) ve dikey çekme (`dragY`) dinamiklerini yansıtan, arka yüz kağıt tonlaması, parlama ve temas gölgesi içeren gerçekçi sayfa kıvrılma animasyonu. Sayfalı EPUB, PDF, CBZ ve CBR (RTL manga dahil) belgelerde çalışır, **Ayarlar → Navigasyon** üzerinden kapatılıp açılabilir.
+- **Çizgi Roman Seri Yönetimi ve 3 Sekmeli Gezinti:** Çok sayılı çizgi roman serilerini (`#1`, `01`, `v01`, `Vol 01`, `ComicInfo.xml`) ana kütüphanede tek bir seri kartı altında toplar. 3 sekmeli (`Bölümler`, `Tüm sayfalar`, `Yer imleri`) içindekiler modalı, arka planda küçük resim üretimi ve canlı önizleme baloncuğuna sahip sayfa gezinti çubuğu (scrubber).
 - **Doğal Sayısal Sıralama (Natural Sort):** Cilt ve bölüm numaralarını doğru sırada dizen taşma korumalı `compareNatural` algoritması (Örn: Cilt 2, Cilt 10'dan önce doğru sıralanır).
-- **Gelişmiş Kumanda ve Ekran Yönü Uyumu:** Dikey modlarda ekrana göre yönlenen analog kaydırma ve menü gezintisi; okuyucuda dikey tutuşta dahi doğrudan yatay sayfa çeviren D-pad kontrolleri; tetik tuşlarının kazara menü değiştirmesini önleyen koruma.
+- **Gelişmiş Kumanda ve Ekran Yönü Uyumu:** Dikey modlarda ekrana göre yönlenen analog kaydırma ve menü gezintisi; okuyucuda dikey tutuşta dahi doğrudan yatay sayfa çeviren D-pad kontrolleri; ZL/ZR tetik tuşlarıyla pürüzsüz sürekli yakınlaştırma; ekrandaki "Sayfaya sığdır" butonuyla anında 1.0x görünüme dönüş.
 - **Gerçek Dikey Sürekli EPUB Kaydırma:** Sahte sayfa hissi olmadan akıcı dikey piksel kaydırma, ayarlanabilir momentum ve pürüzsüz bölüm geçişleri. Klasik sayfalı yatay okuma modu da eksiksiz korunur.
 - **Güçlü PDF Motoru:** MuPDF 1.23.11 tabanlı; genişliğe/sayfaya sığdırma, serbest analog ve dokunmatik kaydırma, yakınlaştırma ve belge renk filtreleri (Orijinal, Koyu, Sepya, Ters).
-- **Bütünleşik Kâğıt Görünümü:** Dokuz doğal kâğıt teması (Beyaz, Kitap Kâğıdı, Klasik Sepya, Krem, Koyu Kömür, Gece vb.). Kitaplık, araç çubukları ve okuma pencereleri ortak renk paletini paylaşır.
-- **Çift Dilli Arayüz:** Doğal Türkçe ve İngilizce dil desteği. Kitap içerikleri ve içindekiler orijinal dilinde korunur.
-- **Disk Üzerinde Kapak Önbelleği:** 150×210 RGB24 boyutunda, 32 MiB / 512 dosya ile sınırlandırılmış hızlı kapak önbelleği; sağlama toplamı doğrulaması ve anında beliren şık vektörel kapak yer tutucuları.
+- **Bütünleşik Kâğıt Görünümü:** Dokuz doğal kâğıt teması (Beyaz, Kitap Kâğıdı, Klasik Sepya, Krem, Koyu Kömür, Gece vb.). Kitaplık, araç çubukları, çizgi roman dış kenarları ve okuma pencereleri ortak renk paletini paylaşır.
+- **Çift Dilli Arayüz:** Doğal Türkçe ve İngilizce dil desteği. Kitap içerikleri ve içindekiler orijinal dilinde korunur (İbranice/BiDi metin dizimi proje tasarımı gereği hariç tutulmuştur).
+- **Disk Üzerinde Kapak Önbelleği:** 150×210 RGB24 boyutunda, 32 MiB / 512 dosya ile sınırlandırılmış hızlı kapak önbelleği; çizgi romanlar için genişletilmiş 96 MiB worker bütçesi, sağlama toplamı doğrulaması ve anında beliren şık vektörel kapak yer tutucuları.
 - **Okuma Günlüğü ve Çevrimdışı İstatistikler:** Okuma süresi, oturumlar, tamamlama oranları ve günlük hedefleri tamamen yerel olarak takip eder.
 - **Veri Koruma ve Kurtarma:** Geçici dosya yazımı, `.bak` yedekleme ve otomatik kurtarma mekanizmaları veri kaybı riskini asgariye indirir. Paket kullanıcı veritabanlarını içermez.
 
@@ -52,8 +54,16 @@ Tüm kitaplarınız, çizgi roman arşivleriniz, kapak önbelleğiniz, okuma ge�
 
 1. Güncel sürüm arşivini [`PaperNX-switch-v0.9.1.zip`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.1/PaperNX-switch-v0.9.1.zip) indirin.
 2. Arşivi Switch microSD kartınızın ana dizinine (`sdmc:/`) çıkartın.
-3. `.epub`, `.pdf` ve `.cbz` dosyalarınızı `sdmc:/switch/PaperNX/books/` dizinine kopyalayın.
+3. `.epub`, `.pdf`, `.cbz` ve `.cbr` dosyalarınızı `sdmc:/switch/PaperNX/books/` dizinine kopyalayın.
 4. Homebrew Menu üzerinden **PaperNX** uygulamasını başlatın.
+
+#### Doğrulanmış Dağıtım Dosyaları (v0.9.1)
+
+| Dosya | Boyut | SHA256 Özeti |
+|---|---:|---|
+| `PaperNX.nro` | 48.8 MB | `f411daf2e02f5483ab49563295ea7832ca3e9b0455f433b7c8bfe6db909fced1` |
+| `PaperNX-switch-v0.9.1.zip` | 33.6 MB | `898a1f07e4898c164a3e57f17e7af52d7eda553c92f85892aac9bda8eaf249e9` |
+| `PaperNX-licenses-v0.9.1.zip` | 207 KB | `2890920a31aac7293e92c45ae90ef5d18e274df844daf74ef42db3539df8f005` |
 
 ```text
 sdmc:/switch/PaperNX/

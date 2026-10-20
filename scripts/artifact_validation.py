@@ -1,4 +1,4 @@
-﻿"""Structural Switch artifact checks; these do not establish hardware compatibility."""
+"""Structural Switch artifact checks; these do not establish hardware compatibility."""
 import struct
 import hashlib
 import subprocess
@@ -8,11 +8,11 @@ from pathlib import Path
 def source_identity(root):
     root = Path(root)
     entries = []
-    for folder in ("src", "include"):
+    for folder in ("src", "include", "third_party"):
         for path in sorted((root / folder).rglob("*")):
             if path.is_file():
                 entries.append((path.relative_to(root).as_posix(), hashlib.sha256(path.read_bytes()).hexdigest()))
-    for name in ("Makefile", "CMakeLists.txt", "scripts/build-mupdf-switch.sh"):
+    for name in ("Makefile", "CMakeLists.txt", "Dockerfile", "scripts/build-mupdf-switch.sh"):
         path = root / name
         entries.append((name, hashlib.sha256(path.read_bytes()).hexdigest()))
     digest = hashlib.sha256("".join(f"{name}\t{sha}\n" for name, sha in sorted(entries)).encode()).hexdigest()

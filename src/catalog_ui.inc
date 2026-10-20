@@ -27,7 +27,7 @@ float pageFlipZoom_{1};int pageFlipPanX_{0},pageFlipPanY_{0};
 void pinPageFlip(){
     if(!doc_)return;
     HistoryPosition position{currentPage_,scrollY_,-1,-1,0};
-    px_document_anchor(doc_,currentPage_,scrollY_,&position.chapter,&position.character,&position.offset);
+    px_document_anchor(doc_,currentPage_,documentScrollY(currentPage_,scrollY_),&position.chapter,&position.character,&position.offset);
     pageFlipPosition_=position;pageFlipZoom_=pdfZoom_;pageFlipPanX_=pdfPanX_;pageFlipPanY_=pdfPanY_;
     quickMenu_=false;dirty_=true;
 }
@@ -35,7 +35,10 @@ void returnToPageFlip(){
     if(!pageFlipPosition_||!doc_)return;
     const auto p=*pageFlipPosition_;readingStats_.reanchor();
     currentPage_=std::clamp(p.page,0,std::max(0,pageCount_-1));scrollY_=p.y;
-    if(px_document_is_epub(doc_))px_document_restore_anchor(doc_,p.chapter,p.character,p.offset,&currentPage_,&scrollY_);
+    if(px_document_is_epub(doc_) || comic()) {
+        float anchorY=0;
+        if(px_document_restore_anchor(doc_,p.chapter,p.character,p.offset,&currentPage_,&anchorY))scrollY_=screenScrollY(currentPage_,anchorY);
+    }
     else {pdfZoom_=pageFlipZoom_;pdfPanX_=pageFlipPanX_;pdfPanY_=pageFlipPanY_;clampPdfPan();}
     pageFlipPosition_.reset();quickMenu_=false;scrollVelocity_=0;saveCurrentPosition();dirty_=true;
 }
@@ -70,7 +73,7 @@ int libraryBookAt(float x,float y) {
     return index>=0&&index<int(visibleBooks_.size())?index:-1;
 }
 void setCatalogPanel(CatalogPanel p){catalogPanel_=p;catalogFocus_=0;catalogScroll_=0;listVelocity_=0;dirty_=true;if(p==CatalogPanel::DeleteConfirm){rebuildFocus();navigationFocus_.select("catalog.row.0");}}
-void openBookActions(const Book &book){actionBook_=book;quickMenu_=false;setCatalogPanel(CatalogPanel::Actions);}
+void openBookActions(const Book &book){if(screen_==ScreenState::Library && openSeriesShelf(book))return;actionBook_=book;quickMenu_=false;setCatalogPanel(CatalogPanel::Actions);}
 void tickLibraryHold(){
     if(libraryHold_&&SDL_GetTicks()-libraryHoldStart_>=550){libraryHold_=false;libraryHoldConsumed_=true;
         listTracking_=false;listVelocity_=0;gestureTracker_.reset();
@@ -305,11 +308,10 @@ void renderCatalogPanel(int w,int h,const ThemePalette &pal){
         const std::string genre=e.genre.empty()?e.sourceGenre:e.genre,series=(e.series.empty()?e.sourceSeries:e.series)+(e.sourceSeriesIndex.empty()?std::string{}:" #"+e.sourceSeriesIndex);
         const int coverWidth=std::min(140,r.w/4),contentHeight=catalogContentTop(r)-r.y-90;
         drawCover(display,{r.x+r.w-coverWidth-20,r.y+82,coverWidth,std::min(contentHeight,coverWidth*14/10)},pal);
-        const std::string formatName = actionBook_.format == Format::Pdf ? "PDF" : actionBook_.format == Format::Cbz ? "CBZ" : "EPUB";
-        const std::string details=display.title+"\n"+display.author+"\n"+formatName+" · "+std::to_string(actionBook_.bytes/1024)+" KiB · "+state+"\n"+catLabel("Tür: ","Genre: ")+genre+"\n"+catLabel("Seri: ","Series: ")+series+"\n"+catLabel("Koleksiyonlar: ","Collections: ")+memberships+"\n"+catLabel("İlerleme: ","Progress: ")+std::to_string(int(p.fraction*100))+"%\n"+catLabel("Son okuma: ","Last read: ")+last+"\n"+actionBook_.path;
+        const std::string details=display.title+"\n"+display.author+"\n"+std::string(formatName(actionBook_.format))+" · "+std::to_string(actionBook_.bytes/1024)+" KiB · "+state+"\n"+catLabel("Tür: ","Genre: ")+genre+"\n"+catLabel("Seri: ","Series: ")+series+"\n"+catLabel("Koleksiyonlar: ","Collections: ")+memberships+"\n"+catLabel("İlerleme: ","Progress: ")+std::to_string(int(p.fraction*100))+"%\n"+catLabel("Son okuma: ","Last read: ")+last+"\n"+actionBook_.path;
         typography_->renderWrapped(renderer_,typography_->smallFont(),details,{r.x+20,r.y+82,r.w-coverWidth-56,contentHeight},pal.fg);
     }
-    if(catalogPanel_==CatalogPanel::DeleteConfirm){typography_->renderWrapped(renderer_,typography_->uiFont(),catLabel("Bu dosya SD karttan kalıcı olarak silinecek. Bu işlem geri alınamaz.\n","This file will be permanently deleted from SD storage. This cannot be undone.\n")+fs::path(actionBook_.path).filename().string()+"\n"+actionBook_.path,{r.x+20,r.y+80,r.w-40,132},pal.fg);}
+    if(catalogPanel_==CatalogPanel::DeleteConfirm){typography_->renderWrapped(renderer_,typography_->uiFont(),catLabel("Bu kitap dosyası SD karttan kalıcı olarak silinecek. Bu işlem geri alınamaz.\n","This book file will be permanently deleted from SD storage. This cannot be undone.\n")+fs::path(actionBook_.path).filename().string()+"\n"+actionBook_.path,{r.x+20,r.y+80,r.w-40,132},pal.fg);}
     if(catalogPanel_==CatalogPanel::Statistics){const auto today=readingStats_.dayMilliseconds(localReadingDay())/60000;const auto total=readingStats_.totalMilliseconds()/60000;
         typography_->renderWrapped(renderer_,typography_->uiFont(),catLabel("Bugün: ","Today: ")+std::to_string(today)+catLabel(" dk\nToplam: "," min\nTotal: ")+std::to_string(total)+catLabel(" dk · Hedef: "," min · Goal: ")+std::to_string(readingStats_.dailyGoal())+catLabel(" dk"," min"),{r.x+20,r.y+80,r.w-40,96},pal.fg);}
     const auto rows=catalogRows();const int top=catalogContentTop(r);SDL_Rect clip{r.x+12,top,r.w-24,std::max(0,r.y+r.h-16-top)};SDL_RenderSetClipRect(renderer_,&clip);

@@ -251,7 +251,18 @@ Format detectFormat(const fs::path &path) {
     if (ext == ".epub") return Format::Epub;
     if (ext == ".pdf") return Format::Pdf;
     if (ext == ".cbz") return Format::Cbz;
+    if (ext == ".cbr") return Format::Cbr;
     return Format::Unsupported;
+}
+
+const char *formatName(Format format) {
+    switch(format) {
+        case Format::Epub:return "EPUB";
+        case Format::Pdf:return "PDF";
+        case Format::Cbz:return "CBZ";
+        case Format::Cbr:return "CBR";
+        default:return "Unknown";
+    }
 }
 
 std::string defaultTitle(const fs::path &path) {
@@ -314,7 +325,7 @@ std::vector<Book> filterByCategory(const std::vector<Book> &books, const Progres
 
     for (const auto &b : books) {
         auto p = store.get(b.id);
-        const bool continuousEpub = b.format == Format::Epub && p.readingMode == 1;
+        const bool continuousEpub = (b.format == Format::Epub || isComic(b.format)) && p.readingMode == 1;
         switch (category) {
             case Category::ContinueReading:
                 if (p.lastRead > 0 && p.fraction < 0.98 &&
@@ -343,6 +354,27 @@ std::vector<Book> filterByCategory(const std::vector<Book> &books, const Progres
         }
     }
     return result;
+}
+
+int naturalCompare(const std::string &a,const std::string &b) {
+    const auto left=turkishCaseFold(a),right=turkishCaseFold(b);
+    std::size_t i=0,j=0;
+    while(i<left.size() && j<right.size()) {
+        if(left[i]>='0' && left[i]<='9' && right[j]>='0' && right[j]<='9') {
+            auto ie=i,je=j;
+            while(ie<left.size() && left[ie]>='0' && left[ie]<='9') ++ie;
+            while(je<right.size() && right[je]>='0' && right[je]<='9') ++je;
+            auto iz=i,jz=j;
+            while(iz<ie && left[iz]=='0') ++iz;
+            while(jz<je && right[jz]=='0') ++jz;
+            if(ie-iz!=je-jz) return ie-iz<je-jz?-1:1;
+            int n=left.compare(iz,ie-iz,right,jz,je-jz); if(n) return n<0?-1:1;
+            i=ie;j=je;continue;
+        }
+        if(left[i]!=right[j]) return static_cast<unsigned char>(left[i])<static_cast<unsigned char>(right[j])?-1:1;
+        ++i;++j;
+    }
+    return i==left.size()?(j==right.size()?0:-1):1;
 }
 
 std::vector<Book> search(const std::vector<Book> &books, const std::string &needle, Sort sort) {
@@ -449,6 +481,7 @@ bool AppSettingsStore::load() {
         preferences.displayOrientation=display.pdfViewMode;
         preferences.preservePdfZoom=display.scrollInertia!=0;
         preferences.shoulderPageTurns=display.publisherStyles==0;
+        preferences.pageCurlAnimation=display.readingMode==0;
         preferences.paperTexture=display.pdfColorMode;
     }
     put(std::move(preferences));
@@ -470,6 +503,7 @@ bool AppSettingsStore::save() const {
     display.pdfViewMode=preferences_.displayOrientation;
     display.scrollInertia=preferences_.preservePdfZoom?1:0;
     display.publisherStyles=preferences_.shoulderPageTurns?0:1;
+    display.readingMode=preferences_.pageCurlAnimation?0:1;
     display.pdfColorMode=preferences_.paperTexture;
     store_.put("APP_DISPLAY_V04_",std::move(display));
     return store_.save();

@@ -62,6 +62,8 @@ int main() {
     assert(localizeUiText("Sayfalar arası yakınlaştırma: Kapalı",1)=="Preserve zoom across pages: Off");
     assert(localizeUiText("L/R sayfa kısayolu: Açık",1)=="L/R page shortcuts: On");
     assert(localizeUiText("L/R sayfa kısayolu: Kapalı",1)=="L/R page shortcuts: Off");
+    assert(localizeUiText("Sayfa çevirme animasyonu: Açık",1)=="Page curl animation: On");
+    assert(localizeUiText("Sayfa çevirme animasyonu: Kapalı",1)=="Page curl animation: Off");
 
     // Live preview paragraphs
     assert(localizeUiText("Bir sayfa, bir dünya",1)=="One page, one world");
