@@ -112,3 +112,18 @@ The test-only branch commit `8c38513` exercises the production `startLibraryScan
 ## J. 2026-10-24 — Cancellation during inventory staging
 
 The code commit `faecf30` adds an atomic cancellation check while converting the completed scan into the disposable `ProgressStore` inventory. A cancelled worker skips the save, leaving the prior inventory file untouched; the existing atomic store save still completes a whole snapshot if cancellation arrives after persistence begins. `papernx_library_index_tests` and `papernx_modern_library_tests` rebuilt and passed **2/2**. The Switch cross-build and artifact validation also passed at `faecf30`: AArch64 ELF/NRO, `-lcurl`, 118 certificates embedded (200,116 bytes), NRO SHA-256 `30c29d0ca291c5dacdc39040627e0a094f25d300259607f22aeb4b3a0e782a95`. No full CTest rerun, hardware test or end-to-end performance measurement was performed. This narrows cancellation's inventory-write window but does not change the provenance classification or complete the requested independent scanner/index redesign.
+
+## L. 2026-10-24 — G3 comic paper reverse / fixed folio
+
+Code commit `37d978f0f34ba86f0f1bda95088d061cae946723` is pushed to the existing feature branch. Comic curls now paint one pinned page/range caption in the reader overlay instead of animating separate folio textures. Comic backs use a theme-derived pale paper surface with subdued reverse ink; paired curls preserve the full-color target page at the final endpoint. Tests read the footer region at six animation progresses and compare single/wide and paired texture captures.
+
+| Area | G3 result | Evidence |
+|---|---|---|
+| Comic paper reverse / fixed folio | TARGETED DESKTOP PASS | `papernx_reader_input_tests`, `papernx_reader_spread_tests`, `papernx_comic_app_tests`, `papernx_page_curl_app_tests`; the first three also cover single/paired/zoom and endpoint/cancel behavior. |
+| Comic worker performance regression | PASS | `papernx_comic_performance_tests`; no new UI rasterization regression was observed. No before/after timing baseline was captured. |
+| Page Curl normal and fallback renderers | PASS, 2/2 | `papernx_page_curl_tests` and `papernx_page_curl_fallback_tests`. |
+| Pixel screenshot evidence | PASS | `verification/v092/ui/comic-folio/comic-paired-0.bmp`, `...-20.bmp`, `...-40.bmp`, `...-60.bmp`, `...-80.bmp`, `...-100.bmp`; footer pixels are asserted identical during the curl. |
+| Full native / Switch / sanitizers / physical device | NOT RUN / UNVERIFIED | Full suite and Switch build were not restarted at G3; hardware renderer, Joy-Con and SD behavior remain unverified. |
+| Performance impact | UNVERIFIED | The extra per-frame folio render targets were removed, but texture memory/frame-time/FPS were not measured against a baseline. |
+
+**Decision remains INCOMPLETE — BLOCKERS REMAIN.** Updater canonical-NRO power-loss recovery, source-module redesign, full current-HEAD suite, Switch verification, physical-device acceptance and cover benchmarks remain open.

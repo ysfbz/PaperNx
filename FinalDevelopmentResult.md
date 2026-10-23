@@ -289,3 +289,29 @@ Bu bölüm, ana v0.9.2 hardening görevinin devamıdır; release hazırlığı v
 | Full native CTest, Switch cross-build, ASan/UBSan ve fiziksel Switch | **NOT RUN / UNVERIFIED** | Bu G2 checkpoint’inde çalıştırılmadı. RAR koşusunda `XDG_RUNTIME_DIR` uyarısı çıktı; test yine başarıyla tamamlandı. |
 
 **Karar: INCOMPLETE — BLOCKERS REMAIN.** Bu checkpoint comic worker/page-turn davranışını masaüstü odaklı doğrular; 11 alanın tamamını, updater/Switch gereksinimlerini veya fiziksel donanım davranışını tamamlanmış saymaz. Oluşturulmuş `tests/fixtures/comics/performance-37.cbr` dosyası untracked olarak korundu; release, tag, PR, merge veya GitHub Actions çalıştırılmadı.
+
+## M. 2026-10-24 — G3: Comic paper reverse ve sabit folio
+
+- **Branch:** `feature/v0.9.2-complete-reader-enhancements`.
+- **G3 kod commit'i:** `37d978f0f34ba86f0f1bda95088d061cae946723` (`fix(reader): pin comic folio and soften curl reverse`).
+- `PageTurnAnimation` artık comic folio'ları için üç geçici SDL texture ayırmıyor. Dönüş başlamadan önce mevcut `comicSpreadPages()` üzerinden eski tekli veya aralıklı sayaç metni hazırlanıyor; animasyon boyunca reader overlay katmanında sabit çiziliyor. Sayfa/sayaç metni animasyon sonunda normal aktif konuma geçiyor. Mevcut controller dönüşünün `currentPage_`/progress kaydetme zamanı değiştirilmedi.
+- Comic arka yüzü mevcut `ThemePalette::bg` token'ından türetilen hafif sıcak kâğıt zeminine ve düşük opacity/düşük doygunluklu ters mürekkep kopyasına sahip. Paylaşılan kaynak texture'ın SDL color/alpha/blend ayarları kopyalama sonunda geri yükleniyor. Tekli/wide dönüşte hedef sayfa `next` olarak tam renkte korunuyor; iki-yaprak dönüşte `paperBack` yalnızca ara yüzeyde kullanılıyor, `back` ise tam renkli hedef spread'i bitiş karesi için koruyor.
+- Tekli/wide ve iki-yaprak spread geometrileri, cache eviction ve 0/20/40/60/80/100 animasyon karelerindeki alt folio pikselleri test edildi. G3 sayfa curl akışında mevcut PageCurl geometri/fallback algoritmaları korunuyor; renderer API'sine yalnız opsiyonel comic ters-yüz texture'ı eklendi.
+- **Provenance:** `include/papernx/page_curl.hpp` G3 öncesinde v0.9.1'den gelen ve ana karşılaştırma tabanında zaten bulunan koddu; yeni değişiklik bu algoritmanın bağımsız kökeni hakkında iddia oluşturmaz. Altı fork modülü G3 commit'inde değişmedi. Ayrıntı ve SHA kanıtı `docs/V092_SOURCE_PROVENANCE_AUDIT.md` içindedir.
+
+### Çalıştırılan kontroller
+
+| Kontrol | Sonuç | Kanıt |
+|---|---|---|
+| G3 hedef build | **PASS** | `papernx_reader_input_tests`, `papernx_reader_spread_tests`, `papernx_comic_app_tests`, `papernx_comic_performance_tests`, `papernx_page_curl_app_tests` hedefleri derlendi. Son kaynak için `papernx_reader_input_tests` tekrar derlendi. |
+| Comic performance | **PASS** | Hedefli CTest `papernx_comic_performance_tests`, 34.10 sn. Önce/sonra baseline yok; hızlanma iddiası yok. |
+| Reader input / sabit folio | **PASS** | Son hedefli CTest `papernx_reader_input_tests`, 1/1. Alt footer bölgesi 0–100% boyunca `SDL_RenderReadPixels` ile karşılaştırıldı; tekli/wide ve spread back texture farkı sınandı. Görüntüler: `verification/v092/ui/comic-folio/comic-paired-{0,20,40,60,80,100}.bmp`. |
+| Reader spread | **PASS** | Hedefli CTest `papernx_reader_spread_tests`, 1/1; spread uç kareleri, farklı tema/yön ve EPUB/PDF regresyonları. |
+| Comic uygulama akışı | **PASS** | Hedefli CTest `papernx_comic_app_tests`, 1/1; async comic hedefleri için test worker'ı bekliyor ve bozuk geçerli sayfa isteğinin mevcut konumu koruyup hata verdiğini doğruluyor. |
+| Page Curl uygulama | **PASS** | `papernx_page_curl_app_tests`, 1/1. |
+| Page Curl geometrisi ve fallback | **PASS, 2/2** | `papernx_page_curl_tests` ve `papernx_page_curl_fallback_tests`. |
+| İlk birleştirilmiş hedef koşusu | **DÜZELTİLDİ VE TEKRARLANDI** | İlk koşu 3/5 geçti; reader input testindeki tekli/wide spread varsayımı ve comic app testindeki eski eşzamanlı worker varsayımı yakalandı. Asenkron bekleme ve geometriye uygun assertions eklendi; iki hedefi ayrı çalıştırınca PASS oldu. |
+| Full CTest / Switch / sanitizers / fiziksel Switch | **NOT RUN / UNVERIFIED** | G3 için tam test zinciri yeniden başlatılmadı; Switch ekranı, gerçek SD/FAT, Joy-Con ve kâğıt arkası cihaz render'ı denenmedi. |
+| Performans | **UNVERIFIED** | Folio target texture'ları kaldırıldı, ancak frame-time, texture RAM ve Switch FPS öncesi/sonrası ölçülmedi. |
+
+**Karar: INCOMPLETE — BLOCKERS REMAIN.** G3 kodu commit'i `37d978f0f34ba86f0f1bda95088d061cae946723`. G4 updater kurtarma kapısı, G5 bağımsız kaynak mimarisi, full current-HEAD suite/Switch doğrulaması, fiziksel cihaz testleri ve cover performans ölçümleri açık. Release, tag, PR, merge veya GitHub Actions çalıştırılmadı. Devam planı ve 43,484,977 baytlık RAR fixture untracked bırakıldı ve bu commit'e alınmadı.
