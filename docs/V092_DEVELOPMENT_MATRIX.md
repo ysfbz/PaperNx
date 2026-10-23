@@ -1,6 +1,6 @@
 # PaperNX v0.9.2 — Development Acceptance Matrix
 
-> **Audit correction (2026-10-23):** The older `CODE COMPLETE / TESTED` labels in this historical matrix are withdrawn as acceptance evidence. Section G at the end is the current, evidence-based status and supersedes every earlier completion or release-readiness statement in this file.
+> **Audit correction (2026-10-23):** The older `CODE COMPLETE / TESTED` labels in this historical matrix are withdrawn as acceptance evidence. Section H at the end is the latest, evidence-based status and supersedes every earlier completion or release-readiness statement in this file.
 
 **Baseline:** `main@8db85384a1b6c277c74766601ef46e9a672328df` (2026-10-23 audit)  
 **Feature branch:** `feature/v0.9.2-complete-reader-enhancements`  
@@ -75,3 +75,19 @@
 - Corrected stale fixtures and synchronous-scan assumptions in legacy application tests; dedicated tests exercise the actual asynchronous scan path.
 - Kept the main application class and existing `.inc` organization to avoid a broad, behavior-risking move without a focused boundary. The file remains large and is a maintainability risk, not a completed modularization.
 - Source origin remains conservative; see [`V092_SOURCE_PROVENANCE_AUDIT.md`](V092_SOURCE_PROVENANCE_AUDIT.md). No legal attribution was removed.
+
+## H. 2026-10-23 continuation after the reader quick-menu checkpoint
+
+**Current source HEAD:** `b9a22bcf023165ab0338c6e9cbf9a92253290e7f` on `feature/v0.9.2-complete-reader-enhancements`. **Decision remains INCOMPLETE — BLOCKERS REMAIN.** The six-file byte-identity statement is historical at `a35aa7b`; at current HEAD five existing files have different blobs and `include/papernx/interface_theme.hpp` is deleted. Fork-derived attribution remains in place. See [`V092_SOURCE_PROVENANCE_AUDIT.md`](V092_SOURCE_PROVENANCE_AUDIT.md).
+
+| Checkpoint | Result | Evidence |
+|---|---|---|
+| Library scan cancellation | PASS | Commit `e791394`. `LibraryScanner` publishes cancellation so the owner can join the worker; canceled snapshots are ignored and queued rescan requests restart after the worker is joined. Targeted `papernx_library_index_tests` and `papernx_modern_library_tests`: **2/2 passed**. |
+| Updater incomplete-state recovery | PASS on host | Commit `b9a22bc`. Missing boot record plus `.swap`/`.boot.started` restores `.old`; ambiguous state without backup reports an error; safe orphan backup is cleaned only with canonical NRO present. Targeted updater unit and local HTTPS tests: **2/2 passed**. |
+| Switch link and RomFS | PASS | `docker compose run --rm switch bash -lc 'make -j4 && python3 scripts/verify_artifacts.py --version 0.9.1'`: `PaperNX.elf`/NRO validated for AArch64; `-lcurl` linked; embedded CA matched `romfs/cacert.pem` (118 certificates, 200,116 bytes). NRO SHA-256 `e6efb4e6a1f3e3163c1237ffc3982d2047409e34f502712f06d370e9ea420b64`. Hardware field remains `UNVERIFIED`. |
+| Reader quick menu and single-page defaults | PASS on targeted host tests | Commit `36aec98`; earlier focused reader/app test set passed. Joy-Con SDL START event and touch `+` use the same quick menu state. Physical controller remains unverified. |
+| Full native suite at this HEAD | NOT RUN | A full 30/30 CTest run is recorded at the earlier `8204f77` checkpoint. It was not restarted after the reader checkpoint and later cancellation/updater changes, per the instruction to avoid restarting the full verification chain. |
+| Performance matrix | PARTIAL / UNVERIFIED | Synthetic cache scale checks exist; no cold/warm end-to-end 100/500/1000-book timing, archive reopen counters, Switch FPS/RAM traces, or before/after speedup data. |
+| Hardware | UNVERIFIED | Physical Switch TLS/NIFM, brightness restoration, suspend/resume, Joy-Con input, and SD interruption/recovery were not exercised. |
+
+The updater now handles some incomplete metadata states if PaperNX can launch. It does **not** make the two-rename FAT interruption window power-loss proof: if the canonical NRO path is absent, manual restoration from `.old` using an external file manager or computer is still required. No release, tag, PR, merge, or GitHub Actions run was created.
