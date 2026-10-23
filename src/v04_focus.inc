@@ -22,7 +22,7 @@
             ui::SettingsLayout l(w,h);
             // Initial focus is the first setting; selection is still the independent current preference.
             for(int i=0;i<settingsRows();++i){if(aaTab_==2 && i<5)continue;if(aaTab_==4 && i==4 && (!doc_ || px_document_is_epub(doc_)))continue;if(aaTab_==5 && i==4 && browserPath_.empty())continue;auto r=l.control(i);r.y-=int(settingsScroll_);add("setting."+std::to_string(i),r);}
-            if(aaTab_==2)for(int i=0;i<9;++i){auto r=l.control(i/2);r.y-=int(settingsScroll_);int half=(r.w-12)/2;r.x+=(i%2)*(half+12);r.w=half;add("theme."+std::to_string(i),r);}
+            if(aaTab_==2)for(int i=0;i<10;++i){auto r=l.control(i/2);r.y-=int(settingsScroll_);int half=(r.w-12)/2;r.x+=(i%2)*(half+12);r.w=half;add("theme."+std::to_string(i),r);}
             for(int i=0;i<6;++i)add("tab."+std::to_string(i),l.tab(i));
             if(doc_ && aaTab_!=4 && aaTab_!=5)add("scope",l.scope);
             add("close",l.close);

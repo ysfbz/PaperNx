@@ -32,7 +32,9 @@ void showUpdateDialog() {
     quickMenu_=helpMenu_=false;updateDialog_=true;updateNotes_=false;updateFocus_=2;dirty_=true;
 }
 void checkForUpdate() {
-    updateManual_=true;showUpdateDialog();updater_->check();updateSeen_=UpdateState::Idle;
+    updateManual_=true;showUpdateDialog();updateSeen_=UpdateState::Idle;
+    if(!startUpdateNetwork())updater_->reportError("Network services are unavailable");
+    else if(!updater_->check())dirty_=true;
 }
 void pollUpdates() {
     const auto state=updater_->status();
@@ -54,16 +56,16 @@ void pollUpdates() {
 }
 SDL_Rect updatePanel(int w,int h) const {const int width=std::min(660,w-48),height=std::min(540,h-112);return {(w-width)/2,(h-height)/2,width,height};}
 SDL_Rect updateButton(int index,int count,int w,int h) const {const auto r=updatePanel(w,h);const int step=(r.w-48)/count;return {r.x+24+index*step,r.y+r.h-80,step-8,56};}
-int updateButtonCount(const UpdateStatus &s) const {return !updateNotes_&&s.state==UpdateState::Available&&s.release.installable()?3:1;}
+int updateButtonCount(const UpdateStatus &s) const {return updateBusy(s)||s.state==UpdateState::Cancelled?1:s.state==UpdateState::Ready?2:!updateNotes_&&s.state==UpdateState::Available&&s.release.installable()?3:1;}
 bool updateBusy(const UpdateStatus &s) const {return s.state==UpdateState::Checking||s.state==UpdateState::Downloading;}
 void activateUpdate(int index) {
-    const auto s=updater_->status();if(updateBusy(s))return;
+    const auto s=updater_->status();if(updateBusy(s)){updater_->cancel();return;}
     if(updateNotes_){updateNotes_=false;updateFocus_=1;std::fill(std::begin(updateAxes_),std::end(updateAxes_),0.f);dirty_=true;return;}
     if(s.state==UpdateState::Available && s.release.installable()) {
         if(index==1){updateNotes_=true;updateNotesScroll_=0;updateFocus_=0;}
         else if(index==2){saveCurrentPosition();flushProgress();updater_->download();}
         else {updateDialog_=false;updateManual_=false;}
-    } else if(s.state==UpdateState::Ready) {updateRestart_=true;exitRequested_=true;}
+    } else if(s.state==UpdateState::Ready) {if(index==1){updateRestart_=true;exitRequested_=true;}else {updateDialog_=false;updateManual_=false;}}
     else {updateDialog_=false;updateManual_=false;}
     dirty_=true;
 }
@@ -76,7 +78,7 @@ bool updateEvent(SDL_Event e) {
     }
     if(e.type==SDL_FINGERUP){
         const int count=updateButtonCount(s),x=int(e.tfinger.x*w),y=int(e.tfinger.y*h);
-        if(!updateBusy(s))for(int i=0;i<count;++i)if(ui::contains(updateButton(i,count,w,h),x,y)){activateUpdate(i);break;}
+        for(int i=0;i<count;++i)if(ui::contains(updateButton(i,count,w,h),x,y)){activateUpdate(i);break;}
         ui::pointer(0,0,false);return true;
     }
     if(e.type==SDL_MOUSEWHEEL){if(updateNotes_)updateNotesScroll_=std::max(0.f,updateNotesScroll_-e.wheel.y*48);dirty_=true;return true;}
@@ -88,8 +90,7 @@ bool updateEvent(SDL_Event e) {
     if(e.type==SDL_KEYDOWN||e.type==SDL_CONTROLLERBUTTONDOWN){
         orientDirectionalEvent(e);const bool pad=e.type==SDL_CONTROLLERBUTTONDOWN;const int k=pad?e.cbutton.button:e.key.keysym.sym;
         auto is=[&](int key,int button){return k==(pad?button:key);};
-        if(updateBusy(s))return true;
-        if(is(SDLK_ESCAPE,SDL_CONTROLLER_BUTTON_B)){if(updateNotes_){updateNotes_=false;updateFocus_=1;}else if(s.state!=UpdateState::Ready){updateDialog_=false;updateManual_=false;}}
+        if(is(SDLK_ESCAPE,SDL_CONTROLLER_BUTTON_B)){if(updateBusy(s))updater_->cancel();else if(updateNotes_){updateNotes_=false;updateFocus_=1;}else if(s.state!=UpdateState::Ready){updateDialog_=false;updateManual_=false;}else {updateDialog_=false;updateManual_=false;}}
         else if(is(SDLK_RETURN,SDL_CONTROLLER_BUTTON_A))activateUpdate(std::clamp(updateFocus_,0,updateButtonCount(s)-1));
         else if(is(SDLK_LEFT,SDL_CONTROLLER_BUTTON_DPAD_LEFT))updateFocus_=std::max(0,updateFocus_-1);
         else if(is(SDLK_RIGHT,SDL_CONTROLLER_BUTTON_DPAD_RIGHT)||(!pad&&k==SDLK_TAB))updateFocus_=(updateFocus_+1)%updateButtonCount(s);
@@ -121,6 +122,7 @@ void renderUpdateDialog(int w,int h,const ThemePalette &pal) {
         else if(s.state==UpdateState::Current)text=ui::label("You are on the latest version")+"\n\n"+APP_VERSION_FULL;
         else if(s.state==UpdateState::Error)text=ui::label("Could not update PaperNX")+"\n\n"+ui::label(s.error);
         else if(s.state==UpdateState::Ready)text=ui::label("Update downloaded. Restart to finish installation.");
+        else if(s.state==UpdateState::Cancelled)text=ui::label("Update cancelled");
         else if(s.state==UpdateState::Available){
             text=ui::label("New version available")+"\n\n"+s.release.version+"\n"+s.release.title;
             if(s.release.bytes)text+="\n"+std::to_string((s.release.bytes+1048575)/1048576)+" MB";
@@ -129,10 +131,11 @@ void renderUpdateDialog(int w,int h,const ThemePalette &pal) {
         SDL_RenderSetClipRect(renderer_,&body);typography_->renderWrapped(renderer_,typography_->uiFont(),text,body,pal.fg);SDL_RenderSetClipRect(renderer_,nullptr);
         if(s.state==UpdateState::Downloading)typography_->drawProgressBar(renderer_,body.x,panel.y+panel.h-118,body.w,8,s.percent/100.f,pal.cardBorder,pal.accent);
     }
-    if(updateBusy(s))return;
     const int count=updateButtonCount(s);
     for(int i=0;i<count;++i){
-        const char *label=count==3?(i==0?"Later":i==1?"What's new":"Update"):updateNotes_?"Back":s.state==UpdateState::Ready?"Restart":"Close";
+        const char *label=count==3?(i==0?"Later":i==1?"What's new":"Update"):
+            updateBusy(s)?s.state==UpdateState::Checking?"Cancel check":"Cancel download":
+            updateNotes_?"Back":s.state==UpdateState::Ready?(i==0?"Later":"Restart"):"Close";
         auto r=updateButton(i,count,w,h);ui::button(renderer_,*typography_,r,ui::label(label),pal,i==std::clamp(updateFocus_,0,count-1));
     }
 }

@@ -13,7 +13,7 @@ struct UpdateRelease {
     std::uint64_t bytes{0};
     bool installable() const {return !url.empty() && (!sha256.empty() || !checksumUrl.empty());}
 };
-enum class UpdateState {Idle,Checking,Current,Available,Downloading,Ready,Error};
+enum class UpdateState {Idle,Checking,Current,Available,Downloading,Ready,Cancelled,Error};
 struct UpdateStatus {
     UpdateState state{UpdateState::Idle};
     UpdateRelease release;
@@ -36,12 +36,22 @@ class SelfUpdater {
 public:
     ~SelfUpdater();
     void configure(std::filesystem::path executable,std::string version,
-                   std::string certificates={},UpdateSource source={});
+                   std::string certificates={});
+#ifdef PAPERNX_UPDATE_TESTING
+    void configureForTesting(std::filesystem::path executable,std::string version,
+                             std::string certificates,UpdateSource source);
+#endif
     bool check();
     bool download();
     UpdateStatus status() const;
+    void cancel();
     void stop();
     bool applyPending(std::string &error);
+    enum class BootRecovery {Normal,Candidate,RolledBack,Error};
+    BootRecovery prepareBoot(std::string &error);
+    bool confirmBoot(std::string &error);
+    bool rollbackBoot(std::string &error);
+    void reportError(std::string error);
     const std::filesystem::path &executable() const {return executable_;}
 private:
     std::filesystem::path executable_;
@@ -54,6 +64,8 @@ private:
     void publish(UpdateState state,const std::string &error={});
     bool busy() const;
     bool validatePending(std::string &error) const;
+    void configureSource(std::filesystem::path executable,std::string version,
+                         std::string certificates,UpdateSource source);
 };
 
 } // namespace papernx

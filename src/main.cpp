@@ -2,7 +2,6 @@
 #include "papernx/core.hpp"
 #include "papernx/mupdf_bridge.h"
 #include "papernx/theme.hpp"
-#include "papernx/interface_theme.hpp"
 #include "papernx/typography.hpp"
 #include "papernx/gestures.hpp"
 #include "papernx/page_cache.hpp"
@@ -29,16 +28,6 @@
 
 #ifdef __SWITCH__
 #include <switch.h>
-static bool s_lblActive = false;
-static void updateSwitchBacklight(int percent) {
-    if (!s_lblActive) {
-        if (R_SUCCEEDED(lblInitialize())) s_lblActive = true;
-    }
-    if (s_lblActive) {
-        float b = std::clamp(percent / 100.0f, 0.05f, 1.0f);
-        lblSetCurrentBrightnessSetting(b);
-    }
-}
 #endif
 
 
@@ -140,9 +129,12 @@ public:
     ~PaperNxApp() {
         libraryScanner_.stop();
         updater_->stop();
+        restoreSystemBrightness();
+        stopUpdateNetwork();
         pagePreviews_.stop();
         comicPages_.stop();
         exportTimings();
+        if(brightnessDragRow_>=0)persistAppSettings();
         if(appSavePending_)appSettings_.save();
         if(catalogSavePending_)catalog_.save();
         if(layoutWorker_.joinable()) layoutWorker_.join();
@@ -281,9 +273,67 @@ public:
 #else
         updater_->configure(path,APP_VERSION);
 #endif
-        updater_->check();
+        autoUpdateCheckPending_=appSettings_.get().automaticUpdateCheck;
     }
     bool restartAfterUpdate() const {return updateRestart_;}
+    void showStartupMessage(std::string message) {currentErrorMessage_=std::move(message);dirty_=true;}
+    void confirmBootAfterFirstRender() {
+        if(bootFrameConfirmed_)return;
+        bootFrameConfirmed_=true;std::string error;
+        if(!updater_->confirmBoot(error)){logMessage("Update startup confirmation: "+error);currentErrorMessage_=error;dirty_=true;}
+    }
+
+    bool startUpdateNetwork() {
+#ifdef __SWITCH__
+        if(networkReady_)return true;
+        if(!socketsReady_) {
+            if(R_FAILED(socketInitializeDefault()))return false;
+            socketsReady_=true;
+        }
+        if(R_FAILED(nifmInitialize(NifmServiceType_User)))return false;
+        networkReady_=true;
+#endif
+        return true;
+    }
+    void stopUpdateNetwork() {
+#ifdef __SWITCH__
+        if(networkReady_){nifmExit();networkReady_=false;}
+        if(socketsReady_){socketExit();socketsReady_=false;}
+#endif
+    }
+    bool setSystemBrightness(int percent) {
+#ifdef __SWITCH__
+        if(backlightUnavailable_)return false;
+        if(!backlightReady_) {
+            if(appletGetOperationMode()!=AppletOperationMode_Handheld || R_FAILED(lblInitialize())) {
+                backlightUnavailable_=true;return false;
+            }
+            backlightReady_=true;
+            bool automatic=false;
+            if(R_FAILED(lblIsAutoBrightnessControlEnabled(&automatic)) || automatic ||
+               R_FAILED(lblGetCurrentBrightnessSetting(&backlightOriginal_)) ||
+               !std::isfinite(backlightOriginal_) || backlightOriginal_<0.f || backlightOriginal_>1.f) {
+                lblExit();backlightReady_=false;backlightUnavailable_=true;return false;
+            }
+            backlightOriginalReady_=true;
+        }
+        if(R_FAILED(lblSetCurrentBrightnessSetting(std::clamp(percent,10,100)/100.f))) {
+            restoreSystemBrightness();backlightUnavailable_=true;return false;
+        }
+        backlightAvailable_=true;return true;
+#else
+        (void)percent;return false;
+#endif
+    }
+    void restoreSystemBrightness() {
+#ifdef __SWITCH__
+        if(backlightReady_) {
+            if(backlightOriginalReady_)lblSetCurrentBrightnessSetting(backlightOriginal_);
+            lblExit();backlightReady_=false;backlightOriginalReady_=false;
+        }
+#endif
+        backlightAvailable_=false;
+    }
 
     void run() {
         bool running = true;
@@ -295,7 +345,7 @@ public:
             auto dispatch=[&](const SDL_Event &event) {
                 const bool wasTurning=pageTurnAnimation_.active;handleEvent(event,running);
                 if(dirty_ && (event.type==SDL_FINGERDOWN || event.type==SDL_MOUSEBUTTONDOWN ||
-                   (!wasTurning && pageTurnAnimation_.active && !pageTurnAnimation_.dragging))) {render();dirty_=false;}
+                   (!wasTurning && pageTurnAnimation_.active && !pageTurnAnimation_.dragging))) {render();dirty_=false;confirmBootAfterFirstRender();}
             };
             // Event-driven loop: wait up to 100ms for events, then flush and draw if dirty
             bool receivedEvent=SDL_WaitEventTimeout(&e, (continuous() && std::abs(scrollVelocity_) > 1) || pageTurnAnimation_.active || std::abs(panVelocityX_)+std::abs(panVelocityY_)>2 || std::abs(listVelocity_)>1 || layoutPending_ || layoutWorker_.joinable() ? 8 : controller_ || controllerMotionActive() || pagePreviews_.pending() || comicPages_.pending() ? 16 : 100);
@@ -334,7 +384,17 @@ public:
             if (dirty_ && running) {
                 render();
                 dirty_ = false;
+                confirmBootAfterFirstRender();
             } else if(!receivedEvent && running) idlePrefetch();
+            if(backlightApplyPending_ && running && !appBackground_) {
+                backlightApplyPending_=false;
+                backlightAvailable_=setSystemBrightness(appSettings_.get().systemBrightness);
+            }
+            if(autoUpdateCheckPending_ && running && !appBackground_) {
+                autoUpdateCheckPending_=false;
+                if(startUpdateNetwork())updater_->check();
+                else updater_->reportError("Network services are unavailable");
+            }
             if(appSavePending_ && !dirty_ && SDL_GetTicks()>=appSaveRetryAt_) {appSavePending_=!appSettings_.save();if(appSavePending_){appSaveRetryAt_=SDL_GetTicks()+3000;currentErrorMessage_="Settings could not be saved";dirty_=true;}}
             // Persist newly extracted metadata only after the first responsive reader frame.
             if(catalogSavePending_ && !dirty_ && !pageTurnAnimation_.active && SDL_GetTicks()>=catalogSaveRetryAt_) {
@@ -365,6 +425,15 @@ private:
     std::unique_ptr<Typography> typography_;
 
     bool romfsReady_{false};
+#ifdef __SWITCH__
+    bool socketsReady_{false},networkReady_{false};
+    bool backlightReady_{false},backlightOriginalReady_{false},backlightUnavailable_{false};
+    float backlightOriginal_{1.f};
+#endif
+    bool backlightApplyPending_{true},backlightAvailable_{false},autoUpdateCheckPending_{false};
+    bool bootFrameConfirmed_{false};
+    SDL_FingerID brightnessFinger_{0};
+    int brightnessDragRow_{-1};
     SDL_Window *window_{nullptr};
     SDL_Renderer *renderer_{nullptr};
     SDL_Texture *orientationTarget_{nullptr};
@@ -856,7 +925,7 @@ private:
         return readerChromePalette(progressStore_.get("PAPERNX_DEFAULTS"),false,0,0);
     }
     ThemePalette interfacePalette() const {
-        const auto &a=appSettings_.get();return modernInterfacePalette(palette(),a.interfaceStyle,a.interfaceAccent);
+        const auto &a=appSettings_.get();return resolveInterfacePalette(palette(),a.interfaceStyle,a.interfaceAccent);
     }
     PageTurnTexture interfaceBackground_{nullptr,SDL_DestroyTexture};
     int interfaceBackgroundHeight_{0},interfaceBackgroundStyle_{-1},interfaceBackgroundAccent_{-1};
@@ -1790,7 +1859,7 @@ private:
     }
 
     bool canCurlPage() {
-        return doc_ && screen_==ScreenState::Reader && !quickMenu_ && !appBackground_ &&
+        return appSettings_.get().pageCurlAnimation && doc_ && screen_==ScreenState::Reader && !quickMenu_ && !appBackground_ &&
                !continuous() && !layoutPending_ && !layoutWorker_.joinable() &&
                (px_document_is_epub(doc_) || comic() || std::abs(pdfZoom_-1.f)<.01f);
     }
@@ -1814,7 +1883,7 @@ private:
         const int direction=(target>currentPage_?1:-1)*readingDirection();
         if(!comic() && !px_document_is_epub(doc_) && !appSettings_.get().preservePdfZoom)
             setPdfView(extraStyle_.pdfViewMode);
-        const bool animate=appSettings_.get().pageCurlAnimation && canCurlPage() && std::abs(delta)==1 && prepareReaderTurn(currentPage_,target,direction);
+        const bool animate=canCurlPage() && std::abs(delta)==1 && prepareReaderTurn(currentPage_,target,direction);
         if(!animate)cancelPageTurn();
         scrollY_=scrollVelocity_=0;
         currentPage_=target;
@@ -2359,6 +2428,47 @@ private:
     #include "page_navigation.inc"
     #include "self_update_ui.inc"
 
+    void changeBrightnessFromSlider(int row,int x,int width,int height,bool save) {
+        ui::SettingsLayout layout(width,height);auto control=layout.control(row);control.y-=int(settingsScroll_);
+        const auto track=ui::settingsSliderTrack(control);auto preferences=appSettings_.get();
+        if(row==8)preferences.softwareBrightness=ui::settingsSliderValue(track,x,50,100);
+        else preferences.systemBrightness=ui::settingsSliderValue(track,x,10,100);
+        appSettings_.put(preferences);
+        if(row==9) {
+#ifdef __SWITCH__
+            backlightAvailable_=setSystemBrightness(preferences.systemBrightness);
+            if(!backlightAvailable_)currentErrorMessage_=catLabel("El cihazı parlaklık servisi kullanılamıyor; yazılımsal dimmer kullanılabilir.",
+                "Handheld brightness control is unavailable; software dimming remains available.");
+#endif
+        }
+        if(save)persistAppSettings();
+        dirty_=true;
+    }
+    bool brightnessSliderEvent(const SDL_Event &event) {
+        if(brightnessDragRow_>=0) {
+            if(event.type!=SDL_FINGERMOTION && event.type!=SDL_FINGERUP && event.type!=SDL_FINGERDOWN)return false;
+            if(event.tfinger.fingerId!=brightnessFinger_)return true;
+            int width,height;getWindowSize(width,height);
+            changeBrightnessFromSlider(brightnessDragRow_,int(event.tfinger.x*width),width,height,event.type==SDL_FINGERUP);
+            ui::pointer(int(event.tfinger.x*width),int(event.tfinger.y*height),event.type!=SDL_FINGERUP);
+            if(event.type==SDL_FINGERUP)brightnessDragRow_=-1;
+            return true;
+        }
+        if(screen_!=ScreenState::AaModal || aaTab_!=2 || event.type!=SDL_FINGERDOWN)return false;
+        int width,height;getWindowSize(width,height);const int x=int(event.tfinger.x*width),y=int(event.tfinger.y*height);
+        const ui::SettingsLayout layout(width,height);
+        for(int row:{8,9}) {
+            auto control=layout.control(row);control.y-=int(settingsScroll_);
+            const auto track=ui::settingsSliderTrack(control);
+            const SDL_Rect hit{track.x-16,control.y,track.w+32,control.h};
+            if(ui::contains(hit,x,y)) {
+                brightnessDragRow_=row;brightnessFinger_=event.tfinger.fingerId;
+                ui::pointer(x,y,true);changeBrightnessFromSlider(row,x,width,height,false);return true;
+            }
+        }
+        return false;
+    }
+
     // Input & Event Handling
     void handleEvent(const SDL_Event &incoming, bool &running) {
         SDL_Event e=incoming;
@@ -2374,8 +2484,12 @@ private:
             running = false;
             return;
         }
-        if(e.type==SDL_APP_WILLENTERBACKGROUND){cancelPageTurn();appBackground_=true;readingStats_.reanchor();readingStats_.save();journal_.pause(SDL_GetTicks(),std::time(nullptr));journal_.save();}
-        if(e.type==SDL_APP_DIDENTERFOREGROUND){appBackground_=false;controllerFocused_=true;clearHeldControls();readingStats_.reanchor();}
+        if(e.type==SDL_APP_WILLENTERBACKGROUND){restoreSystemBrightness();cancelPageTurn();appBackground_=true;readingStats_.reanchor();readingStats_.save();journal_.pause(SDL_GetTicks(),std::time(nullptr));journal_.save();}
+        if(e.type==SDL_APP_DIDENTERFOREGROUND){appBackground_=false;backlightApplyPending_=true;
+#ifdef __SWITCH__
+            backlightUnavailable_=false;
+#endif
+            controllerFocused_=true;clearHeldControls();readingStats_.reanchor();}
         if(e.type==SDL_FINGERDOWN||e.type==SDL_FINGERMOTION||e.type==SDL_KEYDOWN||e.type==SDL_CONTROLLERBUTTONDOWN||e.type==SDL_CONTROLLERAXISMOTION){
             readingStats_.interaction(SDL_GetTicks());
             if(screen_==ScreenState::Reader&&!quickMenu_&&!appBackground_)journal_.interaction(SDL_GetTicks());
@@ -2407,6 +2521,7 @@ private:
         }
 
         if(updateEvent(e))return;
+        if(brightnessSliderEvent(e))return;
         if(e.type==SDL_WINDOWEVENT && e.window.event==SDL_WINDOWEVENT_FOCUS_LOST) {controllerFocused_=false;clearHeldControls();}
         if(e.type==SDL_WINDOWEVENT && e.window.event==SDL_WINDOWEVENT_FOCUS_GAINED) {controllerFocused_=true;clearHeldControls();}
         if(e.type==SDL_APP_WILLENTERBACKGROUND)clearHeldControls();
@@ -2852,7 +2967,7 @@ private:
         int row=-1; for(int i=0;i<settingsRows();++i) if(ui::contains(l.control(i),px,py+int(settingsScroll_)) && ui::contains(l.content,px,py)) row=i;
         if(row<0) return;
         aaRow_=row;
-        if(aaTab_!=5 || row!=16) coverClearConfirm_=false;
+        if(aaTab_!=5 || row!=17) coverClearConfirm_=false;
         bool right=px>=l.content.x+l.content.w/2;
         if(numericSetting()) {
             auto rect=l.control(row);rect.y-=int(settingsScroll_);int hit=ui::StepperLayout(rect).hit(px,py);
@@ -2884,21 +2999,28 @@ private:
             if(row==7) {extraStyle_.textColor=extraStyle_.backgroundColor=-1;}
             if(row==8) {
                 auto p=appSettings_.get();
-                p.softwareBrightness=std::clamp(p.softwareBrightness+(right?5:-5),10,100);
+                p.softwareBrightness=std::clamp(p.softwareBrightness+(right?5:-5),50,100);
                 appSettings_.put(p);
                 persistAppSettings();
-#ifdef __SWITCH__
-                updateSwitchBacklight(p.softwareBrightness);
-#endif
                 dirty_=true;return;
             }
             if(row==9) {
                 auto p=appSettings_.get();
-                p.softwareBrightness=100;
+                p.systemBrightness=std::clamp(p.systemBrightness+(right?1:-1),10,100);
                 appSettings_.put(p);
                 persistAppSettings();
 #ifdef __SWITCH__
-                updateSwitchBacklight(p.softwareBrightness);
+                backlightAvailable_=setSystemBrightness(p.systemBrightness);
+                if(!backlightAvailable_)currentErrorMessage_=catLabel("El cihazı parlaklık servisi kullanılamıyor; yazılımsal dimmer kullanılabilir.",
+                    "Handheld brightness control is unavailable; software dimming remains available.");
+#endif
+                dirty_=true;return;
+            }
+            if(row==10) {
+                auto p=appSettings_.get();p.softwareBrightness=100;p.systemBrightness=100;
+                appSettings_.put(p);persistAppSettings();
+#ifdef __SWITCH__
+                backlightAvailable_=setSystemBrightness(p.systemBrightness);
 #endif
                 dirty_=true;return;
             }
@@ -2927,8 +3049,9 @@ private:
             if(row==12){startLibraryScan();return;}
             if(row==13){openChoice(8,p.interfaceStyle);return;}
             if(row==14){openChoice(9,p.interfaceAccent);return;}
-            if(row==15){checkForUpdate();return;}
-            if(row==16){
+            if(row==15){p.automaticUpdateCheck=!p.automaticUpdateCheck;appSettings_.put(p);persistAppSettings();return;}
+            if(row==16){checkForUpdate();return;}
+            if(row==17){
                 if(!coverClearConfirm_){coverClearConfirm_=true;dirty_=true;return;}
                 coverClearConfirm_=false;requestCoverCacheClear();dirty_=true;return;
             }
@@ -2963,9 +3086,9 @@ private:
             panReaderBy(dx*64.f,dy*64.f);
         } else handleDirectional(dx,dy);
     }
-    int settingsRows() const { if(comic()) {if(aaTab_==0 || aaTab_==1)return 1;if(aaTab_==4)return 7;}const int rows[]={6,4,10,6,5,17}; return rows[aaTab_]; }
+    int settingsRows() const { if(comic()) {if(aaTab_==0 || aaTab_==1)return 1;if(aaTab_==4)return 7;}const int rows[]={6,4,11,6,5,18}; return rows[aaTab_]; }
     bool numericSetting() const { if(comic() && aaTab_==0)return false;return (aaTab_==0 && (aaRow_==0 || aaRow_==2 || aaRow_==3)) ||
-        (aaTab_==1 && (aaRow_==0 || aaRow_==3)) || (aaTab_==2 && aaRow_==8) || (aaTab_==3 && (aaRow_==2 || aaRow_==4)) || (aaTab_==4 && aaRow_==3); }
+        (aaTab_==1 && (aaRow_==0 || aaRow_==3)) || (aaTab_==2 && (aaRow_==8 || aaRow_==9)) || (aaTab_==3 && (aaRow_==2 || aaRow_==4)) || (aaTab_==4 && aaRow_==3); }
     void settingsActivate(int direction=1) {
         int w,h; getWindowSize(w,h); ui::SettingsLayout l(w,h);
         if(settingsColumn_==-1) { settingsColumn_=0; dirty_=true; return; }
@@ -3136,7 +3259,7 @@ private:
         }
         if (screen_ == ScreenState::AaModal && match(SDLK_y, SDL_CONTROLLER_BUTTON_Y)) {
             if (doc_ && !px_document_is_epub(doc_)) { zoomPdf(1.0f); return; }
-            aaRow_ = (aaRow_ + 1) % (aaTab_ == 0 ? 5 : aaTab_ == 1 ? 5 : aaTab_ == 2 ? 4 : 5);
+            aaRow_ = (aaRow_ + 1) % std::max(1,settingsRows());
             dirty_ = true; return;
         }
         if (screen_ == ScreenState::AaModal && doc_ && !px_document_is_epub(doc_) && match(SDLK_f, SDL_CONTROLLER_BUTTON_X)) {
@@ -3551,8 +3674,14 @@ private:
             row(5,catLabel("Metin rengi · Renk paleti","Text color · Color palette"));
             row(6,catLabel("Arka plan · Renk paleti","Background · Color palette"));
             row(7,catLabel("Tema renklerine sıfırla","Reset theme colors"));
-            row(8,"-    "+catLabel("Ekran parlaklığı (Yazılımsal): %","Brightness (Software): %")+std::to_string(appSettings_.get().softwareBrightness)+"    +");
-            row(9,catLabel("Parlaklığı sıfırla (%100)","Reset brightness (100%)"));
+            auto softwareRow=l.control(8);softwareRow.y-=int(settingsScroll_);
+            ui::settingsSliderRow(renderer_,*typography_,softwareRow,
+                catLabel("Yazılımsal parlaklık","Software brightness"),appSettings_.get().softwareBrightness,50,100,pal,aaRow_==8);
+            auto systemRow=l.control(9);systemRow.y-=int(settingsScroll_);
+            const auto systemLabel=catLabel("Sistem parlaklığı (El cihazı)","System brightness (Handheld)")+" · "+
+                (backlightAvailable_?catLabel("Etkin","Active"):catLabel("Yazılım fallback","Software fallback"));
+            ui::settingsSliderRow(renderer_,*typography_,systemRow,systemLabel,appSettings_.get().systemBrightness,10,100,pal,aaRow_==9);
+            row(10,catLabel("Parlaklığı sıfırla (%100)","Reset brightness (100%)"));
         } else if(aaTab_==3) {
             row(0,"Sayfalı Mod · Yatay gezinme",extraStyle_.readingMode==0);
             row(1,"Sürekli Kaydırma · Yukarı / aşağı",extraStyle_.readingMode==1);
@@ -3598,7 +3727,8 @@ private:
             const char *accents[]={"Purple","Blue","Teal","Green","Orange","Red","Pink"};
             row(13,ui::label("Interface appearance")+": "+ui::label(styles[p.interfaceStyle]));
             row(14,ui::label("Accent color")+": "+ui::label(accents[p.interfaceAccent]));
-            row(15,ui::label("Check for updates"));
+            row(15,ui::label("Automatic update check")+": "+ui::label(p.automaticUpdateCheck?"On":"Off"));
+            row(16,ui::label("Check for updates"));
             std::string coverLabel;
             if(coverClearStatus_.load()==1) {
                 coverLabel = ui::label("Clearing cover cache...");
@@ -3609,7 +3739,7 @@ private:
                     catLabel("kapak","covers") + " (" + formatBytes(coverDiskBytes_.load()) + ") · " +
                     ui::label("Clear");
             }
-            row(16,coverLabel);
+            row(17,coverLabel);
 
         }
         SDL_RenderSetClipRect(renderer_,nullptr);
@@ -3674,43 +3804,78 @@ private:
 
 int main(int argc, char **argv) {
 #ifdef __SWITCH__
-    const bool socketsReady=R_SUCCEEDED(socketInitializeDefault());
-    const bool networkReady=R_SUCCEEDED(nifmInitialize(NifmServiceType_User));
+    fs::path root = "sdmc:/switch/PaperNX";
+#else
+    fs::path root = (argc > 1) ? argv[1] : "./PaperNX-data";
 #endif
+    std::string executable=argc>0&&argv&&argv[0]?argv[0]:"";
+#ifdef __SWITCH__
+    if(!executable.empty()&&executable[0]=='/')executable="sdmc:"+executable;
+#endif
+    auto updater=std::make_shared<SelfUpdater>();
+#ifdef __SWITCH__
+    updater->configure(executable,APP_VERSION,"romfs:/cacert.pem");
+#else
+    updater->configure(executable,APP_VERSION);
+#endif
+    std::string bootError;
+    auto boot=updater->prepareBoot(bootError);
+    auto scheduleRelaunch=[&] {
+#ifdef __SWITCH__
+        if(envHasNextLoad())envSetNextLoad(executable.c_str(),executable.c_str());
+#endif
+    };
+    if(boot==SelfUpdater::BootRecovery::Error) {
+        std::fprintf(stderr,"Update recovery: %s\n",bootError.c_str());return 1;
+    }
+    if(boot==SelfUpdater::BootRecovery::RolledBack) {
+        std::fprintf(stderr,"Update recovery: %s\n",bootError.c_str());scheduleRelaunch();return 0;
+    }
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_EVENTS) != 0) {
         std::fprintf(stderr, "Failed to initialize SDL2: %s\n", SDL_GetError());
+        if(boot==SelfUpdater::BootRecovery::Candidate){updater->rollbackBoot(bootError);scheduleRelaunch();}
         return 1;
     }
     if (TTF_Init() != 0) {
         std::fprintf(stderr, "Failed to initialize SDL2_ttf: %s\n", TTF_GetError());
         SDL_Quit();
+        if(boot==SelfUpdater::BootRecovery::Candidate){updater->rollbackBoot(bootError);scheduleRelaunch();}
         return 1;
     }
 
-#ifdef __SWITCH__
-    fs::path root = "sdmc:/switch/PaperNX";
-#else
-    fs::path root = (argc > 1) ? argv[1] : "./PaperNX-data";
-#endif
+    int result=0;std::string startupMessage;
+    for(;;) {
+        bool restart=false;
+        {
+            PaperNxApp app(root,updater);
+            if(app.init()) {
+                if(!startupMessage.empty())app.showStartupMessage(startupMessage);
+                app.startUpdates(argc,argv);app.run();restart=app.restartAfterUpdate();
+            } else result=1;
+        }
 
-    int result = 0;
-    auto updater=std::make_shared<SelfUpdater>();bool restart=false;
-    {
-        PaperNxApp app(root,updater);
-        if (app.init()){app.startUpdates(argc,argv);app.run();restart=app.restartAfterUpdate();}
-        else result = 1;
+        if(boot==SelfUpdater::BootRecovery::Candidate) {
+            const auto recovery=updater->prepareBoot(bootError);
+            if(recovery==SelfUpdater::BootRecovery::RolledBack) {
+                std::fprintf(stderr,"Update recovery: %s\n",bootError.c_str());scheduleRelaunch();result=0;break;
+            }
+            if(recovery==SelfUpdater::BootRecovery::Error) {
+                std::fprintf(stderr,"Update recovery: %s\n",bootError.c_str());result=1;break;
+            }
+        }
+        if(result || !restart)break;
+
+        std::string updateError;
+        if(updater->applyPending(updateError)) {
+            scheduleRelaunch();break;
+        }
+        if(updateError.empty())updateError="Update installation was not started";
+        std::string recoveryError;
+        startupMessage=updateError;
+        if(updater->rollbackBoot(recoveryError))startupMessage+=" · "+recoveryError;
+        else if(!recoveryError.empty())startupMessage+=" · "+recoveryError;
+        std::fprintf(stderr,"Update: %s\n",startupMessage.c_str());
     }
-
-    // PaperNxApp has released its fonts, renderer and RomFS before this swap.
-    std::string updateError;const bool installed=updater->applyPending(updateError);
-    if(!updateError.empty())std::fprintf(stderr,"Update: %s\n",updateError.c_str());
-#ifdef __SWITCH__
-    if(installed&&restart&&envHasNextLoad())envSetNextLoad(updater->executable().string().c_str(),updater->executable().string().c_str());
-    if(networkReady)nifmExit();
-    if(socketsReady)socketExit();
-#else
-    (void)installed;(void)restart;
-#endif
 
     TTF_Quit();
     SDL_Quit();

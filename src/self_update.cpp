@@ -4,6 +4,8 @@
 #include <mupdf/fitz.h>
 #include <algorithm>
 #include <array>
+#include <charconv>
+#include <cctype>
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
@@ -14,184 +16,825 @@
 
 namespace papernx {
 namespace {
-constexpr std::uint64_t maxNro=256ull*1024*1024;
-struct Version {std::vector<std::string> base,pre;bool valid{false};};
-bool digits(const std::string &s){return !s.empty() && s.find_first_not_of("0123456789")==std::string::npos;}
-std::vector<std::string> split(const std::string &s,char separator){std::vector<std::string> out;std::size_t from=0,to;do{to=s.find(separator,from);out.push_back(s.substr(from,to==s.npos?s.npos:to-from));from=to+1;}while(to!=s.npos);return out;}
-bool identifiers(const std::vector<std::string> &parts,bool numericOnly){
-    for(const auto &p:parts){if(p.empty() || p.size()>32)return false;for(char c:p)if(!((c>='a'&&c<='z')||(c>='A'&&c<='Z')||(c>='0'&&c<='9')||c=='-'))return false;if(numericOnly&&!digits(p))return false;if(digits(p)&&p.size()>1&&p[0]=='0')return false;}return true;
+constexpr std::uint64_t maxNro = 256ull * 1024 * 1024;
+constexpr std::uint64_t installReserve = 1024ull * 1024;
+
+struct Version {
+    std::array<std::uint64_t, 3> core{};
+    std::vector<std::string> prerelease;
+    bool valid{false};
+};
+
+bool digits(const std::string &value) {
+    return !value.empty() && value.find_first_not_of("0123456789") == std::string::npos;
 }
-Version version(std::string s){
-    Version v;if(s.empty()||s.size()>128)return v;if(s[0]=='v'||s[0]=='V')s.erase(0,1);
-    const auto metadata=s.find('+');if(metadata!=s.npos){auto ids=split(s.substr(metadata+1),'.');for(const auto &id:ids)if(id.empty()||id.find_first_not_of("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-")!=id.npos)return v;s.resize(metadata);}
-    const auto dash=s.find('-');if(dash!=s.npos){v.pre=split(s.substr(dash+1),'.');s.resize(dash);if(!identifiers(v.pre,false))return v;}
-    v.base=split(s,'.');v.valid=v.base.size()==3&&identifiers(v.base,true);return v;
+
+std::vector<std::string> split(const std::string &value, char separator) {
+    std::vector<std::string> parts;
+    std::size_t start = 0;
+    while (start <= value.size()) {
+        const auto end = value.find(separator, start);
+        parts.push_back(value.substr(start, end == std::string::npos ? end : end - start));
+        if (end == std::string::npos) break;
+        start = end + 1;
+    }
+    return parts;
 }
-int numericCompare(const std::string &a,const std::string &b){if(a.size()!=b.size())return a.size()>b.size()?1:-1;return a==b?0:a>b?1:-1;}
-int compare(const Version &a,const Version &b){
-    for(int i=0;i<3;++i){int result=numericCompare(a.base[i],b.base[i]);if(result)return result;}
-    if(a.pre.empty()!=b.pre.empty())return a.pre.empty()?1:-1;
-    for(std::size_t i=0;i<std::min(a.pre.size(),b.pre.size());++i){const auto &x=a.pre[i],&y=b.pre[i];if(x==y)continue;bool xn=digits(x),yn=digits(y);if(xn!=yn)return xn?-1:1;return xn?numericCompare(x,y):x>y?1:-1;}
-    return a.pre.size()==b.pre.size()?0:a.pre.size()>b.pre.size()?1:-1;
+
+bool validIdentifiers(const std::vector<std::string> &parts, bool numericOnly) {
+    for (const auto &part : parts) {
+        if (part.empty() || part.size() > 32) return false;
+        for (unsigned char c : part) {
+            if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                  (c >= '0' && c <= '9') || c == '-')) return false;
+        }
+        if (numericOnly && (!digits(part) || (part.size() > 1 && part.front() == '0'))) return false;
+        if (!numericOnly && digits(part) && part.size() > 1 && part.front() == '0') return false;
+    }
+    return true;
 }
-std::string stripV(const std::string &s){return !s.empty()&&(s[0]=='v'||s[0]=='V')?s.substr(1):s;}
-std::string hashValue(std::string value){
-    if(value.compare(0,7,"sha256:")==0)value.erase(0,7);
-    if(value.size()!=64 || value.find_first_not_of("0123456789abcdefABCDEF")!=value.npos)return {};
-    std::transform(value.begin(),value.end(),value.begin(),[](unsigned char c){return char(std::tolower(c));});return value;
+
+Version parseVersion(std::string value) {
+    Version parsed;
+    if (value.empty() || value.size() > 128) return parsed;
+    if (value.front() == 'v' || value.front() == 'V') value.erase(value.begin());
+
+    const auto metadata = value.find('+');
+    if (metadata != std::string::npos) {
+        if (!validIdentifiers(split(value.substr(metadata + 1), '.'), false)) return parsed;
+        value.resize(metadata);
+    }
+
+    const auto dash = value.find('-');
+    if (dash != std::string::npos) {
+        parsed.prerelease = split(value.substr(dash + 1), '.');
+        if (!validIdentifiers(parsed.prerelease, false)) return Version{};
+        value.resize(dash);
+    }
+
+    const auto components = split(value, '.');
+    if (components.size() != parsed.core.size() || !validIdentifiers(components, true)) return Version{};
+    for (std::size_t i = 0; i < components.size(); ++i) {
+        const auto result = std::from_chars(components[i].data(), components[i].data() + components[i].size(), parsed.core[i]);
+        if (result.ec != std::errc{} || result.ptr != components[i].data() + components[i].size()) return Version{};
+    }
+    parsed.valid = true;
+    return parsed;
 }
-std::uint64_t integer(const update_json::Value &v){
-    if(v.kind!=update_json::Value::Number || !digits(v.text) || v.text.size()>12)return 0;
-    std::uint64_t out=0;for(char c:v.text)out=out*10+c-'0';return out;
+
+int compareNumericIdentifier(const std::string &left, const std::string &right) {
+    if (left.size() != right.size()) return left.size() < right.size() ? -1 : 1;
+    return left == right ? 0 : left < right ? -1 : 1;
 }
-struct CurlRuntime {CURLcode result{curl_global_init(CURL_GLOBAL_DEFAULT)};~CurlRuntime(){curl_global_cleanup();}};
+
+int compareVersion(const Version &left, const Version &right) {
+    for (std::size_t i = 0; i < left.core.size(); ++i) {
+        if (left.core[i] != right.core[i]) return left.core[i] < right.core[i] ? -1 : 1;
+    }
+    if (left.prerelease.empty() != right.prerelease.empty()) return left.prerelease.empty() ? 1 : -1;
+    for (std::size_t i = 0; i < std::min(left.prerelease.size(), right.prerelease.size()); ++i) {
+        const auto &a = left.prerelease[i];
+        const auto &b = right.prerelease[i];
+        if (a == b) continue;
+        const bool aNumeric = digits(a), bNumeric = digits(b);
+        if (aNumeric != bNumeric) return aNumeric ? -1 : 1;
+        return aNumeric ? compareNumericIdentifier(a, b) : a < b ? -1 : 1;
+    }
+    if (left.prerelease.size() == right.prerelease.size()) return 0;
+    return left.prerelease.size() < right.prerelease.size() ? -1 : 1;
+}
+
+std::string withoutPrefix(std::string value) {
+    if (!value.empty() && (value.front() == 'v' || value.front() == 'V')) value.erase(value.begin());
+    return value;
+}
+
+std::string normalizedHash(std::string value) {
+    if (value.compare(0, 7, "sha256:") == 0) value.erase(0, 7);
+    if (value.size() != 64 || value.find_first_not_of("0123456789abcdefABCDEF") != std::string::npos) return {};
+    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) { return char(std::tolower(c)); });
+    return value;
+}
+
+std::uint64_t jsonInteger(const update_json::Value &value) {
+    if (value.kind != update_json::Value::Number || !digits(value.text) || value.text.size() > 12) return 0;
+    std::uint64_t result = 0;
+    const auto parsed = std::from_chars(value.text.data(), value.text.data() + value.text.size(), result);
+    return parsed.ec == std::errc{} && parsed.ptr == value.text.data() + value.text.size() ? result : 0;
+}
+
+struct CurlRuntime {
+    CURLcode result{curl_global_init(CURL_GLOBAL_DEFAULT)};
+    ~CurlRuntime() { curl_global_cleanup(); }
+};
+
 struct Transfer {
-    std::atomic<bool> *cancel;std::string *body{nullptr};FILE *file{nullptr};std::size_t limit{0},written{0};
+    std::atomic<bool> *cancel{nullptr};
+    std::string *body{nullptr};
+    FILE *file{nullptr};
+    std::size_t limit{0};
+    std::size_t written{0};
     std::function<void(int)> progress;
 };
-std::size_t receive(char *data,std::size_t size,std::size_t count,void *user){
-    auto &t=*static_cast<Transfer*>(user);if(size && count>t.limit/size)return 0;auto bytes=size*count;
-    if(t.cancel->load()||bytes>t.limit-t.written)return 0;
-    if(t.file){if(std::fwrite(data,1,bytes,t.file)!=bytes)return 0;}else t.body->append(data,bytes);
-    t.written+=bytes;return bytes;
+
+std::size_t receive(char *data, std::size_t size, std::size_t count, void *context) {
+    auto &transfer = *static_cast<Transfer *>(context);
+    if (size && count > transfer.limit / size) return 0;
+    const auto bytes = size * count;
+    if (transfer.cancel->load() || transfer.written > transfer.limit || bytes > transfer.limit - transfer.written) return 0;
+    if (transfer.file) {
+        if (std::fwrite(data, 1, bytes, transfer.file) != bytes) return 0;
+    } else {
+        transfer.body->append(data, bytes);
+    }
+    transfer.written += bytes;
+    return bytes;
 }
-int progress(void *user,curl_off_t total,curl_off_t now,curl_off_t,curl_off_t){auto &t=*static_cast<Transfer*>(user);if(t.cancel->load())return 1;if(t.progress&&total>0)t.progress(int(std::min<curl_off_t>(100,now*100/total)));return 0;}
-bool request(const std::string &url,const std::string &ca,Transfer &t,std::string &error){
-    static CurlRuntime runtime;if(runtime.result!=CURLE_OK){error="Network initialization failed";return false;}
-    auto *curl=curl_easy_init();if(!curl){error="Network initialization failed";return false;}
-    char message[CURL_ERROR_SIZE]{};
-    curl_easy_setopt(curl,CURLOPT_URL,url.c_str());curl_easy_setopt(curl,CURLOPT_USERAGENT,"PaperNX updater");
-    curl_easy_setopt(curl,CURLOPT_FOLLOWLOCATION,1L);curl_easy_setopt(curl,CURLOPT_MAXREDIRS,5L);
-    // HTTP is only used by an explicitly injected loopback test source.
-    const bool https=url.compare(0,8,"https://")==0;
-#if LIBCURL_VERSION_NUM >= 0x075500
-    curl_easy_setopt(curl,CURLOPT_PROTOCOLS_STR,https?"https":"http,https");
-    curl_easy_setopt(curl,CURLOPT_REDIR_PROTOCOLS_STR,https?"https":"http,https");
+
+int reportTransfer(void *context, curl_off_t total, curl_off_t current, curl_off_t, curl_off_t) {
+    auto &transfer = *static_cast<Transfer *>(context);
+    if (transfer.cancel->load()) return 1;
+    if (transfer.progress && total > 0) {
+        transfer.progress(int(std::min<curl_off_t>(100, current * 100 / total)));
+    }
+    return 0;
+}
+
+bool loopbackHttp(const std::string &url) {
+#ifdef PAPERNX_UPDATE_TESTING
+    return url.compare(0, 17, "http://127.0.0.1:") == 0 || url.compare(0, 17, "http://localhost:") == 0;
 #else
-    const long protocols=https?CURLPROTO_HTTPS:CURLPROTO_HTTP|CURLPROTO_HTTPS;
-    curl_easy_setopt(curl,CURLOPT_PROTOCOLS,protocols);curl_easy_setopt(curl,CURLOPT_REDIR_PROTOCOLS,protocols);
+    (void)url;
+    return false;
 #endif
-    curl_easy_setopt(curl,CURLOPT_SSL_VERIFYPEER,1L);curl_easy_setopt(curl,CURLOPT_SSL_VERIFYHOST,2L);
-    if(!ca.empty())curl_easy_setopt(curl,CURLOPT_CAINFO,ca.c_str());
-    curl_easy_setopt(curl,CURLOPT_FAILONERROR,1L);curl_easy_setopt(curl,CURLOPT_NOSIGNAL,1L);
-    curl_easy_setopt(curl,CURLOPT_CONNECTTIMEOUT,8L);curl_easy_setopt(curl,CURLOPT_TIMEOUT,t.file?600L:20L);
-    curl_easy_setopt(curl,CURLOPT_LOW_SPEED_LIMIT,1024L);curl_easy_setopt(curl,CURLOPT_LOW_SPEED_TIME,30L);
-    curl_easy_setopt(curl,CURLOPT_WRITEFUNCTION,receive);curl_easy_setopt(curl,CURLOPT_WRITEDATA,&t);
-    curl_easy_setopt(curl,CURLOPT_NOPROGRESS,0L);curl_easy_setopt(curl,CURLOPT_XFERINFOFUNCTION,progress);curl_easy_setopt(curl,CURLOPT_XFERINFODATA,&t);
-    curl_easy_setopt(curl,CURLOPT_ERRORBUFFER,message);
-    const auto result=curl_easy_perform(curl);curl_easy_cleanup(curl);
-    if(result!=CURLE_OK){error=t.cancel->load()?"Update cancelled":result==CURLE_PEER_FAILED_VERIFICATION?"Certificate verification failed; check the console date and time":std::string(message[0]?message:curl_easy_strerror(result));return false;}return true;
 }
-bool fetch(const std::string &url,const std::string &ca,std::atomic<bool> &cancel,std::string &body,std::string &error,std::size_t limit=4*1024*1024){Transfer t{&cancel,&body,nullptr,limit,0,{}};return request(url,ca,t,error);}
-bool durable(FILE *file){return std::fflush(file)==0 && ::fsync(::fileno(file))==0;}
-std::uint32_t le32(const unsigned char *p){return std::uint32_t(p[0])|(std::uint32_t(p[1])<<8)|(std::uint32_t(p[2])<<16)|(std::uint32_t(p[3])<<24);}
-std::uint64_t le64(const unsigned char *p){return std::uint64_t(le32(p))|(std::uint64_t(le32(p+4))<<32);}
-bool validateNro(const std::filesystem::path &path,const std::string &expectedHash,std::uint64_t bytes,const std::string &expectedVersion,std::string &error){
-    std::error_code ec;const auto size=std::filesystem::file_size(path,ec);
-    if(ec||size!=bytes||size<0x1000||size>maxNro){error="Update download size does not match";return false;}
-    std::ifstream file(path,std::ios::binary);std::array<unsigned char,0x80> header{};file.read(reinterpret_cast<char*>(header.data()),header.size());
-    if(!file||std::memcmp(header.data()+0x10,"NRO0",4)){error="Downloaded file is not a Switch application";return false;}
-    const auto declared=le32(header.data()+0x18);if(declared<0x80||declared>size-0x38){error="Invalid NRO header";return false;}
-    std::uint64_t end=0;for(int i=0;i<3;++i){auto offset=le32(header.data()+0x20+i*8),length=le32(header.data()+0x24+i*8);if(offset<end||std::uint64_t(offset)+length>declared){error="Invalid NRO segments";return false;}end=std::uint64_t(offset)+length;}
-    std::array<unsigned char,0x38> assets{};file.seekg(declared);file.read(reinterpret_cast<char*>(assets.data()),assets.size());
-    if(!file||std::memcmp(assets.data(),"ASET",4)){error="Update is missing its resources";return false;}
-    const auto nacp=le64(assets.data()+0x18),nacpSize=le64(assets.data()+0x20),romfs=le64(assets.data()+0x28),romfsSize=le64(assets.data()+0x30);
-    const auto available=size-declared;
-    if(nacp<0x38||nacpSize!=0x4000||nacp>available||nacpSize>available-nacp||romfs<0x38||romfs>available||romfsSize<0x50||romfsSize>available-romfs){error="Invalid update resources";return false;}
-    std::array<char,512> title{};file.seekg(declared+nacp);file.read(title.data(),title.size());
-    std::array<char,16> appVersion{};file.seekg(declared+nacp+0x3060);file.read(appVersion.data(),appVersion.size());
-    if(!file||std::string(title.data(),strnlen(title.data(),title.size()))!="PaperNX"||std::string(appVersion.data(),strnlen(appVersion.data(),appVersion.size()))!=stripV(expectedVersion).substr(0,15)){error="Update application or version does not match";return false;}
-    file.clear();file.seekg(0);fz_sha256 sha;fz_sha256_init(&sha);std::array<unsigned char,32768> buffer{};
-    while(file){file.read(reinterpret_cast<char*>(buffer.data()),buffer.size());fz_sha256_update(&sha,buffer.data(),std::size_t(file.gcount()));}
-    if(!file.eof()){error="Cannot read the update";return false;}
-    unsigned char digest[32];fz_sha256_final(&sha,digest);std::string actual;const char *hex="0123456789abcdef";for(auto c:digest){actual+=hex[c>>4];actual+=hex[c&15];}
-    if(actual!=expectedHash){error="Update checksum does not match";return false;}return true;
+
+bool request(const std::string &url, const std::string &certificates, Transfer &transfer, std::string &error) {
+    static CurlRuntime runtime;
+    if (runtime.result != CURLE_OK) {
+        error = "Network initialization failed";
+        return false;
+    }
+    const bool testHttp = loopbackHttp(url);
+    const bool https = url.compare(0, 8, "https://") == 0;
+    if (!https && !testHttp) {
+        error = "The updater only accepts HTTPS URLs";
+        return false;
+    }
+    if (https && !certificates.empty()) {
+        std::ifstream ca(certificates, std::ios::binary);
+        if (!ca) {
+            error = "The RomFS CA certificate bundle is missing or unreadable";
+            return false;
+        }
+    }
+
+    CURL *curl = curl_easy_init();
+    if (!curl) {
+        error = "Network initialization failed";
+        return false;
+    }
+    char message[CURL_ERROR_SIZE]{};
+    auto set = [curl](CURLoption option, auto value) { return curl_easy_setopt(curl, option, value); };
+    bool configured = set(CURLOPT_URL, url.c_str()) == CURLE_OK &&
+        set(CURLOPT_USERAGENT, "PaperNX updater") == CURLE_OK &&
+        set(CURLOPT_FOLLOWLOCATION, 1L) == CURLE_OK && set(CURLOPT_MAXREDIRS, 5L) == CURLE_OK &&
+        set(CURLOPT_SSL_VERIFYPEER, 1L) == CURLE_OK && set(CURLOPT_SSL_VERIFYHOST, 2L) == CURLE_OK &&
+        set(CURLOPT_FAILONERROR, 1L) == CURLE_OK && set(CURLOPT_NOSIGNAL, 1L) == CURLE_OK &&
+        set(CURLOPT_CONNECTTIMEOUT, 8L) == CURLE_OK && set(CURLOPT_TIMEOUT, transfer.file ? 600L : 20L) == CURLE_OK &&
+        set(CURLOPT_LOW_SPEED_LIMIT, 1024L) == CURLE_OK && set(CURLOPT_LOW_SPEED_TIME, 30L) == CURLE_OK &&
+        set(CURLOPT_WRITEFUNCTION, receive) == CURLE_OK && set(CURLOPT_WRITEDATA, &transfer) == CURLE_OK &&
+        set(CURLOPT_NOPROGRESS, 0L) == CURLE_OK && set(CURLOPT_XFERINFOFUNCTION, reportTransfer) == CURLE_OK &&
+        set(CURLOPT_XFERINFODATA, &transfer) == CURLE_OK && set(CURLOPT_ERRORBUFFER, message) == CURLE_OK;
+    if (configured && !certificates.empty()) configured = set(CURLOPT_CAINFO, certificates.c_str()) == CURLE_OK;
+#if LIBCURL_VERSION_NUM >= 0x075500
+    if (configured) configured = set(CURLOPT_PROTOCOLS_STR, testHttp ? "http,https" : "https") == CURLE_OK &&
+                                 set(CURLOPT_REDIR_PROTOCOLS_STR, testHttp ? "http,https" : "https") == CURLE_OK;
+#else
+    const long protocols = testHttp ? (CURLPROTO_HTTP | CURLPROTO_HTTPS) : CURLPROTO_HTTPS;
+    if (configured) configured = set(CURLOPT_PROTOCOLS, protocols) == CURLE_OK &&
+                                 set(CURLOPT_REDIR_PROTOCOLS, protocols) == CURLE_OK;
+#endif
+    if (!configured) {
+        error = "Could not configure secure network transfer";
+        curl_easy_cleanup(curl);
+        return false;
+    }
+
+    const auto result = curl_easy_perform(curl);
+    curl_easy_cleanup(curl);
+    if (result == CURLE_OK) return true;
+    if (transfer.cancel->load()) error = "Update cancelled";
+    else if (result == CURLE_PEER_FAILED_VERIFICATION) error = "Certificate verification failed; check the console date and time";
+    else error = message[0] ? message : curl_easy_strerror(result);
+    return false;
+}
+
+bool fetch(const std::string &url, const std::string &certificates, std::atomic<bool> &cancel,
+           std::string &body, std::string &error, std::size_t limit = 4 * 1024 * 1024) {
+    Transfer transfer{&cancel, &body, nullptr, limit, 0, {}};
+    return request(url, certificates, transfer, error);
+}
+
+bool durable(FILE *file) {
+    return std::fflush(file) == 0 && ::fsync(::fileno(file)) == 0;
+}
+
+bool writeAtomicText(const std::filesystem::path &path, const std::string &text, std::string &error) {
+    const auto temporary = path.string() + ".tmp";
+    FILE *file = std::fopen(temporary.c_str(), "wb");
+    if (!file) {
+        error = "Cannot write update recovery data";
+        return false;
+    }
+    bool ok = std::fwrite(text.data(), 1, text.size(), file) == text.size() && durable(file);
+    if (std::fclose(file) != 0) ok = false;
+    if (ok && std::rename(temporary.c_str(), path.string().c_str()) == 0) return true;
+    std::remove(temporary.c_str());
+    error = "Cannot save update recovery data";
+    return false;
+}
+
+bool copyDurable(const std::filesystem::path &source, const std::filesystem::path &destination) {
+    FILE *input = std::fopen(source.string().c_str(), "rb");
+    if (!input) return false;
+    FILE *output = std::fopen(destination.string().c_str(), "wb");
+    if (!output) {
+        std::fclose(input);
+        return false;
+    }
+    std::array<unsigned char, 32768> buffer{};
+    bool ok = true;
+    while (ok) {
+        const auto count = std::fread(buffer.data(), 1, buffer.size(), input);
+        if (count && std::fwrite(buffer.data(), 1, count, output) != count) ok = false;
+        if (count < buffer.size()) {
+            if (std::ferror(input)) ok = false;
+            break;
+        }
+    }
+    ok = ok && durable(output);
+    if (std::fclose(input) != 0) ok = false;
+    if (std::fclose(output) != 0) ok = false;
+    return ok;
+}
+
+std::uint32_t readLe32(const unsigned char *data) {
+    return std::uint32_t(data[0]) | (std::uint32_t(data[1]) << 8) |
+           (std::uint32_t(data[2]) << 16) | (std::uint32_t(data[3]) << 24);
+}
+
+std::uint64_t readLe64(const unsigned char *data) {
+    return std::uint64_t(readLe32(data)) | (std::uint64_t(readLe32(data + 4)) << 32);
+}
+
+std::string boundedString(const std::array<char, 512> &data) {
+    std::size_t length = 0;
+    while (length < data.size() && data[length]) ++length;
+    return std::string(data.data(), length);
+}
+
+std::string sha256File(const std::filesystem::path &path, std::string &error) {
+    std::ifstream file(path, std::ios::binary);
+    if (!file) {
+        error = "Cannot read the update";
+        return {};
+    }
+    fz_sha256 sha;
+    fz_sha256_init(&sha);
+    std::array<unsigned char, 32768> buffer{};
+    while (file) {
+        file.read(reinterpret_cast<char *>(buffer.data()), buffer.size());
+        const auto count = file.gcount();
+        if (count > 0) fz_sha256_update(&sha, buffer.data(), static_cast<std::size_t>(count));
+    }
+    if (!file.eof()) {
+        error = "Cannot read the update";
+        return {};
+    }
+    unsigned char digest[32];
+    fz_sha256_final(&sha, digest);
+    static const char digits[] = "0123456789abcdef";
+    std::string result;
+    result.reserve(64);
+    for (unsigned char byte : digest) {
+        result.push_back(digits[byte >> 4]);
+        result.push_back(digits[byte & 15]);
+    }
+    return result;
+}
+
+bool validateNro(const std::filesystem::path &path, const std::string &expectedHash,
+                 std::uint64_t expectedBytes, const std::string &expectedVersion, std::string &error) {
+    std::error_code ec;
+    const auto size = std::filesystem::file_size(path, ec);
+    if (ec || size != expectedBytes || size < 0x1000 || size > maxNro) {
+        error = "Update download size does not match";
+        return false;
+    }
+
+    std::ifstream file(path, std::ios::binary);
+    std::array<unsigned char, 0x80> header{};
+    file.read(reinterpret_cast<char *>(header.data()), header.size());
+    if (!file || std::memcmp(header.data() + 0x10, "NRO0", 4) != 0) {
+        error = "Downloaded file is not a Switch application";
+        return false;
+    }
+    const auto declared = readLe32(header.data() + 0x18);
+    if (declared < header.size() || declared > size - 0x38) {
+        error = "Invalid NRO header";
+        return false;
+    }
+    std::uint64_t segmentEnd = 0;
+    for (int i = 0; i < 3; ++i) {
+        const auto offset = readLe32(header.data() + 0x20 + i * 8);
+        const auto length = readLe32(header.data() + 0x24 + i * 8);
+        if (offset < segmentEnd || std::uint64_t(offset) + length > declared) {
+            error = "Invalid NRO segments";
+            return false;
+        }
+        segmentEnd = std::uint64_t(offset) + length;
+    }
+
+    std::array<unsigned char, 0x38> assets{};
+    file.seekg(declared);
+    file.read(reinterpret_cast<char *>(assets.data()), assets.size());
+    if (!file || std::memcmp(assets.data(), "ASET", 4) != 0) {
+        error = "Update is missing its resources";
+        return false;
+    }
+    const auto nacp = readLe64(assets.data() + 0x18);
+    const auto nacpSize = readLe64(assets.data() + 0x20);
+    const auto romfs = readLe64(assets.data() + 0x28);
+    const auto romfsSize = readLe64(assets.data() + 0x30);
+    const auto available = size - declared;
+    if (nacp < 0x38 || nacpSize != 0x4000 || nacp > available || nacpSize > available - nacp ||
+        romfs < 0x38 || romfs > available || romfsSize < 0x50 || romfsSize > available - romfs) {
+        error = "Invalid update resources";
+        return false;
+    }
+
+    std::array<char, 512> title{};
+    std::array<char, 16> version{};
+    file.seekg(declared + nacp);
+    file.read(title.data(), title.size());
+    file.seekg(declared + nacp + 0x3060);
+    file.read(version.data(), version.size());
+    std::size_t versionLength = 0;
+    while (versionLength < version.size() && version[versionLength]) ++versionLength;
+    if (!file || boundedString(title) != "PaperNX" ||
+        std::string(version.data(), versionLength) != withoutPrefix(expectedVersion).substr(0, version.size() - 1)) {
+        error = "Update application or version does not match";
+        return false;
+    }
+    const auto actualHash = sha256File(path, error);
+    if (actualHash.empty()) return false;
+    if (actualHash != expectedHash) {
+        error = "Update checksum does not match";
+        return false;
+    }
+    return true;
+}
+
+struct BootRecord {
+    std::string hash;
+    std::string version;
+    std::uint64_t bytes{0};
+};
+
+bool readBootRecord(const std::filesystem::path &path, BootRecord &record) {
+    std::ifstream file(path);
+    std::string hash, version, bytesText, extra;
+    if (!(file >> hash >> version >> bytesText) || (file >> extra)) return false;
+    record.hash = normalizedHash(hash);
+    record.version = version;
+    if (record.hash.empty() || !parseVersion(record.version).valid || !digits(bytesText)) return false;
+    const auto parsed = std::from_chars(bytesText.data(), bytesText.data() + bytesText.size(), record.bytes);
+    return parsed.ec == std::errc{} && record.bytes >= 0x1000 && record.bytes <= maxNro;
+}
+
+std::string bootRecordText(const BootRecord &record) {
+    return record.hash + "\n" + record.version + "\n" + std::to_string(record.bytes) + "\n";
+}
+
+bool pathExists(const std::filesystem::path &path) {
+    std::error_code ec;
+    return std::filesystem::exists(path, ec);
+}
+
+bool restoreBackup(const std::filesystem::path &executable, std::string &error) {
+    const auto backup = executable.string() + ".old";
+    const auto failed = executable.string() + ".failed";
+    if (!pathExists(backup)) {
+        error = "The previous PaperNX NRO backup is missing";
+        return false;
+    }
+    if (pathExists(failed)) {
+        error = "Cannot restore the previous NRO while a .failed file exists";
+        return false;
+    }
+    bool movedCandidate = false;
+    if (pathExists(executable)) {
+        if (std::rename(executable.string().c_str(), failed.c_str()) != 0) {
+            error = "Cannot move the failed PaperNX NRO aside";
+            return false;
+        }
+        movedCandidate = true;
+    }
+    if (std::rename(backup.c_str(), executable.string().c_str()) != 0) {
+        const auto reason = errno;
+        if (movedCandidate) std::rename(failed.c_str(), executable.string().c_str());
+        error = std::string("Cannot restore the previous PaperNX NRO: ") + std::strerror(reason);
+        return false;
+    }
+    if (movedCandidate) std::remove(failed.c_str());
+    std::remove((executable.string() + ".boot").c_str());
+    std::remove((executable.string() + ".boot.started").c_str());
+    std::remove((executable.string() + ".boot.ok").c_str());
+    std::remove((executable.string() + ".ready").c_str());
+    std::remove((executable.string() + ".part").c_str());
+    return true;
+}
+
+bool hasSpaceFor(const std::filesystem::path &directory, std::uint64_t required) {
+    std::error_code ec;
+    const auto space = std::filesystem::space(directory, ec);
+    return !ec && space.available >= required;
 }
 } // namespace
 
-bool updateVersionNewer(const std::string &candidate,const std::string &current){auto a=version(candidate),b=version(current);return a.valid&&b.valid&&compare(a,b)>0;}
-bool selectUpdateRelease(const std::string &json,const std::string &current,const UpdateSource &source,UpdateRelease &release,std::string &error){
-    update_json::Value root;if(!update_json::Parser(json).parse(root)||root.kind!=update_json::Value::Array){error="Invalid release response";return false;}
-    if(!version(current).valid){error="Invalid installed version";return false;}
-    bool published=false;release={};
-    for(const auto &item:root.items){
-        if(item.kind!=update_json::Value::Object||item.get("draft").yes())continue;
-        auto tag=item.get("tag_name").str();if(!version(tag).valid)continue;published=true;
-        if(!updateVersionNewer(tag,release.version.empty()?current:release.version))continue;
-        release={};release.version=stripV(tag);release.title=item.get("name").str().substr(0,256);release.notes=item.get("body").str().substr(0,32768);
-        const auto &assets=item.get("assets");if(assets.kind!=update_json::Value::Array)continue;
-        for(const auto &asset:assets.items){
-            const auto name=asset.get("name").str(),url=asset.get("browser_download_url").str();
-            if(url!=source.assetPrefix+tag+"/"+name)continue;
-            if(name=="PaperNX.nro") {release.bytes=integer(asset.get("size"));if(release.bytes>=0x1000&&release.bytes<=maxNro){release.url=url;release.sha256=hashValue(asset.get("digest").str());}}
-            if(name=="PaperNX.nro.sha256")release.checksumUrl=url;
-        }
-    }
-    if(!published){error="No published release found";return false;}return true;
+bool updateVersionNewer(const std::string &candidate, const std::string &current) {
+    const auto newer = parseVersion(candidate);
+    const auto installed = parseVersion(current);
+    return newer.valid && installed.valid && compareVersion(newer, installed) > 0;
 }
 
-SelfUpdater::~SelfUpdater(){stop();}
-void SelfUpdater::configure(std::filesystem::path executable,std::string current,std::string certificates,UpdateSource source){stop();executable_=std::move(executable);current_=std::move(current);certificates_=std::move(certificates);source_=std::move(source);std::lock_guard<std::mutex> lock(mutex_);status_={};}
-UpdateStatus SelfUpdater::status() const {std::lock_guard<std::mutex> lock(mutex_);return status_;}
-bool SelfUpdater::busy() const {auto state=status().state;return state==UpdateState::Checking||state==UpdateState::Downloading;}
-void SelfUpdater::publish(UpdateState state,const std::string &error){std::lock_guard<std::mutex> lock(mutex_);status_.state=state;status_.error=error;if(state==UpdateState::Downloading)status_.percent=0;}
-void SelfUpdater::stop(){cancel_=true;if(worker_.joinable())worker_.join();}
-bool SelfUpdater::check(){
-    if(busy())return false;
-    if(worker_.joinable())worker_.join();
-    cancel_=false;
-    if(executable_.empty()||executable_.extension()!=".nro"||(!executable_.is_absolute()&&executable_.string().compare(0,6,"sdmc:/")!=0)){publish(UpdateState::Error,"Cannot determine the running NRO path");return false;}
+bool selectUpdateRelease(const std::string &json, const std::string &current, const UpdateSource &source,
+                         UpdateRelease &release, std::string &error) {
+    update_json::Value root;
+    if (!update_json::Parser(json).parse(root) || root.kind != update_json::Value::Array) {
+        error = "Invalid release response";
+        return false;
+    }
+    if (!parseVersion(current).valid) {
+        error = "Invalid installed version";
+        return false;
+    }
+
+    release = {};
+    for (const auto &item : root.items) {
+        if (item.kind != update_json::Value::Object || item.get("tag_name").kind != update_json::Value::String ||
+            item.get("tag_name").str().empty()) {
+            error = "Invalid release response";
+            return false;
+        }
+        if (item.get("draft").yes() || item.get("prerelease").yes()) continue;
+        const auto tag = item.get("tag_name").str();
+        if (!updateVersionNewer(tag, current) || (!release.version.empty() && !updateVersionNewer(tag, release.version))) continue;
+
+        UpdateRelease candidate;
+        candidate.version = withoutPrefix(tag);
+        candidate.title = item.get("name").str().substr(0, 256);
+        candidate.notes = item.get("body").str().substr(0, 32768);
+        const auto &assets = item.get("assets");
+        if (assets.kind == update_json::Value::Array) {
+            bool nroSeen = false, checksumSeen = false;
+            for (const auto &asset : assets.items) {
+                const auto name = asset.get("name").str();
+                const auto url = asset.get("browser_download_url").str();
+                if (name == "PaperNX.nro") {
+                    if (nroSeen) { candidate.url.clear(); break; }
+                    nroSeen = true;
+                    const auto bytes = jsonInteger(asset.get("size"));
+                    if (url == source.assetPrefix + tag + "/PaperNX.nro" && bytes >= 0x1000 && bytes <= maxNro) {
+                        candidate.url = url;
+                        candidate.bytes = bytes;
+                        candidate.sha256 = normalizedHash(asset.get("digest").str());
+                    }
+                } else if (name == "PaperNX.nro.sha256") {
+                    if (checksumSeen) { candidate.checksumUrl.clear(); break; }
+                    checksumSeen = true;
+                    if (url == source.assetPrefix + tag + "/PaperNX.nro.sha256") candidate.checksumUrl = url;
+                }
+            }
+        }
+        release = std::move(candidate);
+    }
+    error.clear();
+    return true;
+}
+
+SelfUpdater::~SelfUpdater() { stop(); }
+
+void SelfUpdater::configure(std::filesystem::path executable, std::string version, std::string certificates) {
+    configureSource(std::move(executable), std::move(version), std::move(certificates), UpdateSource{});
+}
+
+#ifdef PAPERNX_UPDATE_TESTING
+void SelfUpdater::configureForTesting(std::filesystem::path executable, std::string version,
+                                      std::string certificates, UpdateSource source) {
+    configureSource(std::move(executable), std::move(version), std::move(certificates), std::move(source));
+}
+#endif
+
+void SelfUpdater::configureSource(std::filesystem::path executable, std::string version,
+                                  std::string certificates, UpdateSource source) {
+    stop();
+    executable_ = std::move(executable);
+    current_ = std::move(version);
+    certificates_ = std::move(certificates);
+    source_ = std::move(source);
+    cancel_ = false;
+    std::lock_guard<std::mutex> lock(mutex_);
+    status_ = {};
+}
+
+UpdateStatus SelfUpdater::status() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return status_;
+}
+
+bool SelfUpdater::busy() const {
+    const auto state = status().state;
+    return state == UpdateState::Checking || state == UpdateState::Downloading;
+}
+
+void SelfUpdater::publish(UpdateState state, const std::string &error) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    status_.state = state;
+    status_.error = error;
+    if (state == UpdateState::Downloading) status_.percent = 0;
+}
+
+void SelfUpdater::reportError(std::string error) {
+    publish(UpdateState::Error, error);
+}
+
+void SelfUpdater::cancel() { cancel_ = true; }
+
+void SelfUpdater::stop() {
+    cancel_ = true;
+    if (worker_.joinable()) worker_.join();
+}
+
+bool SelfUpdater::check() {
+    if (busy()) return false;
+    if (worker_.joinable()) worker_.join();
+    cancel_ = false;
+    const auto path = executable_.string();
+    if (executable_.extension() != ".nro" ||
+        (!executable_.is_absolute() && path.compare(0, 6, "sdmc:/") != 0)) {
+        publish(UpdateState::Error, "Cannot determine the running NRO path");
+        return false;
+    }
     publish(UpdateState::Checking);
-    worker_=std::thread([this]{
+    worker_ = std::thread([this] {
         std::string error;
-        // A fully verified download may have survived an interrupted shutdown.
-        if(validatePending(error)){publish(UpdateState::Ready);return;}
-        std::string body;error.clear();if(!fetch(source_.api,certificates_,cancel_,body,error)){publish(UpdateState::Error,error);return;}
-        UpdateRelease release;if(!selectUpdateRelease(body,current_,source_,release,error)){publish(UpdateState::Error,error);return;}
-        std::lock_guard<std::mutex> lock(mutex_);status_.release=std::move(release);status_.state=status_.release.version.empty()?UpdateState::Current:UpdateState::Available;status_.error.clear();
-    });return true;
+        if (validatePending(error)) {
+            publish(UpdateState::Ready);
+            return;
+        }
+        std::string response;
+        if (!fetch(source_.api, certificates_, cancel_, response, error)) {
+            publish(cancel_ ? UpdateState::Cancelled : UpdateState::Error, error);
+            return;
+        }
+        UpdateRelease release;
+        if (!selectUpdateRelease(response, current_, source_, release, error)) {
+            publish(UpdateState::Error, error);
+            return;
+        }
+        std::lock_guard<std::mutex> lock(mutex_);
+        status_.release = std::move(release);
+        status_.state = status_.release.version.empty() ? UpdateState::Current : UpdateState::Available;
+        status_.error.clear();
+    });
+    return true;
 }
-bool SelfUpdater::download(){
-    auto snapshot=status();if(snapshot.state!=UpdateState::Available||!snapshot.release.installable())return false;
-    if(worker_.joinable())worker_.join();
-    cancel_=false;publish(UpdateState::Downloading);
-    worker_=std::thread([this,release=snapshot.release]()mutable{
+
+bool SelfUpdater::download() {
+    const auto snapshot = status();
+    if (snapshot.state != UpdateState::Available || !snapshot.release.installable()) return false;
+    if (worker_.joinable()) worker_.join();
+    if (pathExists(executable_.string() + ".old") || pathExists(executable_.string() + ".boot")) {
+        publish(UpdateState::Error, "A previous update still needs boot recovery");
+        return false;
+    }
+    std::error_code ec;
+    const auto installedBytes = std::filesystem::file_size(executable_, ec);
+    if (ec || installedBytes > std::numeric_limits<std::uint64_t>::max() - snapshot.release.bytes - installReserve ||
+        !hasSpaceFor(executable_.parent_path(), installedBytes + snapshot.release.bytes + installReserve)) {
+        publish(UpdateState::Error, "There is not enough free space on the SD card");
+        return false;
+    }
+
+    cancel_ = false;
+    publish(UpdateState::Downloading);
+    worker_ = std::thread([this, release = snapshot.release]() mutable {
         std::string error;
-        if(release.sha256.empty()){
-            std::string body;if(!fetch(release.checksumUrl,certificates_,cancel_,body,error,1024)){publish(UpdateState::Error,error);return;}
-            std::istringstream line(body);std::string hash,name;line>>hash>>name;if(!name.empty()&&name!="PaperNX.nro"&&name!="*PaperNX.nro"){publish(UpdateState::Error,"Invalid update checksum file");return;}release.sha256=hashValue(hash);
-            if(release.sha256.empty()){publish(UpdateState::Error,"Invalid update checksum file");return;}
+        if (release.sha256.empty()) {
+            std::string body;
+            if (!fetch(release.checksumUrl, certificates_, cancel_, body, error, 1024)) {
+                publish(cancel_ ? UpdateState::Cancelled : UpdateState::Error, error);
+                return;
+            }
+            std::istringstream checksum(body);
+            std::string hash, name, extra;
+            checksum >> hash >> name;
+            if (checksum >> extra || (!name.empty() && name != "PaperNX.nro" && name != "*PaperNX.nro")) {
+                publish(UpdateState::Error, "Invalid update checksum file");
+                return;
+            }
+            release.sha256 = normalizedHash(hash);
+            if (release.sha256.empty()) {
+                publish(UpdateState::Error, "Invalid update checksum file");
+                return;
+            }
         }
-        const auto part=executable_.string()+".part",pending=executable_.string()+".new",ready=executable_.string()+".ready",temp=ready+".tmp";
-        auto *file=std::fopen(part.c_str(),"wb");if(!file){publish(UpdateState::Error,"Cannot write update to the SD card");return;}
-        Transfer transfer{&cancel_,nullptr,file,std::size_t(release.bytes),0,[this](int percent){std::lock_guard<std::mutex> lock(mutex_);status_.percent=percent;}};
-        bool ok=request(release.url,certificates_,transfer,error);if(ok&&!durable(file)){ok=false;error="Cannot save update to the SD card";}if(std::fclose(file)!=0){ok=false;error="Cannot save update to the SD card";}
-        if(ok)ok=validateNro(part,release.sha256,release.bytes,release.version,error);
-        if(ok){std::remove(ready.c_str());if(std::rename(part.c_str(),pending.c_str())!=0){ok=false;error="Cannot stage update on the SD card";}}
-        if(ok){
-            file=std::fopen(temp.c_str(),"wb");if(!file){ok=false;}else{ok=std::fprintf(file,"%s\n%s\n%llu\n",release.sha256.c_str(),release.version.c_str(),static_cast<unsigned long long>(release.bytes))>0&&durable(file);if(std::fclose(file)!=0)ok=false;}
-            if(ok)ok=std::rename(temp.c_str(),ready.c_str())==0;
-            if(!ok)error="Cannot save pending update";
+
+        const auto part = executable_.string() + ".part";
+        const auto pending = executable_.string() + ".new";
+        const auto ready = executable_.string() + ".ready";
+        const auto temporary = ready + ".tmp";
+        std::remove(part.c_str());
+        std::remove(pending.c_str());
+        std::remove(ready.c_str());
+        std::remove(temporary.c_str());
+
+        FILE *file = std::fopen(part.c_str(), "wb");
+        if (!file) {
+            publish(UpdateState::Error, "Cannot write update to the SD card");
+            return;
         }
-        if(!ok){std::remove(part.c_str());std::remove(temp.c_str());std::remove(pending.c_str());publish(UpdateState::Error,error);return;}
-        {std::lock_guard<std::mutex> lock(mutex_);status_.release=std::move(release);status_.percent=100;status_.state=UpdateState::Ready;}
-    });return true;
+        Transfer transfer{&cancel_, nullptr, file, static_cast<std::size_t>(release.bytes), 0,
+            [this](int percent) {
+                std::lock_guard<std::mutex> lock(mutex_);
+                status_.percent = percent;
+            }};
+        bool ok = request(release.url, certificates_, transfer, error);
+        if (ok && !durable(file)) { ok = false; error = "Cannot save update to the SD card"; }
+        if (std::fclose(file) != 0) { ok = false; error = "Cannot save update to the SD card"; }
+        if (ok) ok = validateNro(part, release.sha256, release.bytes, release.version, error);
+        if (ok && std::rename(part.c_str(), pending.c_str()) != 0) {
+            ok = false;
+            error = "Cannot stage update on the SD card";
+        }
+        if (ok) ok = writeAtomicText(ready, release.sha256 + "\n" + release.version + "\n" +
+                                     std::to_string(release.bytes) + "\n", error);
+        if (!ok) {
+            std::remove(part.c_str());
+            std::remove(temporary.c_str());
+            std::remove(pending.c_str());
+            std::remove(ready.c_str());
+            publish(cancel_ ? UpdateState::Cancelled : UpdateState::Error,
+                    error.empty() ? "Update download failed" : error);
+            return;
+        }
+        std::lock_guard<std::mutex> lock(mutex_);
+        status_.release = std::move(release);
+        status_.percent = 100;
+        status_.state = UpdateState::Ready;
+    });
+    return true;
 }
+
 bool SelfUpdater::validatePending(std::string &error) const {
-    if(executable_.empty())return false;
-    std::ifstream ready(executable_.string()+".ready");std::string hash,tag;std::uint64_t bytes=0;
-    if(!(ready>>hash>>tag>>bytes)||hashValue(hash)!=hash||!updateVersionNewer(tag,current_))return false;
-    return validateNro(executable_.string()+".new",hash,bytes,tag,error);
+    if (executable_.empty()) return false;
+    std::ifstream ready(executable_.string() + ".ready");
+    std::string hash, version, bytesText, extra;
+    if (!(ready >> hash >> version >> bytesText) || (ready >> extra) || normalizedHash(hash) != hash || !digits(bytesText)) return false;
+    std::uint64_t bytes = 0;
+    const auto parsed = std::from_chars(bytesText.data(), bytesText.data() + bytesText.size(), bytes);
+    if (parsed.ec != std::errc{} || parsed.ptr != bytesText.data() + bytesText.size() || !updateVersionNewer(version, current_)) return false;
+    return validateNro(executable_.string() + ".new", hash, bytes, version, error);
 }
-bool SelfUpdater::applyPending(std::string &error){
-    stop();error.clear();std::error_code ec;
-    if(executable_.empty()||!std::filesystem::exists(executable_.string()+".ready",ec))return false;
-    if(!validatePending(error)){if(error.empty())error="Pending update is invalid";return false;}
-    const auto path=executable_.string(),backup=path+".old";
-    // FAT/newlib cannot always replace an existing file with rename. Retain a
-    // backup until installation succeeds, and restore it after a failed swap.
-    std::remove(backup.c_str());if(std::rename(path.c_str(),backup.c_str())!=0){error="Cannot move the installed NRO";return false;}
-    if(std::rename((path+".new").c_str(),path.c_str())!=0){const auto reason=errno;if(std::rename(backup.c_str(),path.c_str())!=0)error="Update failed; restore the NRO from its .old backup";else error=std::string("Cannot install update: ")+std::strerror(reason);return false;}
-    std::remove((path+".ready").c_str());std::remove(backup.c_str());return true;
+
+SelfUpdater::BootRecovery SelfUpdater::prepareBoot(std::string &error) {
+    error.clear();
+    const auto marker = std::filesystem::path(executable_.string() + ".boot");
+    const auto started = std::filesystem::path(executable_.string() + ".boot.started");
+    const auto confirmed = std::filesystem::path(executable_.string() + ".boot.ok");
+    if (pathExists(confirmed)) {
+        if (pathExists(executable_.string() + ".old") && std::remove((executable_.string() + ".old").c_str()) != 0) {
+            error = "Update started, but the old NRO backup could not be cleaned up";
+            return BootRecovery::Error;
+        }
+        std::remove(marker.string().c_str());
+        std::remove(started.string().c_str());
+        std::remove(confirmed.string().c_str());
+        std::remove((executable_.string() + ".ready").c_str());
+        return BootRecovery::Normal;
+    }
+    if (!pathExists(marker)) return BootRecovery::Normal;
+
+    BootRecord record;
+    if (!readBootRecord(marker, record)) {
+        error = "Update boot record is damaged";
+        return pathExists(executable_.string() + ".old") && rollbackBoot(error) ? BootRecovery::RolledBack : BootRecovery::Error;
+    }
+    if (pathExists(started)) {
+        error = "The updated PaperNX did not complete startup; restoring the previous version";
+        return rollbackBoot(error) ? BootRecovery::RolledBack : BootRecovery::Error;
+    }
+    if (!validateNro(executable_, record.hash, record.bytes, record.version, error)) {
+        error = "The installed update failed its startup check; restoring the previous version";
+        return rollbackBoot(error) ? BootRecovery::RolledBack : BootRecovery::Error;
+    }
+
+    FILE *file = std::fopen(started.string().c_str(), "wb");
+    const bool saved = file && durable(file);
+    const bool closed = file && std::fclose(file) == 0;
+    if (!saved || !closed) {
+        error = "Cannot save update startup recovery state";
+        rollbackBoot(error);
+        return BootRecovery::Error;
+    }
+    return BootRecovery::Candidate;
+}
+
+bool SelfUpdater::confirmBoot(std::string &error) {
+    error.clear();
+    const auto marker = std::filesystem::path(executable_.string() + ".boot");
+    if (!pathExists(marker)) return true;
+    const auto confirmed = std::filesystem::path(executable_.string() + ".boot.ok");
+    if (!writeAtomicText(confirmed, "PaperNX startup confirmed\n", error)) return false;
+    if (pathExists(executable_.string() + ".old") && std::remove((executable_.string() + ".old").c_str()) != 0) {
+        error = "PaperNX started, but the old NRO backup could not be cleaned up";
+        return false;
+    }
+    std::remove(marker.string().c_str());
+    std::remove((executable_.string() + ".boot.started").c_str());
+    std::remove(confirmed.string().c_str());
+    return true;
+}
+
+bool SelfUpdater::rollbackBoot(std::string &error) {
+    error.clear();
+    if (!pathExists(executable_.string() + ".old")) {
+        error = "The previous PaperNX NRO backup is missing";
+        return false;
+    }
+    if (!restoreBackup(executable_, error)) return false;
+    error = "The previous PaperNX version was restored";
+    return true;
+}
+
+bool SelfUpdater::applyPending(std::string &error) {
+    stop();
+    error.clear();
+    if (!pathExists(executable_.string() + ".ready")) return false;
+    if (!validatePending(error)) {
+        if (error.empty()) error = "Pending update is invalid";
+        return false;
+    }
+
+    const auto path = executable_.string();
+    const auto backup = path + ".old";
+    const auto swap = path + ".swap";
+    const auto marker = std::filesystem::path(path + ".boot");
+    if (pathExists(backup) || pathExists(swap) || pathExists(marker) || pathExists(path + ".boot.started") || pathExists(path + ".boot.ok")) {
+        error = "An earlier update still needs recovery";
+        return false;
+    }
+    if (!copyDurable(executable_, backup)) {
+        std::remove(backup.c_str());
+        error = "Cannot create a durable backup of the installed NRO";
+        return false;
+    }
+    std::ifstream ready(path + ".ready");
+    BootRecord record;
+    if (!(ready >> record.hash >> record.version >> record.bytes) || normalizedHash(record.hash) != record.hash) {
+        std::remove(backup.c_str());
+        error = "Pending update record is invalid";
+        return false;
+    }
+    if (!writeAtomicText(marker, bootRecordText(record), error)) {
+        std::remove(backup.c_str());
+        return false;
+    }
+
+    // shortcut: power loss between FAT renames can hide the NRO; restore .old manually until a bootable recovery tool exists.
+    if (std::rename(path.c_str(), swap.c_str()) != 0) {
+        const auto reason = errno;
+        std::remove(marker.string().c_str());
+        std::remove(backup.c_str());
+        error = std::string("Cannot stage the installed NRO: ") + std::strerror(reason);
+        return false;
+    }
+    if (std::rename((path + ".new").c_str(), path.c_str()) != 0) {
+        const auto reason = errno;
+        if (std::rename(swap.c_str(), path.c_str()) == 0) {
+            std::remove(marker.string().c_str());
+            std::remove(backup.c_str());
+        } else {
+            error = "Update install was interrupted; the previous NRO is preserved as .old";
+            return false;
+        }
+        error = std::string("Cannot install the verified update: ") + std::strerror(reason);
+        return false;
+    }
+    std::remove(swap.c_str());
+    std::remove((path + ".ready").c_str());
+    return true;
 }
 } // namespace papernx

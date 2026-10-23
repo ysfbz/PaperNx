@@ -102,14 +102,18 @@
                 commitChoice();
                 return true;
             }
-            if(isKey(SDLK_UP,SDL_CONTROLLER_BUTTON_DPAD_UP)) {
+            const bool previous=isKey(SDLK_UP,SDL_CONTROLLER_BUTTON_DPAD_UP) ||
+                isKey(SDLK_LEFT,SDL_CONTROLLER_BUTTON_DPAD_LEFT);
+            const bool next=isKey(SDLK_DOWN,SDL_CONTROLLER_BUTTON_DPAD_DOWN) ||
+                isKey(SDLK_RIGHT,SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
+            if(previous) {
                 if(choiceFocusedIndex_>0) {
                     --choiceFocusedIndex_;
                     ensureChoiceVisible(w,h);
                     dirty_=true;
                 }
             }
-            if(isKey(SDLK_DOWN,SDL_CONTROLLER_BUTTON_DPAD_DOWN)) {
+            if(next) {
                 if(choiceFocusedIndex_+1<int(options.size())) {
                     ++choiceFocusedIndex_;
                     ensureChoiceVisible(w,h);

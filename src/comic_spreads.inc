@@ -44,6 +44,10 @@ int comicTurnTarget(int page,int steps) {
     return target;
 }
 int comicViewportHeight(int h) const {return std::max(1,h-72-(appSettings_.get().expandedViewport?44:72));}
+SDL_Rect visibleComicRect(SDL_Rect rect) {
+    int w,h;getWindowSize(w,h);const SDL_Rect viewport{currentMargin_,72,fixedViewportWidth(w),comicViewportHeight(h)};
+    SDL_Rect visible{};return SDL_IntersectRect(&rect,&viewport,&visible)?visible:SDL_Rect{rect.x,rect.y,0,0};
+}
 SDL_FRect comicLeafArtwork(int page,SDL_Rect leaf) {
     float pw=0,ph=0;if(!px_document_page_size(doc_,page,&pw,&ph) || pw<=0 || ph<=0)return {};
     const auto group=comicSpreadPages(page);
@@ -125,7 +129,7 @@ SDL_Rect comicTurnBounds(int base,bool head=false) {
     if(comicSpreadActive() && comicSpreadPages(base).second==2) {
         auto other=comicArtworkRect(base,1,head);SDL_Rect joined{};SDL_UnionRect(&r,&other,&joined);r=joined;
     }
-    return r;
+    return visibleComicRect(r);
 }
 bool comicCanGrip(float x,float y) {
     int w,h;getWindowSize(w,h);const auto r=comicTurnBounds(currentPage_);

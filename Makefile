@@ -2,11 +2,12 @@
 MUPDF_PREFIX ?= $(MUPDF_AARCH64_ROOT)
 ifeq ($(strip $(MUPDF_PREFIX)),)
 ifneq ($(wildcard $(CURDIR)/prefix-mupdf-switch/lib/libmupdf.a),)
-	MUPDF_PREFIX := $(CURDIR)/prefix-mupdf-switch
+	MUPDF_PREFIX := $(abspath $(CURDIR)/prefix-mupdf-switch)
 else
 $(error "MUPDF_PREFIX must refer to a real cross-compiled ARM64 MuPDF prefix containing lib/libmupdf.a. Run scripts/build-mupdf-switch.sh first.")
 endif
 endif
+export MUPDF_PREFIX
 #---------------------------------------------------------------------------------
 .SUFFIXES:
 #---------------------------------------------------------------------------------
@@ -75,7 +76,7 @@ CFLAGS += -std=c11
 ASFLAGS	:=	-g $(ARCH)
 LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map) -Wl,--gc-sections
 
-LIBS := -Wl,--start-group -lSDL2_ttf -lmupdf -lharfbuzz -lfreetype -lmupdf-third -larchive -lwebp -llzma -llz4 -lzstd -lexpat `sdl2-config --libs` -lbz2 -lpng -ljpeg -lz -Wl,--end-group -lm -lnx
+LIBS := -Wl,--start-group -lSDL2_ttf -lmupdf -lharfbuzz -lfreetype -lmupdf-third -larchive -lcurl -lwebp -llzma -llz4 -lzstd -lexpat `sdl2-config --libs` -lbz2 -lpng -ljpeg -lz -Wl,--end-group -lm -lnx
 
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing
@@ -178,13 +179,17 @@ endif
 .PHONY: $(BUILD) clean all
 
 #---------------------------------------------------------------------------------
-all: validate-branding $(BUILD)
+all: validate-branding validate-romfs $(BUILD)
 
 .PHONY: validate-branding
 validate-branding:
 	python3 scripts/validate_branding.py
 
-$(BUILD): validate-branding
+.PHONY: validate-romfs
+validate-romfs:
+	python3 scripts/validate_romfs.py
+
+$(BUILD): validate-branding validate-romfs
 
 $(BUILD):
 	@[ -d $@ ] || mkdir -p $@

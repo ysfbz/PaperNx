@@ -463,6 +463,7 @@ void AppSettingsStore::put(AppPreferences preferences) {
     preferences.displayOrientation = std::clamp(preferences.displayOrientation, 0, 2);
     preferences.paperTexture = std::clamp(preferences.paperTexture, 0, 2);
     preferences.softwareBrightness = std::clamp(preferences.softwareBrightness, 50, 100);
+    preferences.systemBrightness = std::clamp(preferences.systemBrightness, 10, 100);
     preferences.interfaceStyle = std::clamp(preferences.interfaceStyle, 0, 2);
     preferences.interfaceAccent = std::clamp(preferences.interfaceAccent, 0, 6);
     std::vector<std::string> folders;
@@ -513,6 +514,11 @@ bool AppSettingsStore::load() {
         preferences.paperTexture=display.pdfColorMode;
         preferences.softwareBrightness=display.scrollSensitivity; // Previously unused in APP_DISPLAY_V04_.
     }
+    if(store_.all().count("APP_UPDATE_V092_")) {
+        const auto updater=store_.get("APP_UPDATE_V092_");
+        preferences.automaticUpdateCheck=updater.favorite;
+        preferences.systemBrightness=updater.page;
+    }
     put(std::move(preferences));
     return true;
 }
@@ -544,6 +550,10 @@ bool AppSettingsStore::save() const {
     theme.fontFamily=preferences_.interfaceStyle;theme.fontSize=12+preferences_.interfaceAccent;
     theme.scrollInertia=preferences_.scanOnLaunch?1:0;
     store_.put("APP_UI_THEME_016",std::move(theme));
+    Progress updater;
+    updater.favorite=preferences_.automaticUpdateCheck;
+    updater.page=preferences_.systemBrightness;
+    store_.put("APP_UPDATE_V092_",std::move(updater));
     for(int index=0;index<32;++index) {
         char key[32];std::snprintf(key,sizeof key,"LIB_FOLDER_%05d",index);Progress folder;
         if(index<int(preferences_.libraryFolders.size()))folder.bookPath=preferences_.libraryFolders[index];

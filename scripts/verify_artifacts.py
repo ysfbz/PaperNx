@@ -26,8 +26,12 @@ assert nacp_data[0x3060:0x3070].split(b"\0")[0].decode() == args.version.removep
 files = read_romfs(nro, assets["romfs"])
 for name in ("NotoSans-Regular.ttf", "NotoSans-SemiBold.ttf", "NotoSerif-Regular.ttf", "OFL.txt"):
     assert files["fonts/" + name] == (Path("fonts") / name).read_bytes(), name
+ca_bundle = Path("romfs/cacert.pem").read_bytes()
+assert files["cacert.pem"] == ca_bundle, "RomFS CA bundle differs from the validated source"
+assert len(ca_bundle.split(b"-----BEGIN CERTIFICATE-----")) - 1 >= 50, "RomFS CA bundle is empty or truncated"
 result = {"source": source_identity(Path.cwd()), "elf": validate_elf(elf), "nro": meta, "assets": assets, "icon": icon_meta, "embedded_icon_identical": True,
-          "romfs_files": sorted(files), "nro_sha256": hashlib.sha256(nro).hexdigest(),
+          "romfs_files": sorted(files), "ca_bundle_bytes": len(ca_bundle), "ca_certificates": len(ca_bundle.split(b"-----BEGIN CERTIFICATE-----")) - 1,
+          "nro_sha256": hashlib.sha256(nro).hexdigest(),
           "hardware": "UNVERIFIED"}
 Path("verification").mkdir(exist_ok=True)
 Path("verification/artifacts.json").write_text(json.dumps(result, indent=2) + "\n")

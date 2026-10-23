@@ -80,8 +80,8 @@ bool prepareComicTurn(int from,int target,int direction) {
     const int side=direction>0?1:0;
     const int footer=layout.footerHeight();
     if(turn.spread) {
-        turn.viewport=comicArtworkRect(from,side);
-        turn.oppositeViewport=comicArtworkRect(target,1-side,true);
+        turn.viewport=visibleComicRect(comicArtworkRect(from,side));
+        turn.oppositeViewport=visibleComicRect(comicArtworkRect(target,1-side,true));
         const int frontPage=readerSidePage(oldGroup.first,side),backPage=readerSidePage(newGroup.first,1-side);
         turn.previous=captureTurnPage(frontPage,false,turn.viewport);
         turn.back=captureTurnPage(backPage,false,turn.oppositeViewport);

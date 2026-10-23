@@ -28,6 +28,12 @@ inline void surface(SDL_Renderer *r, SDL_Rect rect, SDL_Color color, int corner=
         SDL_RenderDrawLine(r,rect.x+inset,rect.y+rect.h-1-y,rect.x+rect.w-1-inset,rect.y+rect.h-1-y);
     }
 }
+inline void elevated(SDL_Renderer *r,SDL_Rect rect,const ThemePalette &pal) {
+    SDL_Rect shadow{rect.x+3,rect.y+4,rect.w,rect.h};surface(r,shadow,{0,0,0,42});
+    surface(r,rect,pal.card);
+    SDL_SetRenderDrawColor(r,pal.cardBorder.r,pal.cardBorder.g,pal.cardBorder.b,255);
+    SDL_RenderDrawRect(r,&rect);
+}
 inline void focusRing(SDL_Renderer *r,SDL_Rect rect,const ThemePalette &pal,bool editing=false) {
     // Two contrasting outlines stay visible on selected accent fills and on
     // surrounding surfaces. Shape communicates focus independently of hue.
@@ -75,6 +81,10 @@ inline void menuRow(SDL_Renderer *r,Typography &type,SDL_Rect rect,const std::st
     type.renderText(r,type.buttonFont(),label,rect.x+20,rect.y+std::max(0,(rect.h-textHeight)/2),color,rect.w-76);
     if(focused)focusRing(r,rect,pal);
 }
+inline void preferenceRow(SDL_Renderer *r,Typography &type,SDL_Rect rect,const std::string &label,
+                          const ThemePalette &pal,bool selected=false) {
+    menuRow(r,type,rect,label,pal,selected);
+}
 struct StepperLayout {
     SDL_Rect label,minus,value,plus;
     explicit StepperLayout(SDL_Rect r) {
@@ -95,6 +105,29 @@ inline void settingsRow(SDL_Renderer *r,Typography &type,SDL_Rect rect,const std
     int width=0; type.measureText(type.buttonFont(),value,&width,&height);
     type.renderText(r,type.buttonFont(),value,layout.value.x+std::max(0,(layout.value.w-width)/2),rect.y+(rect.h-height)/2,pal.fg,layout.value.w);
     if(focused || editing) focusRing(r,rect,pal,editing);
+}
+inline SDL_Rect settingsSliderTrack(SDL_Rect rect) {
+    const int valueWidth=54,labelWidth=std::max(112,rect.w*45/100);
+    return {rect.x+labelWidth,rect.y+rect.h/2-3,std::max(24,rect.w-labelWidth-valueWidth-18),6};
+}
+inline int settingsSliderValue(SDL_Rect track,int x,int minimum,int maximum) {
+    const float ratio=std::clamp(float(x-track.x)/std::max(1,track.w-1),0.f,1.f);
+    return minimum+int(std::lround(ratio*(maximum-minimum)));
+}
+inline void settingsSliderRow(SDL_Renderer *r,Typography &type,SDL_Rect rect,const std::string &label,
+                              int value,int minimum,int maximum,const ThemePalette &pal,bool focused=false) {
+    surface(r,rect,focused?pal.card:pal.header);
+    const auto track=settingsSliderTrack(rect);int height=0;
+    type.measureText(type.uiFont(),ui::label(label),nullptr,&height);
+    type.renderText(r,type.uiFont(),ui::label(label),rect.x+12,rect.y+(rect.h-height)/2,pal.fg,track.x-rect.x-20);
+    surface(r,track,pal.cardBorder,3);
+    const int thumbX=track.x+int(float(track.w-1)*(std::clamp(value,minimum,maximum)-minimum)/std::max(1,maximum-minimum));
+    surface(r,{track.x,track.y,thumbX-track.x+1,track.h},pal.accent,3);
+    surface(r,{thumbX-8,rect.y+rect.h/2-12,16,24},pal.accent,8);
+    const auto text=std::to_string(value)+"%";int width=0;
+    type.measureText(type.buttonFont(),text,&width,&height);
+    type.renderText(r,type.buttonFont(),text,rect.x+rect.w-width-12,rect.y+(rect.h-height)/2,pal.fg,54);
+    if(focused)focusRing(r,rect,pal);
 }
 inline void favorite(SDL_Renderer *r,SDL_Rect rect,const ThemePalette &pal,bool selected) {
     surface(r,rect,selected?pal.accent:(pointerDown&&contains(rect,pointerX,pointerY)?pal.cardBorder:pal.header));

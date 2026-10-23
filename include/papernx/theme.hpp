@@ -62,6 +62,19 @@ inline SDL_Color blendColor(SDL_Color a,SDL_Color b,int percent) {
     auto mix=[percent](int x,int y){return Uint8((x*(100-percent)+y*percent)/100);};
     return {mix(a.r,b.r),mix(a.g,b.g),mix(a.b,b.b),255};
 }
+inline ThemePalette resolveInterfacePalette(const ThemePalette &reading,int variant,int accent) {
+    static constexpr SDL_Color accents[]={{96,60,243,255},{36,104,216,255},{8,127,139,255},{23,125,66,255},
+        {184,81,13,255},{202,51,71,255},{185,46,119,255}};
+    auto palette=reading;
+    if(variant==0) {
+        palette.bg={10,11,18,255};palette.fg={241,242,248,255};palette.muted={156,161,184,255};
+        palette.card={22,24,36,255};palette.header={30,33,48,255};palette.cardBorder={48,52,72,255};
+    } else if(variant==1) {
+        palette.bg={245,246,251,255};palette.fg={29,34,53,255};palette.muted={102,111,138,255};
+        palette.card={255,255,255,255};palette.header={237,240,249,255};palette.cardBorder={218,223,238,255};
+    }
+    palette.accent=accents[std::clamp(accent,0,6)];return palette;
+}
 // One appearance resolver for both native EPUB and PDF reader chrome.
 // Legacy PDF filter bytes are ignored: PDF derives paper and text colors from
 // ReaderPreferences.theme/backgroundColor/textColor like EPUB.
@@ -129,7 +142,7 @@ inline double readingContrast(SDL_Color a, SDL_Color b) {
     double x = luminance(a), y = luminance(b);
     return (std::max(x, y) + .05) / (std::min(x, y) + .05);
 }
-inline std::string generateEpubCss(const ReaderPreferences &style) {
+inline std::string generateEpubCss(const ReaderPreferences &style,bool expandedViewport=true) {
     const auto &pal = g_palettes[std::clamp(style.theme, 0, 5)];
     auto bg = readingColor(style.backgroundColor, pal.bg), fg = readingColor(style.textColor, pal.fg);
     char css[2048];
@@ -137,7 +150,8 @@ inline std::string generateEpubCss(const ReaderPreferences &style) {
     std::snprintf(css, sizeof css,
         "html, body { background-color: #%02x%02x%02x !important; color: #%02x%02x%02x !important; } ",
         bg.r, bg.g, bg.b, fg.r, fg.g, fg.b);
-    std::string result = css;
+    std::string result = expandedViewport?"@page { margin: 0 !important; padding: 0 !important; } ":"";
+    result += css;
     // Selected paper colors override embedded white publisher backgrounds.
     // MuPDF would otherwise repaint the interior after the reader chrome changes.
     const bool explicitPaper=style.backgroundColor>=0 || style.textColor>=0 || style.theme!=0;
