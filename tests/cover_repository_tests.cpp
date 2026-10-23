@@ -91,6 +91,42 @@ int main() {
         assert(fs::exists(outside / (key + ".pnxc")));
         assert(fs::exists(outside / "sentinel.txt"));
     }
+    // A user-requested cleanup removes only generated artifacts. It retains
+    // books, unknown files and all user data, and permits immediate regeneration.
+    { CoverRepository cleanup(cache);
+      const auto before = cleanup.stats();
+      assert(before.entries > 0 && before.bytes > 0);
+      assert(cleanup.read(book));
+      assert(cleanup.read(book));
+      const auto counters = cleanup.stats();
+      assert(counters.hits >= 2 && counters.bytes > 0);
+      { std::ofstream out(cache / (key + ".tmp")); out << "interrupted"; }
+      assert(cleanup.clear());
+      const auto after = cleanup.stats();
+      assert(after.entries == 0 && after.bytes == 0);
+      assert(!fs::exists(file));
+      assert(!fs::exists(cache / (key + ".tmp")));
+      assert(fs::exists(book.path));
+      assert(fs::exists(cache / "user-notes.txt"));
+      assert(fs::exists(outside / "sentinel.txt"));
+      assert(cleanup.write(book, image));
+      assert(cleanup.read(book)->rgb == image.rgb);
+    }
+    // Never traverse even a malicious filename-shaped symlink in the cache.
+    if (!linkError) {
+        const auto deceptive = cache / (std::string(32, 'a') + ".pnxc");
+        std::error_code local;
+        fs::create_symlink(outside / "sentinel.txt", deceptive, local);
+        if (!local) {
+            CoverRepository cleanup(cache);
+            assert(!cleanup.clear());
+            assert(fs::exists(outside / "sentinel.txt"));
+            fs::remove(deceptive);
+            assert(cleanup.clear());
+        }
+        CoverRepository unsafe(root / "linked");
+        assert(!unsafe.clear());
+    }
     fs::remove_all(root); // Dedicated unique test-owned directory only.
     std::cout << "cover repository tests passed\n";
 }
