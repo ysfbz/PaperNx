@@ -4,7 +4,7 @@
 
 **Baseline:** `main@8db85384a1b6c277c74766601ef46e9a672328df` (2026-10-23 audit)  
 **Feature branch:** `feature/v0.9.2-complete-reader-enhancements`  
-**Current code HEAD:** `1cb06a135dc30dfff676a7124e2602b2ed06cc4f`; final audit documents are recorded in Section G.
+**Latest recorded branch/source HEAD:** `ffb6d7047b3874746ae5a120209ab608f2590e4c` (G2 comic-turn checkpoint; later report-only commits may advance HEAD).
 **Fork reference:** `rtk19/PaperNx@d2b4bcfd10b1a66043c5b8cd36da08340cffec6d`  
 **Version remains:** v0.9.1; do not tag, release or merge to main.
 
@@ -91,6 +91,19 @@
 | Hardware | UNVERIFIED | Physical Switch TLS/NIFM, brightness restoration, suspend/resume, Joy-Con input, and SD interruption/recovery were not exercised. |
 
 The updater now handles some incomplete metadata states if PaperNX can launch. It does **not** make the two-rename FAT interruption window power-loss proof: if the canonical NRO path is absent, manual restoration from `.old` using an external file manager or computer is still required. No release, tag, PR, merge, or GitHub Actions run was created.
+
+## K. 2026-10-24 — G2 cold-cache comic turns
+
+Code checkpoint `ffb6d7047b3874746ae5a120209ab608f2590e4c` defers cold comic destination pages to `ComicPages`, preserves the current page/progress while waiting, coalesces rapid turns, and clears failed requests without changing saved position. Active current-page fallback remains in the existing SDL/main-thread path; missing partner and destination rasters remain worker-owned. Touch swipe release while waiting becomes a queued turn.
+
+| Area | G2 result | Evidence |
+|---|---|---|
+| Comic cache / input / spreads | TARGETED DESKTOP PASS | `papernx_comic_performance_tests`, `papernx_reader_input_tests`, `papernx_reader_spread_tests`: **3/3 PASS** after the G2 changes. The targets rebuilt again after a small helper simplification; latest `papernx_reader_input_tests`: **1/1 PASS**. |
+| Cold-cache user action | PASS | Performance test checks controller rapid-turn coalescing, delayed touch release, no page/progress mutation before the target is ready, worker failure cleanup, and no target UI rasterization. |
+| 37-page RAR5 idle/turn exercise | PASS, host only | Direct executable run with `tests/fixtures/comics/performance-37.cbr`; 30 curl frames 321 ms, 30 pan frames 10 ms, zero UI rasterizations in those loops, worker opens/closes balanced after suspend/stop. No baseline; no speedup claimed. |
+| Full native / Switch / hardware | NOT RUN / UNVERIFIED | Full CTest and Switch cross-build were not rerun at G2. Physical Switch renderer/input/timing remain unverified. |
+
+**Decision remains INCOMPLETE — BLOCKERS REMAIN.** Independent scanner/index/parser redesign, updater's canonical-NRO power-loss window, full current-HEAD test coverage, hardware validation and the requested end-to-end cover performance matrix remain open.
 
 ## I. 2026-10-24 — Queued scan regression
 

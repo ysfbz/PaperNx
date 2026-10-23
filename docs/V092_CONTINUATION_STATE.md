@@ -74,3 +74,14 @@ Next, continue the PaperNX-specific library/index redesign while preserving the 
 ## 2026-10-24 post-push identity note
 
 The verified/pushed branch HEAD at the start of this note was `ed9e3b69c184de1b488c9726c660dacdef1635b2`; its latest source-bearing ancestor is `faecf30eb4fb12fd143d3c1666d91f0b690b484c`. The report commit did not modify source files, so the source-provenance blob table remains valid for that branch HEAD. A new audit-doc-only clarification records this distinction. The pushed commits did not run GitHub Actions: there is no `push` trigger and no open PR for the branch. The generated CBR fixture remains untracked and must stay outside commits.
+
+## 2026-10-24 G2 comic cold-cache turn checkpoint
+
+- **Code commit / source HEAD:** `ffb6d7047b3874746ae5a120209ab608f2590e4c` on `feature/v0.9.2-complete-reader-enhancements`.
+- `turnPage()` now queues cold comic destinations to the existing `ComicPages` worker, holds reader position/progress until texture readiness, coalesces bounded rapid input, and resumes the page curl only after the needed group is present. The visible current page keeps its existing renderer fallback on a rare cache miss; missing partner/destination pages stay asynchronous.
+- Held touch gestures resume once the target is ready; a release while waiting becomes a single queued turn. Empty results and SDL texture/cache failures cancel the pending action and preserve the saved page, with a localized error message.
+- **Host checks:** targeted native CTest for comic performance, reader input and spreads passed **3/3**. After a final helper signature simplification, all three targets rebuilt and `papernx_reader_input_tests` passed **1/1**. A direct run against the existing 37-page `performance-37.cbr` passed; the worker held its document through 30 seconds idle and reported balanced opens/closes after suspend and stop.
+- RAR run measured 321 ms for 30 curl frames and 10 ms for 30 pan frames under this container's OpenGL renderer, with zero UI rasterizations in those loops. No before/after baseline exists; do not claim a speedup. `XDG_RUNTIME_DIR` emitted a warning, but the test completed successfully.
+- **Not rerun at G2:** full native CTest, Switch cross-build, ASan/UBSan, physical Switch input/renderer and 100/500/1000-book cover benchmark. No release or workflow was run.
+- **Git at this code checkpoint:** local branch was three commits ahead of remote `4536beca9848a34663c58a0c022955fa79bdc0a5`. The existing workflow has no `push` trigger; it has `pull_request` and `workflow_dispatch` only. The untracked binding execution plan and generated RAR fixture remain outside the G2 code commit.
+- **Next gate:** continue the binding plan's G3 comic folio/paper-back correctness work; do not restart the full verification chain and do not mark the overall task complete. Overall decision remains `INCOMPLETE — BLOCKERS REMAIN`.

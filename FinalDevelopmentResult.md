@@ -267,3 +267,25 @@ Bu bölüm, ana v0.9.2 hardening görevinin devamıdır; release hazırlığı v
 - Bu ek belge denetimi için test çalıştırılmadı; son kod doğrulaması `faecf30` source checkpoint'inde: hedefli library CTest 2/2 ve Switch build/artifact validation PASS. Full suite güncel checkpoint'te NOT RUN.
 
 **Karar: INCOMPLETE — BLOCKERS REMAIN.** Bağımsız scanner/index/parser yeniden tasarımı, canonical NRO bulunmadığında otomatik güç-kesintisi kurtarması, fiziksel Switch testleri ve kapsamlı performans ölçümleri açık.
+
+## L. 2026-10-24 — G2: Soğuk cache comic sayfa dönüşü
+
+- **Branch:** `feature/v0.9.2-complete-reader-enhancements`.
+- **Kod commit'i:** `ffb6d7047b3874746ae5a120209ab608f2590e4c` (`fix(comic): defer cold turns until textures are ready`).
+- Soğuk hedef sayfalar artık `ComicPages` worker kuyruğunda hazırlanıyor. `currentPage_` ve progress, hedef texture hazır olana kadar değişmiyor; hızlı ardışık dönüşler tek bekleyen istek içinde birleştiriliyor.
+- Kaynak sayfanın cache’te bulunmadığı durumda aktif yaprak mevcut renderer fallback’iyle hazırlanıyor; eksik eş yaprak worker’dan, hedef spread ise `TurnTarget` önceliğiyle geliyor. SDL texture oluşturma/yükleme UI thread’inde kalıyor.
+- Dokunma sürüklemesi texture beklerken korunuyor; parmak erken kaldırılırsa dönüş bekleyen controller girdisine çevriliyor. Boş/başarısız worker sonucu beklemeyi temizliyor, okuma konumunu koruyor ve TR/EN hata metni gösteriyor.
+- `SDL_CONTROLLER_BUTTON_START` ile dokunmatik `+` aynı `toggleQuickMenu()` yolunu kullanmaya devam ediyor; bu commit Joy-Con menü kapsamını değiştirmedi. Sentetik SDL doğrulaması önceki G checkpoint’inde; fiziksel Joy-Con halen **UNVERIFIED**.
+
+### Çalıştırılan kontroller
+
+| Kontrol | Sonuç | Kanıt |
+|---|---|---|
+| Hedefli derleme | **PASS** | `docker compose run --rm desktop bash -lc 'cmake --build build-native --target papernx_comic_performance_tests papernx_reader_input_tests papernx_reader_spread_tests --parallel 4'`. |
+| Comic / input / spread CTest | **PASS, 3/3** | `docker compose run --rm desktop bash -lc 'ctest --test-dir build-native --output-on-failure -R "^papernx_comic_performance_tests$|^papernx_reader_input_tests$|^papernx_reader_spread_tests$"'`. Soğuk controller dönüşü, dokunma bırakma, cache beklemesi, hatalı arşiv sonucu ve spread regression’ları kapsandı. |
+| RAR5 performance executable | **PASS** | `docker compose run --rm desktop bash -lc './build-native/papernx_comic_performance_tests tests/fixtures/comics/performance-37.cbr'`; 37 sayfa / 43,484,977 bayt. Worker 30 saniye idle kaldı; `opens=2, closes=1`, suspend/stop sonunda `opens=3, closes=3`. |
+| RAR5 ölçülen frame döngüleri | **ÖLÇÜM VAR, hızlanma iddiası yok** | Bu container’daki SDL OpenGL renderer’da 30 curl karesi 321 ms, 30 pan karesi 10 ms; iki döngüde UI rasterization sayacı sıfır. Önce/sonra baseline’ı ve Switch cihaz ölçümü yok. |
+| Son küçük helper sadeleştirmesi sonrası derleme / CTest | **PASS** | Üç hedef yeniden derlendi; `papernx_reader_input_tests` son kaynakta **1/1 PASS**. |
+| Full native CTest, Switch cross-build, ASan/UBSan ve fiziksel Switch | **NOT RUN / UNVERIFIED** | Bu G2 checkpoint’inde çalıştırılmadı. RAR koşusunda `XDG_RUNTIME_DIR` uyarısı çıktı; test yine başarıyla tamamlandı. |
+
+**Karar: INCOMPLETE — BLOCKERS REMAIN.** Bu checkpoint comic worker/page-turn davranışını masaüstü odaklı doğrular; 11 alanın tamamını, updater/Switch gereksinimlerini veya fiziksel donanım davranışını tamamlanmış saymaz. Oluşturulmuş `tests/fixtures/comics/performance-37.cbr` dosyası untracked olarak korundu; release, tag, PR, merge veya GitHub Actions çalıştırılmadı.
