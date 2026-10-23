@@ -1,6 +1,6 @@
 # PaperNX v0.9.2 — Development Acceptance Matrix
 
-> **Audit correction (2026-10-23):** The older `CODE COMPLETE / TESTED` labels in this historical matrix are withdrawn as acceptance evidence. Section H at the end is the latest, evidence-based status and supersedes every earlier completion or release-readiness statement in this file.
+> **Audit correction (2026-10-23):** The older `CODE COMPLETE / TESTED` labels in this historical matrix are withdrawn as acceptance evidence. The latest dated section at the end is the evidence-based status and supersedes every earlier completion or release-readiness statement in this file.
 
 **Baseline:** `main@8db85384a1b6c277c74766601ef46e9a672328df` (2026-10-23 audit)  
 **Feature branch:** `feature/v0.9.2-complete-reader-enhancements`  
@@ -78,11 +78,11 @@
 
 ## H. 2026-10-23 continuation after the reader quick-menu checkpoint
 
-**Current source HEAD:** `b9a22bcf023165ab0338c6e9cbf9a92253290e7f` on `feature/v0.9.2-complete-reader-enhancements`. **Decision remains INCOMPLETE — BLOCKERS REMAIN.** The six-file byte-identity statement is historical at `a35aa7b`; at current HEAD five existing files have different blobs and `include/papernx/interface_theme.hpp` is deleted. Fork-derived attribution remains in place. See [`V092_SOURCE_PROVENANCE_AUDIT.md`](V092_SOURCE_PROVENANCE_AUDIT.md).
+**Current branch HEAD:** `8c38513` on `feature/v0.9.2-complete-reader-enhancements`; application source is unchanged from `b9a22bc` and `8c38513` adds only a test. **Decision remains INCOMPLETE — BLOCKERS REMAIN.** The six-file byte-identity statement is historical at `a35aa7b`; at current HEAD five existing files have different blobs and `include/papernx/interface_theme.hpp` is deleted. Fork-derived attribution remains in place. See [`V092_SOURCE_PROVENANCE_AUDIT.md`](V092_SOURCE_PROVENANCE_AUDIT.md).
 
 | Checkpoint | Result | Evidence |
 |---|---|---|
-| Library scan cancellation | PASS | Commit `e791394`. `LibraryScanner` publishes cancellation so the owner can join the worker; canceled snapshots are ignored and queued rescan requests restart after the worker is joined. Targeted `papernx_library_index_tests` and `papernx_modern_library_tests`: **2/2 passed**. |
+| Library scan cancellation | PASS | Commit `e791394`; test-only commit `8c38513` covers queued rescan coalescing. Targeted `papernx_library_index_tests` and `papernx_modern_library_tests`: **2/2 passed** after the code fix; the updated modern-library queue regression also passed **1/1**. |
 | Updater incomplete-state recovery | PASS on host | Commit `b9a22bc`. Missing boot record plus `.swap`/`.boot.started` restores `.old`; ambiguous state without backup reports an error; safe orphan backup is cleaned only with canonical NRO present. Targeted updater unit and local HTTPS tests: **2/2 passed**. |
 | Switch link and RomFS | PASS | `docker compose run --rm switch bash -lc 'make -j4 && python3 scripts/verify_artifacts.py --version 0.9.1'`: `PaperNX.elf`/NRO validated for AArch64; `-lcurl` linked; embedded CA matched `romfs/cacert.pem` (118 certificates, 200,116 bytes). NRO SHA-256 `e6efb4e6a1f3e3163c1237ffc3982d2047409e34f502712f06d370e9ea420b64`. Hardware field remains `UNVERIFIED`. |
 | Reader quick menu and single-page defaults | PASS on targeted host tests | Commit `36aec98`; earlier focused reader/app test set passed. Joy-Con SDL START event and touch `+` use the same quick menu state. Physical controller remains unverified. |
@@ -91,3 +91,11 @@
 | Hardware | UNVERIFIED | Physical Switch TLS/NIFM, brightness restoration, suspend/resume, Joy-Con input, and SD interruption/recovery were not exercised. |
 
 The updater now handles some incomplete metadata states if PaperNX can launch. It does **not** make the two-rename FAT interruption window power-loss proof: if the canonical NRO path is absent, manual restoration from `.old` using an external file manager or computer is still required. No release, tag, PR, merge, or GitHub Actions run was created.
+
+## I. 2026-10-24 — Queued scan regression
+
+The test-only branch commit `8c38513` exercises the production `startLibraryScan()` coalescing path: a second request cancels the running scan, the partial/cancelled snapshot is not applied, and one replacement scan is published. `papernx_modern_library_tests` was rebuilt and passed **1/1**. The first run found a stale assertion expecting the old five-book state after the newly queued scan; the expected post-scan count was corrected to six, and the focused test passed on rerun. No production source changed after `b9a22bc`; the full native suite, hardware matrix and performance matrix were not rerun.
+
+## J. 2026-10-24 — Cancellation during inventory staging
+
+The code commit `faecf30` adds an atomic cancellation check while converting the completed scan into the disposable `ProgressStore` inventory. A cancelled worker skips the save, leaving the prior inventory file untouched; the existing atomic store save still completes a whole snapshot if cancellation arrives after persistence begins. `papernx_library_index_tests` and `papernx_modern_library_tests` rebuilt and passed **2/2**. The Switch cross-build and artifact validation also passed at `faecf30`: AArch64 ELF/NRO, `-lcurl`, 118 certificates embedded (200,116 bytes), NRO SHA-256 `30c29d0ca291c5dacdc39040627e0a094f25d300259607f22aeb4b3a0e782a95`. No full CTest rerun, hardware test or end-to-end performance measurement was performed. This narrows cancellation's inventory-write window but does not change the provenance classification or complete the requested independent scanner/index redesign.

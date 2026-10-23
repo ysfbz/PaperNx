@@ -38,15 +38,35 @@ Read the current source-provenance report and latest `FinalDevelopmentResult.md`
 
 This section supersedes the stale “Full native CTest is running” wording in the earlier scan checkpoint. Work remains on the same feature branch; no release, tag, PR, merge, or GitHub Actions run was created.
 
-- **Latest source HEAD:** `b9a22bcf023165ab0338c6e9cbf9a92253290e7f`.
-- **Recent code commits:** `e791394` (`fix(library): make async scans cancellable`) and `b9a22bc` (`fix(updater): recover incomplete install state`). Reader quick-menu checkpoint: `36aec98`. The branch was two commits ahead of origin at this source checkpoint; publish only with a fast-forward update.
-- **Library scan:** active scans can be cancelled; cancelled results are joined and discarded; a queued rescan begins after cancellation. Focused `papernx_library_index_tests` and `papernx_modern_library_tests` passed **2/2** after `e791394`.
+- **Latest branch HEAD:** `8c38513`; latest application-source commit: `b9a22bcf023165ab0338c6e9cbf9a92253290e7f`. `8c38513` changes only the modern library regression test.
+- **Recent commits:** `e791394` (`fix(library): make async scans cancellable`), `b9a22bc` (`fix(updater): recover incomplete install state`), and `8c38513` (`test(library): cover coalesced async rescans`). Reader quick-menu checkpoint: `36aec98`. The remote is currently at `d2ad560`; publish this test checkpoint only with a fast-forward update after checking workflow triggers.
+- **Library scan:** active scans can be cancelled; cancelled results are joined and discarded; a queued rescan begins after cancellation. Focused `papernx_library_index_tests` and `papernx_modern_library_tests` passed **2/2** after `e791394`; the expanded queued-rescan `papernx_modern_library_tests` passed **1/1** at `8c38513`.
 - **Updater recovery:** if a missing `.boot` record is accompanied by `.swap` or `.boot.started`, startup restores `.old`; an ambiguous install without a backup fails closed. A redundant `.old` is removed only when the canonical executable exists and no install-start evidence remains. Focused updater unit and local HTTPS tests passed **2/2** after `b9a22bc`.
 - **Switch build/artifact check:** `docker compose run --rm switch bash -lc 'make -j4 && python3 scripts/verify_artifacts.py --version 0.9.1'` passed at `b9a22bc`; ELF/NRO AArch64 validated, `-lcurl` resolved, and the exact 118-certificate / 200,116-byte CA bundle is embedded. NRO SHA-256: `e6efb4e6a1f3e3163c1237ffc3982d2047409e34f502712f06d370e9ea420b64`. Hardware is still `UNVERIFIED`.
 - **Reader add-on:** the targeted reader/app checks recorded under section G of `FinalDevelopmentResult.md` passed; physical Joy-Con behavior remains unverified.
 - **Full suite:** 30/30 native tests are recorded at the prior `8204f77` checkpoint. The full suite was not rerun after subsequent reader, scanner-cancellation, and updater changes. Do not carry forward that PASS as if it were run at current HEAD.
-- **Provenance:** the historical six-file byte match is true at `a35aa7b`, not current. At `b9a22bc`, five paths exist with changed blobs and `include/papernx/interface_theme.hpp` is deleted. All derived/adapted source lineage and Refael Bar / Refael Avramashvili credits remain documented in `V092_SOURCE_PROVENANCE_AUDIT.md` and `LICENSES.md`.
+- **Provenance:** the historical six-file byte match is true at `a35aa7b`, not current. At current branch HEAD `8c38513` (same six source identities as `b9a22bc`), five paths exist with changed blobs and `include/papernx/interface_theme.hpp` is deleted. All derived/adapted source lineage and Refael Bar / Refael Avramashvili credits remain documented in `V092_SOURCE_PROVENANCE_AUDIT.md` and `LICENSES.md`.
 - **Still open:** independent PaperNX redesign of scanner/index/updater parser is incomplete; the canonical-NRO-missing power-loss window still needs manual file-manager/computer recovery; physical Switch checks and end-to-end performance matrix remain unverified. The existing 32 MiB cover and 64 MiB page-cache limits remain unchanged without measurement.
-- **Worktree note:** `tests/fixtures/comics/performance-37.cbr` is a generated 43,484,977-byte fixture and remains untracked; do not stage it unintentionally. Documentation updates for this checkpoint are in progress.
+- **Worktree note:** `tests/fixtures/comics/performance-37.cbr` is a generated 43,484,977-byte fixture and remains untracked; do not stage it unintentionally. The latest provenance wording refresh for the test-only `8c38513` HEAD is in progress; the prior report/audit checkpoint is `933eb2e` / `d2ad560`.
 
 Continue from the latest source-provenance table and updater recovery state. Keep the final decision `INCOMPLETE — BLOCKERS REMAIN` unless all independent-origin and functional verification requirements are actually satisfied.
+
+## 2026-10-24 queued-scan regression checkpoint
+
+- **Branch HEAD:** `8c38513` (`test(library): cover coalesced async rescans`); application source is unchanged from `b9a22bc`.
+- The expanded `tests/modern_library_tests.cpp` requests a second scan while the first worker is still owned, waits for cancellation/join, then verifies that exactly one replacement snapshot is applied and that newly discovered books are present.
+- Targeted rebuild and CTest for `papernx_modern_library_tests`: **PASS, 1/1**. An initial failure was a stale test count after the new queued scan; the expectation was corrected, and the same test passed on rerun.
+- Full native CTest was not restarted. The previous full-suite result remains historical at `8204f77`; it is not a current-HEAD verification.
+- The provenance table was adjusted for `8c38513`; that commit changes only the test file, so source blobs remain those recorded for `b9a22bc`. All attribution remains retained.
+- Current source and hardware blockers are unchanged: independent scanner/index/parser architecture, power-loss while canonical NRO is absent, physical Switch checks and end-to-end performance measurements.
+
+Next, continue the PaperNX-specific library/index redesign while preserving the passing scan cancellation, queueing, inventory, active-reader, and progress-preservation contracts. Do not mark the whole v0.9.2 task complete based on this focused test.
+
+## 2026-10-24 cancellation-stage hardening
+
+- **Current code-bearing HEAD:** `faecf30eb4fb12fd143d3c1666d91f0b690b484c`; `src/library_index.cpp` checks cancellation while preparing the disposable inventory and skips persistence when cancellation arrives before the atomic store save. Full native CTest was not rerun.
+- **Targeted native verification:** rebuilt `papernx_library_index_tests` and `papernx_modern_library_tests`; CTest **2/2 PASS**. The queued-rescan scenario from `8c38513` remains included.
+- **Switch verification:** `docker compose run --rm switch bash -lc 'make -j4 && python3 scripts/verify_artifacts.py --version 0.9.1'` **PASS**. AArch64 ELF/NRO; `-lcurl` linked; exact 118-certificate / 200,116-byte CA source embedded. NRO SHA-256 `30c29d0ca291c5dacdc39040627e0a094f25d300259607f22aeb4b3a0e782a95`; hardware remains `UNVERIFIED`.
+- **Provenance:** the six historical files still matched the pinned fork only at `a35aa7b`. Current existing scanner/index/updater/parser source files have changed blobs but remain derivative by history; the interface theme header remains deleted and its palette remains attributed. The current scan/index module is not represented as an independent clean-room implementation.
+- **Git:** branch remains `feature/v0.9.2-complete-reader-enhancements`; at this checkpoint, `8c38513` and `faecf30` are local ahead of remote `d2ad560`. Documentation updates are being prepared. The untracked generated CBR performance fixture remains untouched.
+- **Open:** independent source redesign, full native suite after later reader/scanner/updater changes, power-loss recovery when canonical NRO is absent, real Switch hardware checks, and end-to-end cache/performance measurements.
