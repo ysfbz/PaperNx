@@ -2,7 +2,7 @@
 
 **Updated:** 2026-10-24
 **Branch:** `feature/v0.9.2-complete-reader-enhancements`
-**Latest source commit:** `7aa78bc4da9714227a8ea3a9c48ae7d1552b881a` (G5 scanner/history worker checkpoint).
+**Latest source commit:** `52164e7c8eb45ded2898998ea99152400f095979` (G6 cover-cache counter checkpoint).
 **Last source commit before the current hardening changes:** `bb9d8579db9ccf0d10b5843e1929c2e696565c59`
 **Hardening source commits:** `913fb8f` and `1cb06a1`.
 **Audit documentation:** committed on this feature branch; use `git log` for the final report commit SHA.
@@ -25,7 +25,7 @@
 1. **Independent source redesign:** scanner/index have PaperNX-specific safety adaptations but remain fork-derived; updater/parser also retain fork lineage. No module is falsely described as clean-room. See [`V092_SOURCE_PROVENANCE_AUDIT.md`](V092_SOURCE_PROVENANCE_AUDIT.md).
 2. **External update recovery:** the current updater never replaces the canonical NRO. The separate file-manager replacement can still be interrupted; PaperNX cannot guarantee recovery if that external operation leaves no bootable NRO. Keep a backup; physical replacement is untested. Legacy `.boot/.old/.swap` recovery only addresses transactions from older builds.
 3. **Physical Switch validation:** actual TLS/NIFM operation, real backlight changes and restoration, docked/HOME/suspend/resume behavior, touch/Joy-Con slider use, startup rollback and SD-card write/interruption behavior remain `UNVERIFIED`.
-4. **Performance evidence:** no before/after comparison or 100/500/1000-book cold/warm cover benchmark was captured. No archive reopen/metadata reopen counters or Switch FPS/RAM traces were collected. Existing 32 MiB cover and 64 MiB page cache budgets were not retuned without data.
+4. **Performance evidence:** five synthetic repository-I/O runs cover placeholder counts 100/500/1000; see [`V092_COVER_BENCHMARK.md`](V092_COVER_BENCHMARK.md). No real-document cold/warm decode benchmark, archive/metadata reopen counters, before/after comparison, or Switch FPS/RAM traces were collected. Existing 32 MiB cover and 64 MiB page cache budgets were not retuned.
 
 ## Evidence paths and commands
 
@@ -36,7 +36,7 @@
 
 ## Next session starting point
 
-Read the current source-provenance report and latest `FinalDevelopmentResult.md` section first. Continue only on the existing feature branch. Continue with G6 cover cache safety and the 100/500/1000 benchmark, then G7 Ponytail and remaining source redesign. Do not restart the full verification chain prematurely. Keep the final decision `INCOMPLETE — BLOCKERS REMAIN`; hardware behavior remains unverified until tested on a physical console.
+Read the current source-provenance report and latest `FinalDevelopmentResult.md` section first. Continue only on the existing feature branch. G6 counters and its synthetic scale run are recorded below; continue with G7 reader/UI/brightness regression and Ponytail audit, plus the remaining source redesign. Do not restart the full verification chain prematurely. Keep the final decision `INCOMPLETE — BLOCKERS REMAIN`; hardware behavior remains unverified until tested on a physical console.
 
 ## 2026-10-23 latest continuation checkpoint
 
@@ -122,3 +122,11 @@ The verified/pushed branch HEAD at the start of this note was `ed9e3b69c184de1b4
 - Parser tests now reject duplicate keys inside ignored nested JSON and node-limit overflow. Parser source was not redesigned and remains fork-derived/adapted.
 - **Not run at G5:** full native CTest, Switch cross-build, sanitizers, physical Switch and 100/500/1000 cover benchmark. No speedup claim. No release or workflow was run.
 - **Next:** G6 cover cache safety and measured benchmark, followed by Ponytail/source audit and remaining test gates. Overall decision remains `INCOMPLETE — BLOCKERS REMAIN`.
+
+## 2026-10-24 G6 cover-cache checkpoint
+
+- **Source commit:** `52164e7c8eb45ded2898998ea99152400f095979` (`feat(cover): expose disk cache hit and miss stats`). Settings now show disk-cache entries, bytes, hits, and misses in both languages. The cover worker refreshes metrics after cache hits, misses, and writes; memory texture hits are not included in these disk counters.
+- **Targeted desktop command:** `docker compose run --rm desktop bash -lc 'cmake --build build-desktop --target PaperNX papernx_cover_tests papernx_cover_performance_tests papernx_localization_tests --parallel 4 && ctest --test-dir build-desktop --output-on-failure -R "^papernx_cover_tests$|^papernx_cover_performance_tests$|^papernx_localization_tests$"'` — build PASS; CTest **3/3 PASS**.
+- **Synthetic benchmark:** five current-source runs at 100/500/1000 placeholder books; raw results at `verification/v092/cover-benchmark/synthetic-container-runs.txt`, summary in [`V092_COVER_BENCHMARK.md`](V092_COVER_BENCHMARK.md). Byte budget retained 100/354/354 generated images. This measures only `CoverRepository` synthetic disk I/O; it is not an end-to-end performance or speedup result.
+- **Not run / unverified:** real EPUB/PDF/CBZ/CBR decode and archive/metadata reopen counts, visible-cover/UI frame timing, actual RAM/texture use, baseline comparison, Switch SD performance, full native suite and sanitizers.
+- **Next:** G7 reader/UI/brightness test audit, then remaining independent-source and Ponytail audit. Overall decision remains `INCOMPLETE — BLOCKERS REMAIN`.

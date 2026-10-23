@@ -5,7 +5,7 @@
 
 **Baseline:** `main@8db85384a1b6c277c74766601ef46e9a672328df` (2026-10-23 audit)  
 **Feature branch:** `feature/v0.9.2-complete-reader-enhancements`  
-**Latest source-bearing HEAD:** `7aa78bc4da9714227a8ea3a9c48ae7d1552b881a` (G5 scanner/history worker checkpoint).
+**Latest source-bearing HEAD:** `52164e7c8eb45ded2898998ea99152400f095979` (G6 cover-cache counter checkpoint).
 **Fork reference:** `rtk19/PaperNx@d2b4bcfd10b1a66043c5b8cd36da08340cffec6d`  
 **Version remains:** v0.9.1; do not tag, release or merge to main.
 
@@ -26,7 +26,7 @@
 | 06 | Chapter/page reader chrome | CODE COMPLETE / TESTED | `src/reader_book_chrome.inc` provides chapter titles, page range captions (`bookChapterCaption`, `readerFooterCaption`), scrubber, bookmark indicators, and low-distraction folio. Verified with `tests/book_chrome_tests.cpp`. |
 | 07 | Modern menus, app theme and accent colors | HISTORICAL STATUS WITHDRAWN; palette integrated in shared tokens | `include/papernx/interface_theme.hpp` is deleted; palette resolution now lives in `include/papernx/theme.hpp`. Its fork-derived lineage and Refael Bar attribution remain documented. Current acceptance still requires the dated tests/device matrix below. |
 | 08 | Secure native self-update | HISTORICAL STATUS WITHDRAWN; G4 verified-manual path | Current code verifies and stages the release beside `PaperNX.nro`, but does not mutate the canonical NRO. See dated G4 evidence below. Switch file-manager replacement and legacy boot recovery remain unverified on hardware. |
-| 09 | Persistent cover cache optimization and safe clearing | CODE COMPLETE / TESTED | Optimized cover loading: skips reopening document archives when cover hits exist (`!catalogMetadataCurrent`). Added `CoverRepository::stats()` tracking (entries, bytes, hits, misses), and two-step confirmation for safe worker-serialized clearing (`coverClearConfirm_`, `requestCoverCacheClear()`). Tested via `tests/cover_repository_tests.cpp`. |
+| 09 | Persistent cover cache optimization and safe clearing | HISTORICAL STATUS WITHDRAWN; TARGETED CACHE TESTS PASS; REAL-DOCUMENT PERFORMANCE UNVERIFIED | Existing worker cache and safe-clear path remain; disk hit/miss and size stats are now visible in settings. Synthetic 100/500/1000 repository I/O is documented in [`V092_COVER_BENCHMARK.md`](V092_COVER_BENCHMARK.md); it does not measure document decode or Switch performance. |
 | 10 | Natural paper reading (Soft E-Ink) | CODE COMPLETE / TESTED | Preset 9 `Soft E-Ink` (`#242424` text / `#EAE7DF` background) added to `src/v04_choices.inc` as a neutral 10th preset. Available in reading and global themes with Turkish and English localization (`paperPresetLabel`). Verified via `tests/check_utf8_integrity.py`. |
 | 11 | Brightness | CODE COMPLETE / HARDWARE UNVERIFIED | Full-frame software dimming pass (10–100% brightness) after portrait composition in `src/main.cpp`. Added Nintendo Switch hardware backlight hook (`updateSwitchBacklight` via `lblSetCurrentBrightnessSetting`) under `#ifdef __SWITCH__`. Interactive slider and reset button in Appearance tab. Note: Physical Switch backlight verification is marked HARDWARE UNVERIFIED. |
 
@@ -53,7 +53,7 @@
 | 06 | Chapter/page progress | DESKTOP PASS | `src/reader_book_chrome.inc`, `src/reader_sheets.inc`, `src/main.cpp`; `tests/book_chrome_tests.cpp`, `tests/page_navigation_tests.cpp`, `tests/reader_spread_tests.cpp`. |
 | 07 | Menus/themes/accent | DESKTOP PASS | `include/papernx/theme.hpp`, `include/papernx/ui.hpp`, `src/v04_choices.inc`, `src/v04_focus.inc`; `tests/ui_component_tests.cpp`, `tests/modern_library_tests.cpp`, app tests. Interface theme was consolidated into existing theme tokens. |
 | 08 | Self-updater | DESKTOP HTTPS PASS; Switch compile/link PASS; install power-loss and physical-device behavior not fully verified | `src/self_update.cpp`, `src/self_update_ui.inc`, `src/update_json.hpp`; updater unit and local HTTPS integration tests passed. `make all` linked `-lcurl`; NRO verification found the CA bundle in RomFS. Manual restore of `.old` is required if power loss removes the canonical NRO during the two-rename window. |
-| 09 | Cover cache | Functional tests PASS; requested scale/performance matrix NOT RUN | `src/cover_repository.cpp`, `src/main.cpp`; `tests/cover_repository_tests.cpp` and full native CTest passed. No before/after cover timing, 100/500/1000-book workload or archive-open count was captured. |
+| 09 | Cover cache | Repository safety and synthetic scale tests PASS; real-document performance NOT RUN | `src/cover_repository.cpp`, `src/main.cpp`; focused clear/corruption/budget tests pass. Five synthetic repository-only runs cover placeholder counts 100/500/1000; no actual archive-open count, decode latency, UI frame time, or before/after speedup was captured. See [`V092_COVER_BENCHMARK.md`](V092_COVER_BENCHMARK.md). |
 | 10 | Soft E-Ink/Natural Paper | DESKTOP PASS | `include/papernx/theme.hpp`, `src/v04_choices.inc`, `include/papernx/localization.hpp`; UI and application tests cover persisted settings and TR/EN labels. Comic colors remain on their existing artwork path. |
 | 11 | Brightness | Persistence/slider/software fallback PASS; physical backlight UNVERIFIED | `include/papernx/app_settings.hpp`, `src/core.cpp`, `src/main.cpp`, `include/papernx/ui.hpp`; core/UI/app tests passed. Values clamp consistently (software 50–100%, system 10–100%); `lbl` control restores saved hardware state on exit/background, with software fallback on unavailable/docked systems. |
 
@@ -66,6 +66,20 @@
 - `docker compose run --rm switch bash -lc 'python3 scripts/verify_artifacts.py --version 0.9.1'` — **PASS**: AArch64 ELF, NRO/NACP assets and exact 118-certificate CA bundle, built from source commit `1cb06a135dc30dfff676a7124e2602b2ed06cc4f`. NRO SHA-256 `a99bd4f5287a0843d0d8a9aa7087db0bbe0840f33e67122674cacbd8edf8c167`; CA bundle 200,116 bytes; hardware field is `UNVERIFIED`.
 - Comic host measurements: 37-page RAR5, four idle/toolbar cycles 57 ms, 30 curl frames 486 ms, 30 spread-pan frames 182 ms, and zero UI rasterizations in those measured loops. This is a Docker software-renderer result with no baseline comparison; it proves no speedup and does not predict Switch frame rate.
 - Not run: 100/500/1000-book cover cold/warm benchmark, cold/warm archive-open/metadata-reopen counters, physical Switch interaction/brightness/TLS, and power-cut-at-each-install-step testing.
+
+## P. 2026-10-24 — G6 cover-cache counters and synthetic scale run
+
+The settings screen now exposes the existing disk-only cache hit/miss counters alongside entry count and bytes. The worker refreshes those values after each cache lookup, including misses, and after cache writes so a failed decode or a newly created thumbnail is reflected accurately. Turkish and English labels are covered by localization tests. The configured 32 MiB and 512-entry limits were left unchanged.
+
+Five runs of `papernx_cover_performance_tests` measured repository-only I/O for placeholder counts of 100, 500 and 1000. With 94,556-byte synthetic cache blobs, the byte budget retained 100, 354 and 354 entries respectively. The complete run output and median/p95 summary are in [`V092_COVER_BENCHMARK.md`](V092_COVER_BENCHMARK.md) and `verification/v092/cover-benchmark/synthetic-container-runs.txt`. This is not a real EPUB/PDF/comic decode benchmark; `COVER-01` remains open and no speedup is claimed.
+
+| Area | G6 result | Evidence |
+|---|---|---|
+| Cover repository, settings counters, localization | TARGETED DESKTOP PASS | `PaperNX` built; `papernx_cover_tests`, `papernx_cover_performance_tests`, and `papernx_localization_tests` passed **3/3**. |
+| Safe clearing, cache budget, rebuild | TARGETED PASS | `papernx_cover_tests` exercises safe removal, user-file preservation, budget limits, corruption handling, and regeneration. |
+| 100/500/1000 real-document cold/warm, decode/reopen, UI/FPS/RAM, Switch SD | NOT RUN / UNVERIFIED | The five-run scale test uses placeholder `.epub` files and fixed RGB buffers. No real document decode or renderer is involved. |
+
+**Decision remains INCOMPLETE — BLOCKERS REMAIN.** Continue with G7 reader/UI/brightness regression and Ponytail audit, then close feasible native and Switch gates. Keep real-document cover performance and physical Switch measurements explicitly open.
 
 ### Ponytail full audit findings and code decisions
 
