@@ -75,7 +75,7 @@ SDL_Texture *PageCache::get(const std::string &key, int *outW, int *outH) {
     return it->second->texture;
 }
 
-bool PageCache::put(const std::string &key, SDL_Texture *texture, int w, int h) {
+bool PageCache::put(const std::string &key, SDL_Texture *texture, int w, int h, const std::vector<std::string> &protectedKeys) {
     if (!texture) return false;
     Uint32 format = 0;
     int actualW = 0, actualH = 0;
@@ -88,6 +88,9 @@ bool PageCache::put(const std::string &key, SDL_Texture *texture, int w, int h) 
     const std::size_t bytes = static_cast<std::size_t>(w) * static_cast<std::size_t>(h) *
         std::max(4u, SDL_BYTESPERPIXEL(format));
     if (bytes > maxBytes_) { SDL_DestroyTexture(texture); return false; }
+    auto protectedKey=[&](const std::string &candidate){return std::find(protectedKeys.begin(),protectedKeys.end(),candidate)!=protectedKeys.end();};
+    std::size_t pinned=0;for(const auto &entry:order_)if(entry.key!=key && protectedKey(entry.key))pinned+=entry.bytes;
+    if(pinned>maxBytes_-bytes){SDL_DestroyTexture(texture);return false;}
     auto it = items_.find(key);
     if (it != items_.end()) {
         currentBytes_ -= it->second->bytes;
@@ -95,7 +98,10 @@ bool PageCache::put(const std::string &key, SDL_Texture *texture, int w, int h) 
         order_.erase(it->second);
         items_.erase(it);
     }
-    while (currentBytes_ > maxBytes_ - bytes && !order_.empty()) evictOldest();
+    while (currentBytes_ > maxBytes_ - bytes && !order_.empty()) {
+        auto victim=order_.end();do{--victim;}while(victim!=order_.begin() && protectedKey(victim->key));
+        currentBytes_-=victim->bytes;SDL_DestroyTexture(victim->texture);items_.erase(victim->key);order_.erase(victim);
+    }
     order_.push_front({key, texture, w, h, bytes});
     items_[key] = order_.begin();
     currentBytes_ += bytes;

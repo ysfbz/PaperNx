@@ -461,6 +461,16 @@ void AppSettingsStore::put(AppPreferences preferences) {
     preferences.displayOrientation = std::clamp(preferences.displayOrientation, 0, 2);
     preferences.paperTexture = std::clamp(preferences.paperTexture, 0, 2);
     preferences.softwareBrightness = std::clamp(preferences.softwareBrightness, 50, 100);
+    preferences.interfaceStyle = std::clamp(preferences.interfaceStyle, 0, 2);
+    preferences.interfaceAccent = std::clamp(preferences.interfaceAccent, 0, 6);
+    std::vector<std::string> folders;
+    for(const auto &folder:preferences.libraryFolders) {
+        if(folder.empty())continue;
+        const auto path=fs::u8path(utf8SafeTruncate(folder,4096)).lexically_normal().u8string();
+        if(std::find(folders.begin(),folders.end(),path)==folders.end())folders.push_back(path);
+        if(folders.size()==32)break;
+    }
+    preferences.libraryFolders = std::move(folders);
     preferences.defaultBrowserPath = utf8SafeTruncate(preferences.defaultBrowserPath, 4096);
     preferences_ = std::move(preferences);
 }
@@ -475,6 +485,21 @@ bool AppSettingsStore::load() {
     preferences.sort = record.fontSize - 12;
     preferences.toolbar = record.pdfViewMode;
     preferences.defaultBrowserPath = record.bookPath;
+    if(store_.all().count("APP_UI_THEME_016")) {
+        const auto theme=store_.get("APP_UI_THEME_016");
+        preferences.interfaceStyle=theme.fontFamily;preferences.interfaceAccent=theme.fontSize-12;
+        preferences.scanOnLaunch=theme.scrollInertia!=0;
+    }
+    for(int index=0;index<32;++index) {
+        char key[32];std::snprintf(key,sizeof key,"LIB_FOLDER_%05d",index);
+        const auto folder=store_.get(key).bookPath;
+        if(!folder.empty())preferences.libraryFolders.push_back(folder);
+    }
+    if(store_.all().count("APP_READER_V015_")) {
+        const auto layout=store_.get("APP_READER_V015_");
+        preferences.expandedViewport=layout.textAlign!=0;
+        preferences.landscapeSpreads=layout.publisherStyles!=0;
+    }
     if(store_.all().count("APP_DISPLAY_V04_")) {
         const auto display=store_.get("APP_DISPLAY_V04_");
         preferences.chromePolicy=display.fontFamily;
@@ -509,6 +534,19 @@ bool AppSettingsStore::save() const {
     display.pdfColorMode=preferences_.paperTexture;
     display.scrollSensitivity=preferences_.softwareBrightness;
     store_.put("APP_DISPLAY_V04_",std::move(display));
+    Progress layout;
+    layout.textAlign=preferences_.expandedViewport?1:0;
+    layout.publisherStyles=preferences_.landscapeSpreads?1:0;
+    store_.put("APP_READER_V015_",std::move(layout));
+    Progress theme;
+    theme.fontFamily=preferences_.interfaceStyle;theme.fontSize=12+preferences_.interfaceAccent;
+    theme.scrollInertia=preferences_.scanOnLaunch?1:0;
+    store_.put("APP_UI_THEME_016",std::move(theme));
+    for(int index=0;index<32;++index) {
+        char key[32];std::snprintf(key,sizeof key,"LIB_FOLDER_%05d",index);Progress folder;
+        if(index<int(preferences_.libraryFolders.size()))folder.bookPath=preferences_.libraryFolders[index];
+        store_.put(key,std::move(folder));
+    }
     return store_.save();
 }
 

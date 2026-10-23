@@ -32,6 +32,7 @@ typedef struct {
     off64_t offset;
     size_t bytes;
     float width,height;
+    int double_page;
 } ComicEntry;
 typedef struct {
     fz_document super;
@@ -42,6 +43,8 @@ typedef struct {
     fz_image *cached_image;
     ar_stream *stream;
     ar_archive *rar;
+    struct archive *cursor;
+    int cursor_ordinal;
     char title[512], author[1024], genre[512], series[512], number[64];
     PxTocEntry outline[256];
     int outline_count;
@@ -113,7 +116,7 @@ static void add_entry(fz_context *ctx,ComicDocument *doc,const char *name,int or
     ComicEntry *entry=&doc->entries[doc->count];
     entry->name=fz_strdup(ctx,name);
     for(char *p=entry->name;*p;++p)if(*p=='\\')*p='/';
-    entry->ordinal=ordinal;entry->offset=offset;entry->bytes=size;entry->width=entry->height=0;++doc->count;
+    entry->ordinal=ordinal;entry->offset=offset;entry->bytes=size;entry->width=entry->height=0;entry->double_page=0;++doc->count;
 }
 static struct archive *open_archive(fz_context *ctx,const char *path) {
     struct archive *reader=archive_read_new();
@@ -194,6 +197,8 @@ static void load_info(fz_context *ctx,ComicDocument *doc,fz_buffer *info) {
                 if(index<0)continue;
                 const char *type=fz_xml_att(page,"Type"),*bookmark=fz_xml_att(page,"Bookmark");
                 if(type && !fz_strcasecmp(type,"FrontCover"))doc->cover=index;
+                const char *spread=fz_xml_att(page,"DoublePage");
+                doc->entries[index].double_page=spread && (!fz_strcasecmp(spread,"True") || !strcmp(spread,"1"));
                 if(bookmark && *bookmark && doc->outline_count<256) {
                     PxTocEntry *entry=&doc->outline[doc->outline_count++];
                     copy_text(entry->title,sizeof entry->title,bookmark);entry->page=index;entry->level=0;entry->y=0;
@@ -262,17 +267,26 @@ static void index_rar4(fz_context *ctx,ComicDocument *doc) {
 static fz_buffer *page_buffer(fz_context *ctx,ComicDocument *doc,int number) {
     ComicEntry *wanted=&doc->entries[number];
     if(doc->rar4)return read_rar_entry(ctx,doc,wanted->offset,COMIC_MAX_IMAGE);
-    struct archive *reader=NULL;fz_buffer *buffer=NULL;fz_var(reader);fz_var(buffer);
+    fz_buffer *buffer=NULL;fz_var(buffer);
     fz_try(ctx) {
-        reader=open_archive(ctx,doc->path);struct archive_entry *entry=NULL;int ordinal=0,status;
-        while((status=archive_read_next_header(reader,&entry))==ARCHIVE_OK || status==ARCHIVE_WARN) {
-            if(++ordinal==wanted->ordinal) {buffer=read_archive_entry(ctx,reader,COMIC_MAX_IMAGE);break;}
-            if(archive_read_data_skip(reader)<ARCHIVE_OK)fz_throw(ctx,FZ_ERROR_GENERIC,"Cannot skip damaged comic page");
+        /* Preserve the RAR5 solid dictionary for physical forward reads.
+         * Reopening the archive for each page would replay the whole prefix. */
+        if(doc->cursor && wanted->ordinal<=doc->cursor_ordinal) {
+            archive_read_free(doc->cursor);doc->cursor=NULL;doc->cursor_ordinal=0;
+        }
+        if(!doc->cursor){doc->cursor=open_archive(ctx,doc->path);doc->cursor_ordinal=0;}
+        struct archive_entry *entry=NULL;int status;
+        while((status=archive_read_next_header(doc->cursor,&entry))==ARCHIVE_OK || status==ARCHIVE_WARN) {
+            if(++doc->cursor_ordinal==wanted->ordinal){buffer=read_archive_entry(ctx,doc->cursor,COMIC_MAX_IMAGE);break;}
+            if(archive_read_data_skip(doc->cursor)<ARCHIVE_OK)fz_throw(ctx,FZ_ERROR_GENERIC,"Cannot skip damaged comic page");
         }
         if(!buffer)fz_throw(ctx,FZ_ERROR_GENERIC,"Comic archive changed or a page is missing");
     }
-    fz_always(ctx) {if(reader)archive_read_free(reader);}
-    fz_catch(ctx) {fz_drop_buffer(ctx,buffer);fz_rethrow(ctx);}
+    fz_catch(ctx) {
+        if(doc->cursor)archive_read_free(doc->cursor);
+        doc->cursor=NULL;doc->cursor_ordinal=0;
+        fz_drop_buffer(ctx,buffer);fz_rethrow(ctx);
+    }
     return buffer;
 }
 static fz_image *load_image(fz_context *ctx,ComicDocument *doc,int number) {
@@ -346,6 +360,7 @@ static int comic_metadata(fz_context *ctx,fz_document *document,const char *key,
 }
 static void comic_drop(fz_context *ctx,fz_document *document) {
     ComicDocument *doc=(ComicDocument *)document;
+    if(doc->cursor)archive_read_free(doc->cursor);
     if(doc->rar || doc->stream) {use_allocator(ctx);ar_close_archive(doc->rar);ar_close(doc->stream);reset_allocator();}
     for(int i=0;i<doc->count;++i)fz_free(ctx,doc->entries[i].name);
     fz_free(ctx,doc->entries);fz_free(ctx,doc->path);fz_drop_image(ctx,doc->cached_image);
@@ -367,6 +382,10 @@ fz_document *px_open_comic(fz_context *ctx,const char *path) {
     return (fz_document *)doc;
 }
 int px_comic_cover_page(fz_document *document) {return ((ComicDocument *)document)->cover;}
+int px_comic_page_is_spread(fz_document *document,int page) {
+    ComicDocument *doc=(ComicDocument *)document;
+    return page>=0 && page<doc->count && doc->entries[page].double_page;
+}
 int px_comic_toc(fz_context *ctx,fz_document *document,PxTocEntry *entries,int capacity) {
     (void)ctx;ComicDocument *doc=(ComicDocument *)document;
     int count=doc->outline_count?doc->outline_count:doc->count;if(count>capacity)count=capacity;
@@ -385,4 +404,13 @@ int px_comic_page_size(fz_context *ctx,fz_document *document,int number,float *w
     ComicEntry *entry=&doc->entries[number];
     if(entry->height<=0) {fz_page *page=comic_load_page(ctx,document,0,number);fz_drop_page(ctx,page);}
     *width=entry->width;*height=entry->height;return *width>0 && *height>0;
+}
+
+/* Called only by this document's owner, with geometry from an independently
+ * opened worker document. Avoid archive I/O for warmed neighbouring bounds. */
+int px_comic_remember_size(fz_document *document,int page,float width,float height) {
+    ComicDocument *doc=(ComicDocument *)document;
+    if(page<0 || page>=doc->count || !(width>0 && height>0) || width>100000000.f/height)return 0;
+    if(doc->entries[page].height<=0){doc->entries[page].width=width;doc->entries[page].height=height;}
+    return 1;
 }

@@ -3,6 +3,7 @@
 #include <list>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace papernx {
 
@@ -46,7 +47,7 @@ public:
                                   int viewW, int viewH);
 
     SDL_Texture *get(const std::string &key, int *outW = nullptr, int *outH = nullptr);
-    bool put(const std::string &key, SDL_Texture *texture, int w, int h);
+    bool put(const std::string &key, SDL_Texture *texture, int w, int h, const std::vector<std::string> &protectedKeys = {});
     void evictDocument(const std::string &docId);
     void clear();
 

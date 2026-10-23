@@ -1,0 +1,93 @@
+#define main papernx_application_entry
+#include "../src/main.cpp"
+#undef main
+#include <cassert>
+#include <iostream>
+namespace {
+struct AppTest {
+#include "library_fixture_helpers.inc"
+    static void settle(PaperNxApp &app) {
+        const auto deadline=SDL_GetTicks()+10000;
+        while(app.libraryScanner_.pending() && SDL_GetTicks()<deadline){app.processLibraryScan();SDL_Delay(2);}
+        assert(!app.libraryScanner_.pending());
+    }
+    static void shot(PaperNxApp &app,const std::string &name) {
+        app.render();int w,h;app.getWindowSize(w,h);
+        auto *s=SDL_CreateRGBSurfaceWithFormat(0,w,h,32,SDL_PIXELFORMAT_ARGB8888);assert(s);
+        assert(SDL_RenderReadPixels(app.renderer_,nullptr,s->format->format,s->pixels,s->pitch)==0);
+        fs::create_directories("verification/modern-ui");assert(SDL_SaveBMP(s,("verification/modern-ui/"+name+".bmp").c_str())==0);SDL_FreeSurface(s);
+    }
+    static void setting(PaperNxApp &app,int row) {
+        int w,h;app.getWindowSize(w,h);ui::SettingsLayout l(w,h);
+        app.settingsScroll_=std::clamp(float(row*64-l.content.h+56),0.f,app.maxUiScroll());
+        auto r=l.control(row);r.y-=int(app.settingsScroll_);app.handleAaModalTap(r.x+r.w/2,r.y+r.h/2,w,h);
+    }
+    static void run(const fs::path &root) {
+        {
+            PaperNxApp app(root);assert(app.init());
+            // init starts a worker and does not synchronously traverse book folders.
+            assert(app.libraryScanner_.pending() && app.books_.empty());settle(app);assert(app.books_.size()==1);
+            const auto before=app.completedLibraryScans_;
+            app.openBrowser();app.browserPath_=root/"import";app.scanBrowserDirectory();shot(app,"folder-picker");
+            const auto add=app.browserFolderButton(1280);app.handleTap(float(add.x+add.w/2)/1280,float(add.y+add.h/2)/720);
+            assert(app.screen_==ScreenState::Library && app.libraryScanner_.pending());
+            app.activeFingers_.insert(99);
+            const auto deadline=SDL_GetTicks()+10000;while(!app.libraryScanner_.ready() && SDL_GetTicks()<deadline)SDL_Delay(1);
+            app.processLibraryScan();assert(app.completedLibraryScans_==before);app.activeFingers_.clear();settle(app);
+            assert(app.books_.size()==4 && app.appSettings_.get().libraryFolders.size()==1);
+            // Duplicate folder selection and nested roots do not duplicate books.
+            app.browserPath_=root/"import";app.addBrowserFolder();settle(app);assert(app.books_.size()==4 && app.appSettings_.get().libraryFolders.size()==1);
+            app.browserPath_=root/"import"/"nested";app.addBrowserFolder();settle(app);assert(app.books_.size()==4);
+            for(int i=0;i<40;++i){app.processCompletedThumbnails();SDL_Delay(5);}
+            for(int variant:{0,1,2}) {
+                auto p=app.appSettings_.get();p.interfaceStyle=variant;p.interfaceAccent=variant==1?1:0;app.appSettings_.put(p);
+                const auto suffix=std::to_string(variant);shot(app,"library-"+suffix);
+                app.quickMenu_=true;shot(app,"plus-"+suffix);app.quickMenu_=false;
+                app.openSettings(true,5);shot(app,"settings-"+suffix);app.settingsScroll_=app.maxUiScroll();shot(app,"settings-library-"+suffix);app.dismissSettings();
+                app.openChoice(8,variant);shot(app,"appearance-"+suffix);app.choiceKind_=-1;
+                app.setCatalogPanel(PaperNxApp::CatalogPanel::Browse);shot(app,"catalog-"+suffix);app.closeCatalogPanel();
+            }
+            app.openSettings(true,5);setting(app,11);assert(!app.appSettings_.get().scanOnLaunch);
+            setting(app,13);assert(app.choiceKind_==8);app.choiceIndex_=1;app.commitChoice();
+            setting(app,14);assert(app.choiceKind_==9);app.choiceIndex_=2;app.commitChoice();
+            setting(app,10);assert(app.choiceKind_==10 && app.choiceOptions().size()==4);shot(app,"folders");app.choiceKind_=-1;app.dismissSettings();
+            const auto item=app.books_.front();app.openBook(item);assert(app.doc_);const int page=app.currentPage_;auto *doc=app.doc_;
+            fs::copy_file("tests/fixtures/sample_book.epub",root/"import"/"new.epub");
+            app.startLibraryScan();settle(app);assert(app.doc_==doc && app.currentPage_==page && app.books_.size()==5);
+            app.openSettings(false,0);shot(app,"reading-settings");app.dismissSettings();
+            app.openContents();shot(app,"contents");app.screen_=ScreenState::Reader;
+            app.screen_=ScreenState::BookmarksModal;shot(app,"bookmarks");app.screen_=ScreenState::Reader;
+            // Folder management can also be entered from an open book. Save and
+            // close that reader before giving the library/browser ownership.
+            app.openSettings(false,5);setting(app,10);assert(app.choiceKind_==10);
+            app.choiceIndex_=0;app.commitChoice();assert(app.screen_==ScreenState::FileBrowser && !app.doc_);
+            assert(app.progressStore_.get(item.id).page==page);
+            app.screen_=ScreenState::Library;SDL_SetWindowSize(app.window_,720,1280);app.openSettings(true,5);shot(app,"portrait-settings");
+            ui::language=0;shot(app,"portrait-settings-turkish");ui::language=1;app.dismissSettings();
+            app.persistAppSettings();
+        }
+        fs::copy_file("tests/fixtures/sample_book.epub",root/"import"/"after-restart.epub");
+        {
+            PaperNxApp app(root);assert(app.init());assert(!app.libraryScanner_.pending());
+            assert(app.books_.size()==5);assert(!app.appSettings_.get().scanOnLaunch);
+            assert(app.appSettings_.get().interfaceStyle==1 && app.appSettings_.get().interfaceAccent==2);
+            assert(app.appSettings_.get().libraryFolders.size()==2);
+            app.openSettings(true,5);setting(app,12);assert(app.libraryScanner_.pending());settle(app);assert(app.books_.size()==6);app.dismissSettings();
+            // Removing a folder only disables scanning; it never deletes sources.
+            app.openChoice(10,2);app.commitChoice();assert(app.choiceKind_==11);app.choiceIndex_=1;app.commitChoice();
+            assert(app.appSettings_.get().libraryFolders.size()==1 && fs::exists(root/"import"/"new.epub"));
+        }
+        std::cout<<"PASS: async startup, batch folder import, nested roots, gesture-safe publication, manual/launch scans, settings persistence, reader continuity and modern modal screenshots\n";
+    }
+};
+}
+int main() {
+    assert(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_EVENTS|SDL_INIT_GAMECONTROLLER)==0 && TTF_Init()==0);
+    const auto root=fs::temp_directory_path()/"papernx-modern-library";fs::remove_all(root);fs::create_directories(root/"books");fs::create_directories(root/"import"/"nested");
+    fs::copy_file("tests/fixtures/sample_book.epub",root/"books"/"base.epub");
+    fs::copy_file("tests/fixtures/hebrew_navigation.epub",root/"import"/"first.epub");
+    fs::copy_file("tests/fixtures/sample_doc.pdf",root/"import"/"second.pdf");
+    fs::copy_file("tests/fixtures/comics/navigation.cbz",root/"import"/"nested"/"third.cbz");
+    fs::create_directory_symlink(fs::absolute("fonts"),root/"fonts");
+    AppTest::run(root);fs::remove_all(root);TTF_Quit();SDL_Quit();
+}

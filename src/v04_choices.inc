@@ -2,13 +2,25 @@
     float choiceScroll_{0.f};
     bool choiceDragging_{false},choiceTouchActive_{false};
     float choiceDragStartY_{0.f},choiceDragStartScroll_{0.f};
+    int selectedLibraryFolder_{-1};
+
+    std::string paperPresetLabel(int i) const {
+        static const char *namesTr[10] = {"Orijinal", "Koyu", "Sepya", "Ters renkler", "Doğal Kâğıt", "Gece", "Mavi Işık", "Gündüz", "Monokrom", "Soft E-Ink"};
+        if (ui::language == 0 && i >= 0 && i < 10) return namesTr[i];
+        if (i >= 0 && i < int(sizeof(g_paperPresets)/sizeof(g_paperPresets[0]))) return g_paperPresets[i].name;
+        return "";
+    }
 
     std::vector<std::string> choiceOptions() const {
         switch(choiceKind_) {
-        case 0:return {"Serif","Sans",ui::language?"Publisher":"Yay\u0131nc\u0131"};
-        case 1:return ui::language?std::vector<std::string>{"Landscape","Portrait clockwise","Portrait counterclockwise"}:std::vector<std::string>{"Yatay","Dikey: saat y\u00f6n\u00fc","Dikey: saat y\u00f6n\u00fcn\u00fcn tersi"};
+        case 0:return {"Serif","Sans",ui::language?"Publisher":"Yayıncı"};
+        case 1:return ui::language?std::vector<std::string>{"Landscape","Portrait clockwise","Portrait counterclockwise"}:std::vector<std::string>{"Yatay","Dikey: saat yönü","Dikey: saat yönünün tersi"};
         case 7:{std::vector<std::string> out;for(int i=0;i<int(sizeof(g_paperPresets)/sizeof(g_paperPresets[0]));++i)out.push_back(paperPresetLabel(i));return out;}
-        case 6:return ui::language?std::vector<std::string>{"Off","Soft paper","Natural paper"}:std::vector<std::string>{"Kapal\u0131","Yumu\u015fak ka\u011f\u0131t","Do\u011fal ka\u011f\u0131t"};
+        case 6:return ui::language?std::vector<std::string>{"Off","Soft paper","Natural paper"}:std::vector<std::string>{"Kapalı","Yumuşak kağıt","Doğal kağıt"};
+        case 8:return {ui::label("Dark"),ui::label("Light"),ui::label("Follow reading theme")};
+        case 9:return {ui::label("Purple"),ui::label("Blue"),ui::label("Teal"),ui::label("Green"),ui::label("Orange"),ui::label("Red"),ui::label("Pink")};
+        case 10:{std::vector<std::string> out{ui::label("Add books folder"),ui::label("Scan all folders")};for(const auto &path:appSettings_.get().libraryFolders)out.push_back(path);return out;}
+        case 11:return {ui::label("Browse folder"),ui::label("Stop scanning this folder")};
         default:return {};
         }
     }
@@ -47,6 +59,21 @@
     }
     void commitChoice() {
         auto a=appSettings_.get();
+        if(choiceKind_==10) {
+            if(choiceIndex_>=2){selectedLibraryFolder_=choiceIndex_-2;openChoice(11,0);return;}
+            if(choiceIndex_==0){choiceKind_=-1;openBrowser();return;}
+            if(choiceIndex_==1)startLibraryScan();
+        }
+        if(choiceKind_==11 && selectedLibraryFolder_>=0 && selectedLibraryFolder_<int(a.libraryFolders.size())) {
+            if(choiceIndex_==0) {
+                const auto path=a.libraryFolders[selectedLibraryFolder_];choiceKind_=-1;openBrowser();browserPath_=fs::u8path(path);scanBrowserDirectory();return;
+            }
+            a.libraryFolders.erase(a.libraryFolders.begin()+selectedLibraryFolder_);appSettings_.put(a);persistAppSettings();
+        }
+        if(choiceKind_==8 || choiceKind_==9) {
+            if(choiceKind_==8)a.interfaceStyle=choiceIndex_;else a.interfaceAccent=choiceIndex_;
+            appSettings_.put(a);persistAppSettings();
+        }
         if(choiceKind_==0){currentFontFamily_=choiceIndex_;queueStyleChange();}
         if(choiceKind_==1){a.displayOrientation=choiceIndex_;appSettings_.put(a);pageCache_.clear();if(doc_ && px_document_is_epub(doc_)){++layoutGeneration_;layoutPending_=true;layoutDue_=SDL_GetTicks()+100;}else if(doc_)setPdfView(extraStyle_.pdfViewMode);}
         if(choiceKind_==7)applyGlobalPaperPreset(choiceIndex_);
@@ -63,19 +90,28 @@
         auto options=choiceOptions();
         float maxScroll=std::max(0.f,float(options.size()*56)-cr.h);
 
-        if(e.type==SDL_KEYDOWN || e.type==SDL_CONTROLLERBUTTONDOWN){
-            bool pad=e.type==SDL_CONTROLLERBUTTONDOWN;int k=pad?e.cbutton.button:e.key.keysym.sym;
-            auto m=[&](int key,int button){return k==(pad?button:key);};
-            if(m(SDLK_ESCAPE,SDL_CONTROLLER_BUTTON_B)){choiceKind_=-1;choiceDragging_=false;dirty_=true;}
-            else if(m(SDLK_RETURN,SDL_CONTROLLER_BUTTON_A)){
+        if(e.type==SDL_CONTROLLERBUTTONDOWN || e.type==SDL_KEYDOWN) {
+            bool pad=e.type==SDL_CONTROLLERBUTTONDOWN;
+            int btn=pad?e.cbutton.button:e.key.keysym.sym;
+            auto isKey=[&](int key,int b){return pad?(btn==b):(btn==key);};
+            if(isKey(SDLK_ESCAPE,SDL_CONTROLLER_BUTTON_B)) {
+                choiceKind_=-1;dirty_=true;return true;
+            }
+            if(isKey(SDLK_RETURN,SDL_CONTROLLER_BUTTON_A)) {
                 choiceIndex_=choiceFocusedIndex_;
                 commitChoice();
-            } else {
-                int d=(m(SDLK_DOWN,SDL_CONTROLLER_BUTTON_DPAD_DOWN)||m(SDLK_RIGHT,SDL_CONTROLLER_BUTTON_DPAD_RIGHT))?1:
-                      (m(SDLK_UP,SDL_CONTROLLER_BUTTON_DPAD_UP)||m(SDLK_LEFT,SDL_CONTROLLER_BUTTON_DPAD_LEFT))?-1:0;
-                if(d!=0) {
-                    choiceFocusedIndex_=std::clamp(choiceFocusedIndex_+d,0,int(options.size())-1);
-                    choiceIndex_=choiceFocusedIndex_;
+                return true;
+            }
+            if(isKey(SDLK_UP,SDL_CONTROLLER_BUTTON_DPAD_UP)) {
+                if(choiceFocusedIndex_>0) {
+                    --choiceFocusedIndex_;
+                    ensureChoiceVisible(w,h);
+                    dirty_=true;
+                }
+            }
+            if(isKey(SDLK_DOWN,SDL_CONTROLLER_BUTTON_DPAD_DOWN)) {
+                if(choiceFocusedIndex_+1<int(options.size())) {
+                    ++choiceFocusedIndex_;
                     ensureChoiceVisible(w,h);
                     dirty_=true;
                 }
@@ -124,7 +160,7 @@
             if(ui::contains(cr,x,y)){
                 int localY=y-cr.y+int(choiceScroll_);
                 int index=localY/56;
-                if(index>=0 && index<int(options.size()) && (localY%56)<52){
+                if(index>=0 && index<int(options.size()) && (localY%56)<56){
                     choiceIndex_=index;
                     choiceFocusedIndex_=index;
                     commitChoice();
@@ -154,8 +190,10 @@
     void renderChoices(int w,int h,const ThemePalette &pal) {
         if(choiceKind_<0)return;
         SDL_SetRenderDrawBlendMode(renderer_,SDL_BLENDMODE_BLEND);SDL_SetRenderDrawColor(renderer_,0,0,0,150);SDL_Rect full{0,0,w,h};SDL_RenderFillRect(renderer_,&full);
-        auto box=choiceSheet(w,h);ui::surface(renderer_,box,pal.card,18);
-        typography_->renderText(renderer_,typography_->sectionFont(),ui::language?"Choose an option":"Bir se\u00e7enek se\u00e7in",box.x+24,box.y+16,pal.fg,box.w-48);
+        auto box=choiceSheet(w,h);ui::elevated(renderer_,box,pal);
+        const char *titles[]={"Yazı tipi","Ekran yönü","","","","","Paper texture","General theme","Interface appearance","Accent color","Book folders","Book folders"};
+        const std::string heading=choiceKind_>=0 && choiceKind_<12?ui::label(titles[choiceKind_]):ui::label("Choose an option");
+        typography_->renderText(renderer_,typography_->sectionFont(),heading,box.x+24,box.y+16,pal.fg,box.w-48);
         auto cr=choiceContentRect(w,h);
         SDL_RenderSetClipRect(renderer_,&cr);
         auto options=choiceOptions();
@@ -164,7 +202,7 @@
             if(itemY+56>=cr.y && itemY<=cr.y+cr.h){
                 bool isSelected=(i==choiceIndex_);
                 bool isFocused=(i==choiceFocusedIndex_);
-                ui::button(renderer_,*typography_,{cr.x,itemY,cr.w,52},options[i],pal,isSelected,false,false,isFocused);
+                ui::button(renderer_,*typography_,{cr.x,itemY,cr.w,56},options[i],pal,isSelected,false,false,isFocused);
             }
         }
         SDL_RenderSetClipRect(renderer_,nullptr);

@@ -25,10 +25,14 @@ typedef struct PxTocEntry {
 // Lifecycle
 PxDocument *px_document_open(const char *path, int width, int height, float em, const char *css, char *error, int capacity);
 PxDocument *px_document_open_limited(const char *path, int width, int height, float em, const char *css, char *error, int capacity, size_t memory_limit);
+// Metadata-only handle: no pagination, page count or raster work is performed.
+PxDocument *px_document_open_metadata(const char *path,char *error,int capacity,size_t memory_limit);
 int px_document_pages(PxDocument *doc);
+int px_document_remember_comic_size(PxDocument *doc,int page,float width,float height);
 int px_document_page_size(PxDocument *doc, int page, float *width, float *height);
 int px_document_is_epub(PxDocument *doc);
 int px_document_is_comic(PxDocument *doc);
+int px_document_page_is_spread(PxDocument *doc,int page);
 // True only for an embedded EPUB cover; PDF thumbnails render page one instead.
 int px_document_has_embedded_cover(PxDocument *doc);
 int px_document_relayout(PxDocument *doc, int width, int height, float em, const char *css, char *error, int capacity);
@@ -55,6 +59,7 @@ int64_t px_document_make_position_bookmark(PxDocument *doc, int page, float y);
 int px_document_lookup_position_bookmark(PxDocument *doc, int64_t bookmark, int *page, float *y);
 int px_document_get_location(PxDocument *doc, int page, int *chapter, int *p);
 int px_document_from_location(PxDocument *doc, int chapter, int p);
+int px_document_chapter_page_count(PxDocument *doc, int chapter);
 
 // Table of Contents (Outline)
 int px_document_toc(PxDocument *doc, PxTocEntry *entries, int max_entries);

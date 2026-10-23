@@ -22,6 +22,7 @@ struct PxDocument {
     char embedded_subjects[1024];
     char embedded_series[512];
     char embedded_series_index[64];
+    char embedded_language[64];
     char reading_direction[8];
     int nav_count;
     PxTocEntry nav[256];
@@ -134,7 +135,7 @@ static void set_css_policy(PxDocument *d,const char *css) {
     fz_set_use_document_css(d->ctx,strstr(value,"/*papernx-reader-controlled*/")==NULL);
 }
 
-PxDocument *px_document_open_limited(const char *path, int w, int h, float em, const char *css, char *err, int cap, size_t memory_limit) {
+static PxDocument *open_document_impl(const char *path, int w, int h, float em, const char *css, char *err, int cap, size_t memory_limit, int metadata_only) {
     if (!path || !path[0]) {
         report(err, cap, "Invalid document path");
         return NULL;
@@ -172,15 +173,17 @@ PxDocument *px_document_open_limited(const char *path, int w, int h, float em, c
             fz_throw(d->ctx, FZ_ERROR_GENERIC, "Password-protected documents are not supported");
         }
         d->epub = fz_is_document_reflowable(d->ctx, d->doc);
-        if (d->epub) {
+        if (d->epub && !metadata_only) {
             set_css_policy(d,css);
             float layout_w = (w > 100) ? (float)w : 1180.0f;
             float layout_h = h == 0 ? 0 : (h > 100 ? (float)h : 600.0f);
             float layout_em = (em > 8.0f) ? em : 22.0f;
             fz_layout_document(d->ctx, d->doc, layout_w, layout_h, layout_em);
         }
-        d->pages = fz_count_pages(d->ctx, d->doc);
-        if(d->pages<=0)fz_throw(d->ctx,FZ_ERROR_GENERIC,"Document contains no readable pages");
+        if (!metadata_only) {
+            d->pages = fz_count_pages(d->ctx, d->doc);
+            if(d->pages<=0)fz_throw(d->ctx,FZ_ERROR_GENERIC,"Document contains no readable pages");
+        }
     }
     fz_catch(d->ctx) {
         report(err, cap, fz_caught_message(d->ctx));
@@ -192,8 +195,20 @@ PxDocument *px_document_open_limited(const char *path, int w, int h, float em, c
     return d;
 }
 
+PxDocument *px_document_open_limited(const char *path, int w, int h, float em, const char *css, char *err, int cap, size_t memory_limit) {
+    return open_document_impl(path, w, h, em, css, err, cap, memory_limit, 0);
+}
+
+PxDocument *px_document_open_metadata(const char *path, char *err, int cap, size_t memory_limit) {
+    return open_document_impl(path, 0, 0, 16.f, "", err, cap, memory_limit, 1);
+}
+
 int px_document_pages(PxDocument *d) {
     return d ? d->pages : 0;
+}
+
+int px_document_remember_comic_size(PxDocument *d, int page, float width, float height) {
+    return d && d->comic && isfinite(width) && isfinite(height) ? px_comic_remember_size(d->doc, page, width, height) : 0;
 }
 
 int px_document_page_size(PxDocument *d, int index, float *width, float *height) {
@@ -223,6 +238,7 @@ int px_document_is_epub(PxDocument *d) {
 }
 
 int px_document_is_comic(PxDocument *d) {return d ? d->comic : 0;}
+int px_document_page_is_spread(PxDocument *d,int page) {return d && d->comic?px_comic_page_is_spread(d->doc,page):0;}
 
 int px_document_has_embedded_cover(PxDocument *d) {
     return d && d->cover != NULL;
@@ -573,6 +589,14 @@ int px_document_from_location(PxDocument *d, int chapter, int p) {
     return page_idx;
 }
 
+int px_document_chapter_page_count(PxDocument *d, int chapter) {
+    if (!d || chapter < 0) return 0;
+    int count = 0; fz_var(count);
+    fz_try(d->ctx) { count = fz_count_chapter_pages(d->ctx, d->doc, chapter); }
+    fz_catch(d->ctx) { count = 0; }
+    return count;
+}
+
 static int resolve_outline_page(fz_context *ctx, fz_document *doc, fz_outline *node, float *out_y) {
     int result = -1;
     fz_var(result);
@@ -766,6 +790,8 @@ static void read_embedded_metadata(PxDocument *d, fz_xml *metadata) {
     int entries = 0;
     for (fz_xml *p = fz_xml_down(metadata); p && entries++ < 512; p = fz_xml_next(p)) {
         if (xml_tag(p, "creator")) metadata_append(d->embedded_authors, sizeof d->embedded_authors, p);
+        else if (xml_tag(p, "language") && !d->embedded_language[0])
+            metadata_value(p, d->embedded_language, sizeof d->embedded_language);
         else if (xml_tag(p, "subject")) metadata_append(d->embedded_subjects, sizeof d->embedded_subjects, p);
         else if (xml_tag(p, "meta")) {
             const char *value = fz_xml_att(p, "content");
@@ -846,8 +872,12 @@ static void load_epub_extras(PxDocument *d) {
         const char *progression = fz_xml_att(xml_child(package, "spine"), "page-progression-direction");
         if (progression && (!strcmp(progression, "rtl") || !strcmp(progression, "ltr")))
             metadata_copy(d->reading_direction, sizeof d->reading_direction, progression);
-        else
-            metadata_copy(d->reading_direction, sizeof d->reading_direction, "ltr");
+        else {
+            const char *lang = d->embedded_language;
+            int rtl = (!fz_strncasecmp(lang, "he", 2) && (!lang[2] || lang[2]=='-')) ||
+                (!fz_strncasecmp(lang, "iw", 2) && (!lang[2] || lang[2]=='-'));
+            metadata_copy(d->reading_direction, sizeof d->reading_direction, rtl ? "rtl" : "ltr");
+        }
         const char *cover_id = NULL;
         for (fz_xml *p = fz_xml_down(metadata); p; p = fz_xml_next(p))
             if (xml_tag(p, "meta") && fz_xml_att_eq(p, "name", "cover")) cover_id = fz_xml_att(p, "content");

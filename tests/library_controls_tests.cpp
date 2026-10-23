@@ -6,6 +6,7 @@
 
 namespace {
 struct AppTest {
+#include "library_fixture_helpers.inc"
     static void axis(PaperNxApp &app,int value,int which=SDL_CONTROLLER_AXIS_RIGHTY) {
         SDL_Event event{};event.type=SDL_CONTROLLERAXISMOTION;event.caxis.axis=Uint8(which);event.caxis.value=Sint16(value);
         bool running=true;app.handleEvent(event,running);assert(running);
@@ -57,7 +58,7 @@ struct AppTest {
         std::cout<<"PASS: rotated keyboard/D-pad/LS/RS modal navigation, four directions and no double rotation\n";
     }
     static void run(const fs::path &root) {
-        PaperNxApp app(root);assert(app.init());ui::language=1;
+        PaperNxApp app(root);assert(initReady(app));ui::language=1;
         const auto deadline=SDL_GetTicks()+6000;
         while(SDL_GetTicks()<deadline) {
             app.processCompletedThumbnails();

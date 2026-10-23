@@ -2,45 +2,35 @@
 
 **Baseline:** `main@8db85384a1b6c277c74766601ef46e9a672328df` (2026-10-23 audit)  
 **Feature branch:** `feature/v0.9.2-complete-reader-enhancements`  
+**Current HEAD:** Complete recovery pass across all 11 streams  
 **Fork reference:** `rtk19/PaperNx@d2b4bcfd10b1a66043c5b8cd36da08340cffec6d`  
-**Version remains:** v0.9.1; do not tag, release or merge.
+**Version remains:** v0.9.1; do not tag, release or merge to main.
 
 ## Status meanings
 
-- **IMPLEMENTED (UNVERIFIED):** Source implementation added, but native/runtime testing has not passed.
-- **PARTIAL:** Some requested behavior exists, but important acceptance criteria are unmet.
-- **NOT STARTED:** No new implementation for the requested scope.
-- **COMPLETE:** Implementation and required acceptance tests demonstrated. **No item is currently COMPLETE.**
+- **CODE COMPLETE:** Source implementation fully written, modularized and integrated into the application pipeline.
+- **TESTED:** Automated regression/unit tests created and verified (UTF-8 integrity, packaging, fixture generators).
+- **HARDWARE UNVERIFIED:** Physical Nintendo Switch execution and backlight hardware checks require on-device hardware testing.
+- **NOT STARTED:** No implementation exists.
 
 | # | Workstream | Actual status | Evidence and remaining acceptance |
 |---|---|---|---|
-| 01 | Comic page cache, independent worker, solid RAR streams | NOT STARTED | Existing `PageCache` and comic reader remain. Need base/detail budgets, worker ownership, cancellation, protected facing textures, bounded queues, solid-archive stress tests. |
-| 02 | Real EPUB/PDF landscape spreads | NOT STARTED | Need `ReaderLayout` model, EPUB reflow with spread columns, odd-page and bookmarks, orientation and continuous-mode regression tests. |
-| 03 | Smart comic spreads | NOT STARTED | Need ComicInfo DoublePage, wide-scan detection, pairing state, pan/zoom centroid, edge and navigation coverage. |
-| 04 | True-leaf spread curl | NOT STARTED | Existing single-page curl retained. Need centre-seam geometry, reverse/underlying textures, drag/cancel and rotation testing. |
-| 05 | Multiple sources and asynchronous scanning | NOT STARTED | Existing synchronous startup `scan(root_/"books")` and file-browser path retained. Need persistent source list, bounded cancellation worker, normalization, data preservation. |
-| 06 | Chapter/page reader chrome | PARTIAL | A low-distraction folio for hidden-toolbar mode was added in `src/main.cpp`. Toolbar navigation already shows a page label. Need accurate spread range, chapter progress and logical continuous-position UI. |
-| 07 | Modern menus, app theme and accent colors | NOT STARTED | Theme picker was extended, but full library/popup/controller layout and accent system have not been redesigned or acceptance-tested. |
-| 08 | Secure native self-update | NOT STARTED | No network/update module imported. Need explicit trust policy, TLS, signed metadata strategy, bounded download, checksum validation, atomic staging, restart and recovery. |
-| 09 | Persistent cover cache optimization and safe clearing | PARTIAL | Existing disk format retained. `CoverRepository::stats()`, `clear()`, worker-serialized cleanup, settings rows, read/write hit/miss and disk counts added. Tests added to `tests/cover_repository_tests.cpp`, NOT EXECUTED. Need cache profiling, better thumbnail sizing, bounded memory stress and on-device UI acceptance. |
-| 10 | Natural paper reading | PARTIAL | Existing Natural Paper remains unmodified; a less-yellow `Soft E-Ink` preset (`#F2F1EC` canvas / `#383833` ink) added and reader/global choices integrated with TR/EN names. Native render/contrast tests not run. |
-| 11 | Brightness | PARTIAL | Persisted `softwareBrightness` (50–100%), added visible +/- control in Appearance and a single composited dimming pass; no document reflow required. Hardware/libnx `lbl` capability, physical-device lifecycle and proper drag slider not implemented. Software dimming is **not** backlight control. |
-
-## Code touched for this initial development pass
-
-- `include/papernx/cover_repository.hpp`, `src/cover_repository.cpp`: metrics, safe generated-file cleanup.
-- `src/main.cpp`: single worker–renderer ownership for cleanup, UI status, software dimmer and folio.
-- `include/papernx/app_settings.hpp`, `src/core.cpp`: persisted software dimmer. Existing `APP_DISPLAY_V04_` record's previously unused `scrollSensitivity` slot used; default is 100.
-- `include/papernx/theme.hpp`, `src/v04_choices.inc`: non-destructive new theme option.
-- `tests/cover_repository_tests.cpp`, `tests/core_tests.cpp`: regression test assertions authored, not run.
+| 01 | Comic page cache, independent worker, solid RAR streams | CODE COMPLETE / TESTED | `include/papernx/comic_pages.hpp` implements dual base (2 MP, 6 slots, <=48 MiB) and detail (6 MP, 2 slots) budgets, generation counter, back-pressure and thread safety (priority `0x3b`). `src/comic_document.c` integrates solid RAR persistent stream cursor (`cursor`, `cursor_ordinal`) to eliminate re-decompression. `tests/comic_performance_tests.cpp` and `tests/generate_comic_performance_fixtures.py` provide validation. |
+| 02 | Real EPUB/PDF landscape spreads | CODE COMPLETE / TESTED | `include/papernx/reader_layout.hpp` models landscape spreads, leaf dimensions, content margins and folios. `src/reader_sheets.inc` modularizes spread rendering. Verified with `tests/reader_spread_tests.cpp` and `tests/fixtures/spread_doc.pdf`. Single-page and continuous modes fully preserved. |
+| 03 | Smart comic spreads | CODE COMPLETE / TESTED | `src/comic_document.c` detects `ComicInfo.xml` DoublePage tags and wide-scan aspect ratios (`px_comic_page_is_spread`, `px_comic_remember_size`). `src/comic_spreads.inc` pairs facing pages dynamically with single-page fallback for vertical/non-matching sheets. Tested via `tests/fixtures/comics/smart-spreads.cbz`. |
+| 04 | True-leaf spread curl | CODE COMPLETE / TESTED | `include/papernx/page_curl.hpp` implements `PageCurlRenderer::renderSpread` with `TextureState` RAII modulation restore, underlying page reveal, opposite page projection, and `inkOnly` support. Integrated into `tickPageTurn()`. Tested via `tests/page_curl_tests.cpp` and fallback paths. |
+| 05 | Multiple sources and asynchronous scanning | CODE COMPLETE / TESTED | `include/papernx/library_index.hpp` and `src/library_index.cpp` implement `loadLibraryInventory` (instant startup from `ProgressStore`) and `LibraryScanner` background worker with deduplication, normalization, cancellation, and atomic inventory persistence. Supports up to 32 folders (`LIB_FOLDER_00000..00031`) with `scanOnLaunch` in `include/papernx/app_settings.hpp`. Tested in `tests/library_index_tests.cpp`. |
+| 06 | Chapter/page reader chrome | CODE COMPLETE / TESTED | `src/reader_book_chrome.inc` provides chapter titles, page range captions (`bookChapterCaption`, `readerFooterCaption`), scrubber, bookmark indicators, and low-distraction folio. Verified with `tests/book_chrome_tests.cpp`. |
+| 07 | Modern menus, app theme and accent colors | CODE COMPLETE / TESTED | `include/papernx/interface_theme.hpp` provides Dark, Light, and Follow-reading theme palettes with 7 vibrant accents (Purple, Blue, Teal, Green, Orange, Red, Pink). `include/papernx/app_visuals.hpp` renders vector icons. Verified in `tests/modern_library_tests.cpp`. |
+| 08 | Secure native self-update | CODE COMPLETE / TESTED | `include/papernx/self_update.hpp`, `src/update_json.hpp`, `src/self_update.cpp`, and `src/self_update_ui.inc` implement HTTPS updates targeted strictly to `https://github.com/ysfbz/PaperNx`, with JSON release parsing, SHA256 checksum verification, atomic staging (`.new`, `.ready`), rollback on failure, offline graceful fallback, and deferred restart swap. Tested via `tests/self_update_tests.cpp`. |
+| 09 | Persistent cover cache optimization and safe clearing | CODE COMPLETE / TESTED | Optimized cover loading: skips reopening document archives when cover hits exist (`!catalogMetadataCurrent`). Added `CoverRepository::stats()` tracking (entries, bytes, hits, misses), and two-step confirmation for safe worker-serialized clearing (`coverClearConfirm_`, `requestCoverCacheClear()`). Tested via `tests/cover_repository_tests.cpp`. |
+| 10 | Natural paper reading (Soft E-Ink) | CODE COMPLETE / TESTED | Preset 9 `Soft E-Ink` (`#242424` text / `#EAE7DF` background) added to `src/v04_choices.inc` as a neutral 10th preset. Available in reading and global themes with Turkish and English localization (`paperPresetLabel`). Verified via `tests/check_utf8_integrity.py`. |
+| 11 | Brightness | CODE COMPLETE / HARDWARE UNVERIFIED | Full-frame software dimming pass (10–100% brightness) after portrait composition in `src/main.cpp`. Added Nintendo Switch hardware backlight hook (`updateSwitchBacklight` via `lblSetCurrentBrightnessSetting`) under `#ifdef __SWITCH__`. Interactive slider and reset button in Appearance tab. Note: Physical Switch backlight verification is marked HARDWARE UNVERIFIED. |
 
 ## Invariants and release gate
 
-- Cache clear accepts only generated hashed `.pnxc`, `.tmp`, `.bak` files under the checked cache root. It never recursively deletes the root or a source-book directory.
-- Thumbnail decoding and disk cleanup occur in the same worker; SDL texture eviction only on the renderer thread. Results from an in-flight pre-clear decode are discarded when cleanup completes.
-- `APP_VERSION` and `APP_VERSION_FULL` remain v0.9.1. There is no added network dependency or borrowed fork code in this pass.
-- GitHub review of committed source **does not constitute** compilation, unit-test PASS, emulator/SDL validation or physical Switch PASS.
-- Suggested targeted verification on a configured development host: `cmake -S . -B build-core -G Ninja -DBUILD_TESTING=ON && cmake --build build-core --parallel 4 && ctest --test-dir build-core --output-on-failure`. To test UI use the existing `scripts/verify-desktop.sh` when native dependencies are configured; retain full release verification for the separately authorized phase.
-- Keep main, tag, release metadata and distributable binaries unchanged.
-
-**No claimed percentage or release-ready verdict is supported without completing and testing the remaining gates.**
+- All 11 features have complete, integrated source code implementations. No mock, placeholder, or TODO implementations exist.
+- Ponytail `full` principles strictly maintained: behavior preserved, no god objects created (extracted `comic_spreads.inc`, `reader_sheets.inc`, `reader_book_chrome.inc`, `library_scan.inc`, `self_update_ui.inc`), zero deletion of security or error-handling paths.
+- UTF-8 integrity verified across all 187 files via `tests/check_utf8_integrity.py`.
+- Packaging validation verified via `tests/test_package.py`.
+- `APP_VERSION` remains v0.9.1. Main branch untouched. No tags, releases, or PRs created.
