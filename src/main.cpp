@@ -530,6 +530,13 @@ private:
     std::set<std::string> queuedThumbIds_;
     std::map<std::string, std::chrono::steady_clock::time_point> failedThumbIds_;
     std::map<std::string,CoverState> coverStates_;
+    // Worker owns CoverRepository; the UI only reads these published counters.
+    std::atomic<std::size_t> coverDiskEntries_{0};
+    std::atomic<std::uintmax_t> coverDiskBytes_{0};
+    std::atomic<std::uint64_t> coverDiskHits_{0}, coverDiskMisses_{0};
+    std::atomic<int> coverClearStatus_{0}; // 0 idle, 1 pending, 2/3 worker result, 4/5 displayed result
+    bool coverClearRequested_{false}; // guarded by queueMutex_
+    bool coverClearConfirm_{false};
 
     std::mutex completedMutex_;
     std::vector<LoadedThumb> completedThumbs_;
@@ -563,21 +570,60 @@ private:
         {std::lock_guard<std::mutex> lock(completedMutex_);completedMetadata_.push_back({book.id,title,author,series,index});}
         if(owned)px_document_close(document);
     }
+    void updateCoverCounters() {
+        const auto values = coverRepository_.stats(); // Worker thread only
+        coverDiskEntries_ = values.entries;
+        coverDiskBytes_ = values.bytes;
+        coverDiskHits_ = values.hits;
+        coverDiskMisses_ = values.misses;
+    }
+    void requestCoverCacheClear() {
+        if (coverClearStatus_.load() == 1) return;
+        {
+            std::lock_guard<std::mutex> lock(queueMutex_);
+            thumbQueue_.clear();
+            queuedThumbIds_.clear();
+            failedThumbIds_.clear();
+            coverClearRequested_ = true;
+            coverClearStatus_ = 1;
+        }
+        // Never let a result from an in-flight decode repopulate the texture
+        // cache after a clear. The worker processes cleanup after that decode.
+        queueCv_.notify_one();
+        dirty_ = true;
+    }
     void thumbWorkerLoop() {
+        updateCoverCounters(); // Initial disk inventory, never on the UI thread.
         while (workerRunning_) {
-            Book b;bool metadataOnly=false;
+            Book b; bool metadataOnly=false, clearNow=false;
             {
                 std::unique_lock<std::mutex> lock(queueMutex_);
                 queueCv_.wait(lock, [this]() {
-                    return !workerRunning_ || (!coversPaused_ && (!thumbQueue_.empty() || !metadataQueue_.empty()));
+                    return !workerRunning_ || coverClearRequested_ ||
+                        (coverClearStatus_.load()!=1 && !coversPaused_ &&
+                         (!thumbQueue_.empty() || !metadataQueue_.empty()));
                 });
                 if (!workerRunning_) break;
-                metadataOnly=thumbQueue_.empty();
-                auto &queue=metadataOnly?metadataQueue_:thumbQueue_;b=queue.front();queue.pop_front();
+                if (coverClearRequested_) {
+                    coverClearRequested_ = false;
+                    clearNow = true;
+                } else {
+                    metadataOnly = thumbQueue_.empty();
+                    auto &queue = metadataOnly ? metadataQueue_ : thumbQueue_;
+                    b = queue.front(); queue.pop_front();
+                }
+            }
+            if (clearNow) {
+                const bool ok = coverRepository_.clear();
+                updateCoverCounters();
+                coverClearStatus_ = ok ? 2 : 3;
+                continue;
             }
             if(metadataOnly) {collectBookMetadata(b);continue;}
 
-            if(auto cached=coverRepository_.read(b)) {
+            auto cached = coverRepository_.read(b);
+            updateCoverCounters();
+            if(cached) {
                 LoadedThumb lt; lt.id=b.id; lt.w=cached->width; lt.h=cached->height;
                 lt.stride=cached->stride; lt.rgb=std::move(cached->rgb);
                 lt.state=CoverState::Cached;
@@ -614,6 +660,7 @@ private:
                 lt.rgb.assign(img.rgb, img.rgb + (size_t)img.height * img.stride);
                 px_image_free(&img);
                 coverRepository_.write(b, CoverImage{lt.w,lt.h,lt.stride,lt.rgb});
+                updateCoverCounters();
 
                 {
                     std::lock_guard<std::mutex> lock(completedMutex_);
@@ -631,6 +678,16 @@ private:
     }
 
     void processCompletedThumbnails() {
+        const int clearState = coverClearStatus_.load();
+        if (clearState == 1) return; // In-flight results must never upload during clearing.
+        if (clearState == 2 || clearState == 3) {
+            { std::lock_guard<std::mutex> lock(completedMutex_); completedThumbs_.clear(); }
+            { std::lock_guard<std::mutex> lock(queueMutex_);
+              coverStates_.clear(); queuedThumbIds_.clear(); failedThumbIds_.clear(); }
+            thumbCache_.clear(); // SDL textures destroyed on renderer thread only.
+            coverClearStatus_ = clearState == 2 ? 4 : 5;
+            dirty_ = true;
+        }
         // A reader opening has priority over background library cover uploads.
         // Never regroup the card under a finger between press and release.
         if(coversPaused_ || !activeFingers_.empty() || pointerActive_)return;
@@ -803,7 +860,7 @@ private:
         if(global && !doc_) applyStyle(progressStore_.get("PAPERNX_DEFAULTS"));
         // PDF opens the SAME appearance tab that EPUB uses; PDF-only tab
         // contains layout and zoom controls, never a second color source.
-        aaTab_=doc_ && !px_document_is_epub(doc_) && !comic() && tab==0?2:tab; aaRow_=0;settingsEditing_=false;settingsScroll_=0; screen_=ScreenState::AaModal; dirty_=true;
+        aaTab_=doc_ && !px_document_is_epub(doc_) && !comic() && tab==0?2:tab; aaRow_=0;settingsEditing_=false;settingsScroll_=0; coverClearConfirm_=false; screen_=ScreenState::AaModal; dirty_=true;
     }
     void dismissSettings() {
         screen_=globalSettings_ ? settingsReturn_ : ScreenState::Reader;
@@ -2043,7 +2100,7 @@ private:
 
         // If not already in cache and not failed, enqueue for asynchronous background loading
         std::lock_guard<std::mutex> lock(queueMutex_);
-        if(coverStates_[b.id]==CoverState::NoEmbeddedCover || coversPaused_) return nullptr;
+        if(coverStates_[b.id]==CoverState::NoEmbeddedCover || coversPaused_ || coverClearStatus_.load()==1) return nullptr;
         auto failed = failedThumbIds_.find(b.id);
         if (failed != failedThumbIds_.end() && failed->second <= std::chrono::steady_clock::now())
             failedThumbIds_.erase(failed);
@@ -2584,7 +2641,7 @@ private:
     void handleAaModalTap(int px, int py, int w, int h) {
         ui::SettingsLayout l(w,h);
         if(ui::contains(l.close,px,py) || !ui::contains(l.sheet,px,py)) { dismissSettings(); return; }
-        for(int i=0;i<6;++i) if(ui::contains(l.tab(i),px,py)) { settingsScroll_=0; aaTab_=i; dirty_=true; return; }
+        for(int i=0;i<6;++i) if(ui::contains(l.tab(i),px,py)) { settingsScroll_=0; aaTab_=i; coverClearConfirm_=false; dirty_=true; return; }
         if(ui::contains(l.scope,px,py) && doc_ && aaTab_!=4 && aaTab_!=5) {
             extraStyle_.styleOverride=1-extraStyle_.styleOverride;
             extraStyle_.modeOverride=extraStyle_.styleOverride;
@@ -2667,6 +2724,15 @@ private:
             if(globalSettings_ || !doc_) storeDefaults(); else saveCurrentPosition();
             dirty_=true; return;
         } else if(aaTab_==5) {
+            if (row==8) return; // Read-only disk usage and cache counters.
+            if (row==9) {
+                if (coverClearStatus_.load()==1) return;
+                if (!coverClearConfirm_) { coverClearConfirm_=true; dirty_=true; return; }
+                coverClearConfirm_=false;
+                requestCoverCacheClear();
+                return;
+            }
+            coverClearConfirm_=false;
             auto p=appSettings_.get();
             if(row==0){openChoice(7,globalPaperPresetIndex());return;}
             if(row==6){openChoice(1,p.displayOrientation);return;}
@@ -2692,7 +2758,7 @@ private:
             panReaderBy(dx*64.f,dy*64.f);
         } else handleDirectional(dx,dy);
     }
-    int settingsRows() const { if(comic()) {if(aaTab_==0 || aaTab_==1)return 1;if(aaTab_==4)return 7;}const int rows[]={6,4,8,7,5,8}; return rows[aaTab_]; }
+    int settingsRows() const { if(comic()) {if(aaTab_==0 || aaTab_==1)return 1;if(aaTab_==4)return 7;}const int rows[]={6,4,8,7,5,10}; return rows[aaTab_]; }
     bool numericSetting() const { if(comic() && aaTab_==0)return false;return (aaTab_==0 && (aaRow_==0 || aaRow_==2 || aaRow_==3)) ||
         (aaTab_==1 && (aaRow_==0 || aaRow_==3)) || (aaTab_==3 && (aaRow_==2 || aaRow_==4)) || (aaTab_==4 && aaRow_==3); }
     void settingsActivate(int direction=1) {
@@ -3294,7 +3360,16 @@ private:
             row(6,std::string(ui::language?"Display orientation: ":"Ekran yönü: ")+(ui::language?orientEn:orientTr)[p.displayOrientation]);
             const char *textureEn[]={"Off","Soft paper","Natural paper"};const char *textureTr[]={"Kapal\u0131","Yumu\u015fak ka\u011f\u0131t","Do\u011fal ka\u011f\u0131t"};
             row(7,std::string(ui::language?"Paper texture: ":"Kağıt dokusu: ")+(ui::language?textureEn:textureTr)[p.paperTexture]);
-
+            const auto amount=coverDiskBytes_.load();
+            const auto count=coverDiskEntries_.load();
+            row(8,catLabel("Kapak önbelleği: ","Cover cache: ")+std::to_string(count)+
+                catLabel(" kapak · "," covers · ")+std::to_string((amount+1023)/1024)+" KiB");
+            const int status=coverClearStatus_.load();
+            row(9,status==1?catLabel("Kapak önbelleği temizleniyor…","Clearing cover cache…"):
+                status==5?catLabel("Temizlik başarısız · Yeniden dene","Cleanup failed · Retry"):
+                coverClearConfirm_?catLabel("Onayla: Üretilmiş kapakları sil","Confirm: Delete generated covers"):
+                status==4?catLabel("Temizlendi · Yeniden oluşturulabilir","Cleared · Can regenerate"):
+                catLabel("Kapak önbelleğini temizle","Clear cover cache"));
         }
         SDL_RenderSetClipRect(renderer_,nullptr);
         if(l.preview.w && (!doc_ || px_document_is_epub(doc_))) {
