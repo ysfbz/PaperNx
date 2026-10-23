@@ -72,10 +72,16 @@ struct AppTest {
             assert(app.books_.size()==5);assert(!app.appSettings_.get().scanOnLaunch);
             assert(app.appSettings_.get().interfaceStyle==1 && app.appSettings_.get().interfaceAccent==2);
             assert(app.appSettings_.get().libraryFolders.size()==2);
+            const auto scansBeforeQueue=app.completedLibraryScans_;
+            app.startLibraryScan();assert(app.libraryScanner_.pending());
+            app.startLibraryScan();assert(app.libraryScanAgain_);
+            const auto queuedDeadline=SDL_GetTicks()+10000;while(!app.libraryScanner_.ready() && SDL_GetTicks()<queuedDeadline)SDL_Delay(1);
+            app.processLibraryScan();assert(app.libraryScanner_.pending() && !app.libraryScanAgain_ && app.completedLibraryScans_==scansBeforeQueue);
+            settle(app);assert(app.completedLibraryScans_==scansBeforeQueue+1 && app.books_.size()==6);
             app.openSettings(true,5);const auto completed=app.completedLibraryScans_;
             setting(app,11);assert(app.libraryScanner_.pending());setting(app,11);
             const auto cancelDeadline=SDL_GetTicks()+10000;while(!app.libraryScanner_.ready() && SDL_GetTicks()<cancelDeadline)SDL_Delay(2);
-            app.processLibraryScan();assert(app.completedLibraryScans_==completed && app.books_.size()==5);
+            app.processLibraryScan();assert(app.completedLibraryScans_==completed && app.books_.size()==6);
             setting(app,11);assert(app.libraryScanner_.pending());settle(app);assert(app.books_.size()==6);app.dismissSettings();
             // Removing a folder only disables scanning; it never deletes sources.
             app.openChoice(10,2);app.commitChoice();assert(app.choiceKind_==11);app.choiceIndex_=1;app.commitChoice();
