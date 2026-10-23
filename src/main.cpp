@@ -2698,6 +2698,14 @@ private:
             if(row==2) extraStyle_.indentation=extraStyle_.indentation?0:120;
             if(row==3) extraStyle_.paragraphSpacing=std::clamp(extraStyle_.paragraphSpacing+(right?20:-20),0,200);
         } else if(aaTab_==2) {
+            // Pure compositor dimming: changing this setting never triggers
+            // EPUB pagination, PDF rasterization or page-cache invalidation.
+            if(row==8 || row==9) {
+                auto p=appSettings_.get();
+                p.softwareBrightness=row==9?100:
+                    std::clamp(p.softwareBrightness+(right?5:-5),50,100);
+                appSettings_.put(p); persistAppSettings(); dirty_=true; return;
+            }
             if(row<5) { const int order[]={0,1,4,6,7,8,2,3,5};int index=order[std::min(8,row*2+int(right))]; auto preset=g_paperPresets[index];
                 currentTheme_=preset.theme;extraStyle_.textColor=preset.text;extraStyle_.backgroundColor=preset.background; }
             if(row==5) { editColor(0); return; }
@@ -2758,9 +2766,10 @@ private:
             panReaderBy(dx*64.f,dy*64.f);
         } else handleDirectional(dx,dy);
     }
-    int settingsRows() const { if(comic()) {if(aaTab_==0 || aaTab_==1)return 1;if(aaTab_==4)return 7;}const int rows[]={6,4,8,7,5,10}; return rows[aaTab_]; }
+    int settingsRows() const { if(comic()) {if(aaTab_==0 || aaTab_==1)return 1;if(aaTab_==4)return 7;}const int rows[]={6,4,10,7,5,10}; return rows[aaTab_]; }
     bool numericSetting() const { if(comic() && aaTab_==0)return false;return (aaTab_==0 && (aaRow_==0 || aaRow_==2 || aaRow_==3)) ||
-        (aaTab_==1 && (aaRow_==0 || aaRow_==3)) || (aaTab_==3 && (aaRow_==2 || aaRow_==4)) || (aaTab_==4 && aaRow_==3); }
+        (aaTab_==1 && (aaRow_==0 || aaRow_==3)) || (aaTab_==2 && aaRow_==8) ||
+        (aaTab_==3 && (aaRow_==2 || aaRow_==4)) || (aaTab_==4 && aaRow_==3); }
     void settingsActivate(int direction=1) {
         int w,h; getWindowSize(w,h); ui::SettingsLayout l(w,h);
         if(settingsColumn_==-1) { settingsColumn_=0; dirty_=true; return; }
@@ -3083,6 +3092,21 @@ private:
             SDL_Rect dest{(h-w)/2,(w-h)/2,w,h};
             SDL_RenderCopyEx(renderer_,orientationTarget_,nullptr,&dest,rotation==1?90:270,nullptr,SDL_FLIP_NONE);
         }
+        // Full-frame software dimming fallback, after all reader/UI elements
+        // and after portrait composition. Each frame is cleared first; alpha
+        // cannot accumulate across redraws. No system backlight calls are made.
+        const int dimPercent=100-appSettings_.get().softwareBrightness;
+        if(dimPercent>0) {
+            SDL_BlendMode oldBlend=SDL_BLENDMODE_NONE;
+            SDL_GetRenderDrawBlendMode(renderer_,&oldBlend);
+            SDL_SetRenderDrawBlendMode(renderer_,SDL_BLENDMODE_BLEND);
+            SDL_SetRenderDrawColor(renderer_,0,0,0,Uint8(dimPercent*255/100));
+            int outputW=0,outputH=0;
+            SDL_GetRendererOutputSize(renderer_,&outputW,&outputH);
+            SDL_Rect cover{0,0,outputW,outputH};
+            SDL_RenderFillRect(renderer_,&cover);
+            SDL_SetRenderDrawBlendMode(renderer_,oldBlend);
+        }
         trace("present_begin");
         SDL_RenderPresent(renderer_);
         trace("present_return");
@@ -3323,6 +3347,10 @@ private:
 
             }
             row(5,"Metin rengi \u00b7 Renk paleti");row(6,"Arka plan \u00b7 Renk paleti");row(7,"Tema renklerine s\u0131f\u0131rla");
+            row(8,catLabel("-    Uygulama karartması: %","-    App brightness: %")+
+                std::to_string(appSettings_.get().softwareBrightness)+"    +");
+            row(9,catLabel("Parlaklığı sıfırla · %100 (yalnızca uygulama)",
+                "Reset brightness · 100% (app only)"));
         } else if(aaTab_==3) {
             row(0,"Sayfalı Mod · Yatay gezinme",extraStyle_.readingMode==0);
             row(1,"Sürekli Kaydırma · Yukarı / aşağı",extraStyle_.readingMode==1);
