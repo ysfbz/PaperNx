@@ -54,7 +54,9 @@ inline constexpr PaperPreset g_paperPresets[] = {
     {"Warm Cream",0xf4e8d0,0x41362a,1},{"Natural Paper",0xeee4cf,0x383229,2},
     {"Vintage Sepia",0xe8d6b3,0x4b3828,2},{"Linen",0xe5e1d6,0x343632,0},
     {"Cool Paper",0xe9ebe8,0x303638,3},{"Charcoal Night",0x252522,0xe8e3d9,4},
-    {"OLED Black",0x000000,0xeae7df,5}
+    {"OLED Black",0x000000,0xeae7df,5},
+    // Neutral, low-saturation Kindle-inspired paper. Legacy presets unchanged.
+    {"Soft E-Ink",0xf2f1ec,0x383833,0}
 };
 inline SDL_Color blendColor(SDL_Color a,SDL_Color b,int percent) {
     auto mix=[percent](int x,int y){return Uint8((x*(100-percent)+y*percent)/100);};
