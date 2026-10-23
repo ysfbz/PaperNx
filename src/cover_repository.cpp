@@ -164,7 +164,10 @@ void CoverRepository::initialize() {
         auto bytes = fs::file_size(p, ec); if (ec) break;
         if (bytes > headerSize + maxWidth * maxHeight * 3) { removeOwned(p); continue; }
         entries_[name.substr(0, 32)] = {bytes, ++clock_};
-        trim(); // Bound the index even if an old cache directory contains millions of entries.
+        // Avoid O(N * cache-size) repeated eviction checks at startup.
+        // Inventory remains bounded even for pathological directories.
+        if (entries_.size() > maxEntries_ &&
+            entries_.size() - maxEntries_ >= 128) trim();
     }
     trim();
 }
