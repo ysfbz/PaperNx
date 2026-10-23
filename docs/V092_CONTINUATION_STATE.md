@@ -70,3 +70,7 @@ Next, continue the PaperNX-specific library/index redesign while preserving the 
 - **Provenance:** the six historical files still matched the pinned fork only at `a35aa7b`. Current existing scanner/index/updater/parser source files have changed blobs but remain derivative by history; the interface theme header remains deleted and its palette remains attributed. The current scan/index module is not represented as an independent clean-room implementation.
 - **Git:** branch remains `feature/v0.9.2-complete-reader-enhancements`; at this checkpoint, `8c38513` and `faecf30` are local ahead of remote `d2ad560`. Documentation updates are being prepared. The untracked generated CBR performance fixture remains untouched.
 - **Open:** independent source redesign, full native suite after later reader/scanner/updater changes, power-loss recovery when canonical NRO is absent, real Switch hardware checks, and end-to-end cache/performance measurements.
+
+## 2026-10-24 post-push identity note
+
+The verified/pushed branch HEAD at the start of this note was `ed9e3b69c184de1b488c9726c660dacdef1635b2`; its latest source-bearing ancestor is `faecf30eb4fb12fd143d3c1666d91f0b690b484c`. The report commit did not modify source files, so the source-provenance blob table remains valid for that branch HEAD. A new audit-doc-only clarification records this distinction. The pushed commits did not run GitHub Actions: there is no `push` trigger and no open PR for the branch. The generated CBR fixture remains untracked and must stay outside commits.
