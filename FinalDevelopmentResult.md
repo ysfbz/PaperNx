@@ -221,3 +221,19 @@ Bu ek görev ana v0.9.2 hardening çalışmasını tamamlamaz; aynı feature bra
 | Fiziksel Joy-Con / cihaz | UNVERIFIED | SDL controller START sentetik olayları test edildi; fiziksel Switch/Joy-Con davranışı cihazda denenmedi. |
 
 Önceki bölümdeki “COMPLETE across all 11 streams” ve “READY FOR PEER REVIEW / HARDWARE QA” ifadeleri bu audit için doğrulanmış karar değildir; ana hardening görevi sürmektedir. Bu ek görevdeki hedefli test PASS sonuçları, 11 özelliğin tamamının release doğrulaması yerine geçmez. Release/tag/PR oluşturulmadı.
+
+## H. 2026-10-23 — Tarama İptali ve Updater Kurtarma Devamı
+
+Bu bölüm, ana v0.9.2 hardening görevinin devamıdır; release hazırlığı veya tamamlanma kararı değildir.
+
+- **Kod kaynak HEAD'i:** `b9a22bcf023165ab0338c6e9cbf9a92253290e7f`, `feature/v0.9.2-complete-reader-enhancements`.
+- **Kod commitleri:** `e791394` — tarama worker'ı iptal edilebilir hâle getirildi; tamamlanan iptal sonucu join edilip UI tarafından atılıyor ve bekleyen tekrar taraması yeniden başlatılıyor. `b9a22bc` — eksik `.boot` kaydıyla birlikte `.swap`/`.boot.started` varsa eski NRO geri yükleniyor; gerekli yedek yoksa belirsiz kurulum sessizce kabul edilmiyor. Güvenle tanımlanan kullanılmayan `.old` yalnızca canonical executable mevcutken temizleniyor.
+- **Updater doğrulaması:** `papernx_self_update_tests` ve `papernx_self_update_network_tests` hedefli CTest koşusu **2/2 PASS**. Bozuk/eksik updater recovery state için yeni unit assertions eklendi. Yerel HTTPS testleri aynı koşuda geçti.
+- **Library doğrulaması:** `papernx_library_index_tests` ve `papernx_modern_library_tests` hedefli CTest koşusu **2/2 PASS**; iptal, yeniden başlatma, tarama verisi ve aktif kitap koruması sınandı.
+- **Switch doğrulaması:** `docker compose run --rm switch bash -lc 'make -j4 && python3 scripts/verify_artifacts.py --version 0.9.1'` **PASS**. AArch64 ELF/NRO doğrulandı; Switch libcurl linki çözüldü; RomFS'teki CA kaynağı 118 sertifika / 200,116 bayt olarak doğrulandı. NRO SHA-256: `e6efb4e6a1f3e3163c1237ffc3982d2047409e34f502712f06d370e9ea420b64`. Donanım alanı `UNVERIFIED`.
+- **Provenance:** `V092_SOURCE_PROVENANCE_AUDIT.md` ve `LICENSES.md` güncellendi. Altı dosyanın byte eşleşmesi yalnızca başlangıç HEAD'i `a35aa7b` için iddia ediliyor. Güncel kod HEAD'i `b9a22bc`'de beş dosyanın blob'u değişmiş, `interface_theme.hpp` silinmiş; fork kökeni ve Refael Bar / Refael Avramashvili atıfları korunuyor. Değişiklikler temiz oda implementasyonu olarak gösterilmiyor.
+- **Full native suite:** Son kayıtlı tam koşu önceki `8204f77` checkpoint'inde 30/30 PASS. Ana görevin ek reader/scanner/updater değişikliklerinden sonra full CTest bu turda **NOT RUN**; bu tarihsel PASS güncel HEAD'e atfedilmiyor.
+- **Performance / hardware:** Cover cold/warm 100/500/1000 end-to-end ölçümleri, archive reopen counters ve Switch FPS/RAM ölçümleri **NOT RUN**. Gerçek Switch TLS, Joy-Con, backlight ve SD power-loss recovery **UNVERIFIED**.
+- **Kalan kritik işler:** Scanner/index/parser için istenen bağımsız PaperNX mimarisi tamamlanmadı. İki rename arasındaki kesintide canonical NRO kaybolabilir; uygulama bu durumda kendi recovery kodunu çalıştıramaz ve `.old` harici dosya yöneticisi/bilgisayarla geri yüklenmelidir. Bu durum updater'ı power-loss-proof yapmaz.
+
+**Karar: INCOMPLETE — BLOCKERS REMAIN.** Bu checkpoint'in kod değişiklikleri `e791394` ve `b9a22bc`; provenance/continuation dokümantasyon commit'i `933eb2e`'dir. Bu FinalDevelopmentResult güncellemesi ayrı rapor commit'i olarak kaydedilecektir. Release/tag/PR/merge veya GitHub Actions çalıştırılmadı.
