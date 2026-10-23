@@ -173,8 +173,8 @@ std::optional<CoverImage> CoverRepository::read(const Book &book) {
     initialize(); if (!available_ || !safeRoot(root_)) return {};
     auto key = cacheKey(book); auto p = root_ / (key + ".pnxc");
     auto image = readFile(p, key);
-    if (image) entries_[key] = {headerSize + image->rgb.size(), ++clock_};
-    else { removeOwned(p); entries_.erase(key); }
+    if (image) { entries_[key] = {headerSize + image->rgb.size(), ++clock_}; ++hits_; }
+    else { ++misses_; removeOwned(p); entries_.erase(key); }
     return image;
 }
 
@@ -220,5 +220,50 @@ void CoverRepository::trim() {
         auto oldest = std::min_element(entries_.begin(), entries_.end(), [](const auto &a, const auto &b) { return a.second.used < b.second.used; });
         total -= oldest->second.bytes; removeOwned(root_ / (oldest->first + ".pnxc")); entries_.erase(oldest);
     }
+}
+
+CoverCacheStats CoverRepository::stats() {
+    initialize();
+    CoverCacheStats result;
+    result.entries = entries_.size();
+    for (const auto &entry : entries_) result.bytes += entry.second.bytes;
+    result.hits = hits_;
+    result.misses = misses_;
+    return result;
+}
+
+bool CoverRepository::clear() {
+    initialize();
+    if (!available_ || !safeRoot(root_)) return false;
+    // Enumerate before deleting. This never recursively deletes a directory,
+    // follows a symlink or touches a file not owned by the cover-cache format.
+    std::vector<fs::path> owned;
+    std::error_code ec;
+    fs::directory_iterator it(root_, ec), end;
+    if (ec) return false;
+    for (; it != end; it.increment(ec)) {
+        const auto p = it->path();
+        const auto name = p.filename().string();
+        if (name.size() < 36 || !safeKey(name.substr(0, 32))) continue;
+        const auto suffix = name.substr(32);
+        if (suffix != ".pnxc" && suffix != ".tmp" && suffix != ".bak") continue;
+        const auto status = fs::symlink_status(p, ec);
+        if (ec) return false;
+        if (fs::is_symlink(status)) return false;
+        if (fs::is_regular_file(status)) owned.push_back(p);
+    }
+    if (ec) return false;
+    bool ok = true;
+    for (const auto &p : owned) {
+        ec.clear();
+        if (!fs::remove(p, ec) || ec) ok = false;
+    }
+    // Rebuild the index on the next access, including any files whose removal
+    // failed. Keep cumulative diagnostic hit/miss counters for the session.
+    entries_.clear();
+    clock_ = 0;
+    initialized_ = false;
+    available_ = false;
+    return ok;
 }
 } // namespace papernx
