@@ -219,7 +219,7 @@ public:
         viewMode_=appSettings_.get().libraryLayout ? ViewMode::List : ViewMode::Grid;
         sort_=static_cast<Sort>(appSettings_.get().sort);
         books_ = loadLibraryInventory(root_/"data"/"library-index.txt");
-        restoreLibraryLabels();
+        restoreLibraryLabels(!appSettings_.get().scanOnLaunch);
 
         SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS, "0");
         window_ = SDL_CreateWindow("PaperNX", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,

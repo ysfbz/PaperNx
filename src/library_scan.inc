@@ -30,7 +30,16 @@ void startLibraryScan() {
     std::vector<fs::path> roots{root_/"books"};
     for(const auto &folder:appSettings_.get().libraryFolders)roots.push_back(fs::u8path(folder));
     scanKnownIds_.clear();for(const auto &book:books_)scanKnownIds_.insert(book.id);
-    libraryScanner_.start(std::move(roots),books_,root_/"data"/"library-index.txt");dirty_=true;
+    auto known=books_;
+    for(const auto &[id,p]:progressStore_.all()) {
+        if(known.size()>=10000)break;
+        if(p.bookPath.empty() || id.size()!=16 || !std::all_of(id.begin(),id.end(),[](char c){return (c>='0'&&c<='9')||(c>='a'&&c<='f');}))continue;
+        const auto path=fs::u8path(p.bookPath);const auto format=detectFormat(path);
+        if(format==Format::Unsupported)continue;
+        Book book;book.id=id;book.path=p.bookPath;book.title=p.bookTitle;book.author=p.bookAuthor;book.format=format;
+        known.push_back(std::move(book));
+    }
+    libraryScanner_.start(std::move(roots),std::move(known),root_/"data"/"library-index.txt");dirty_=true;
 }
 void processLibraryScan() {
     if(!activeFingers_.empty() || pointerActive_ || !libraryScanner_.ready())return;

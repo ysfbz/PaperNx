@@ -93,6 +93,16 @@ struct AppTest {
         }
         std::cout<<"PASS: async startup, batch folder import, nested roots, gesture-safe publication, manual/launch scans, settings persistence, reader continuity and modern modal screenshots\n";
     }
+    static void runHistoryRestore(const fs::path &root) {
+        fs::create_directories(root/"books");fs::create_directories(root/"data");fs::create_directories(root/"external");
+        const auto path=root/"external"/"history.epub";fs::copy_file("tests/fixtures/sample_book.epub",path);
+        ProgressStore seed(root/"data"/"progress.txt");Progress p;p.page=3;p.pageCount=10;p.bookPath=path.u8string();p.bookTitle="Recovered title";p.bookAuthor="Recovered author";
+        const auto id=documentId(path.u8string(),fs::file_size(path));seed.put(id,p);assert(seed.save());
+        PaperNxApp app(root);assert(app.init());assert(app.books_.empty() && app.libraryScanner_.pending());
+        settle(app);const auto found=std::find_if(app.books_.begin(),app.books_.end(),[&](const Book &book){return book.id==id;});
+        assert(found!=app.books_.end() && found->title==p.bookTitle && found->author==p.bookAuthor);
+        assert(app.progressStore_.get(id).page==3 && app.progressStore_.get(id).pageCount==10);
+    }
 };
 }
 int main() {
@@ -103,5 +113,6 @@ int main() {
     fs::copy_file("tests/fixtures/sample_doc.pdf",root/"import"/"second.pdf");
     fs::copy_file("tests/fixtures/comics/navigation.cbz",root/"import"/"nested"/"third.cbz");
     fs::create_directory_symlink(fs::absolute("fonts"),root/"fonts");
-    AppTest::run(root);fs::remove_all(root);TTF_Quit();SDL_Quit();
+    AppTest::run(root);const auto historyRoot=fs::temp_directory_path()/"papernx-history-restore";fs::remove_all(historyRoot);
+    AppTest::runHistoryRestore(historyRoot);fs::remove_all(historyRoot);fs::remove_all(root);TTF_Quit();SDL_Quit();
 }

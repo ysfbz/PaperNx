@@ -48,7 +48,9 @@ bool LibraryScanner::start(std::vector<fs::path> roots,std::vector<Book> known,f
             for(const auto &[id,old]:prior) {
                 if(cancel_)break;
                 if(ids.count(id))continue;
-                std::error_code ec;const auto path=fs::u8path(old.path);const auto size=fs::file_size(path,ec);if(ec)continue;
+                std::error_code ec;const auto path=fs::u8path(old.path);
+                if(detectFormat(path)==Format::Unsupported || !fs::is_regular_file(path,ec) || ec)continue;
+                const auto size=fs::file_size(path,ec);if(ec)continue;
                 auto book=old;book.bytes=size;book.id=documentId(book.path,size);
                 if(book.id!=id){book.title=defaultTitle(path);book.author.clear();}
                 auto stamp=fs::last_write_time(path,ec);if(!ec)book.modified=std::chrono::duration_cast<std::chrono::seconds>(stamp.time_since_epoch()).count();
