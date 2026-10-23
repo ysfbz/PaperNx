@@ -7,7 +7,7 @@
         switch(choiceKind_) {
         case 0:return {"Serif","Sans",ui::language?"Publisher":"Yay\u0131nc\u0131"};
         case 1:return ui::language?std::vector<std::string>{"Landscape","Portrait clockwise","Portrait counterclockwise"}:std::vector<std::string>{"Yatay","Dikey: saat y\u00f6n\u00fc","Dikey: saat y\u00f6n\u00fcn\u00fcn tersi"};
-        case 7:{std::vector<std::string> out;for(const auto &p:g_paperPresets)out.push_back(p.name);return out;}
+        case 7:{std::vector<std::string> out;for(int i=0;i<int(sizeof(g_paperPresets)/sizeof(g_paperPresets[0]));++i)out.push_back(paperPresetLabel(i));return out;}
         case 6:return ui::language?std::vector<std::string>{"Off","Soft paper","Natural paper"}:std::vector<std::string>{"Kapal\u0131","Yumu\u015fak ka\u011f\u0131t","Do\u011fal ka\u011f\u0131t"};
         default:return {};
         }
