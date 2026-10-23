@@ -3104,12 +3104,17 @@ private:
         if(dimPercent>0) {
             SDL_BlendMode oldBlend=SDL_BLENDMODE_NONE;
             SDL_GetRenderDrawBlendMode(renderer_,&oldBlend);
+            const SDL_bool wasClipped=SDL_RenderIsClipEnabled(renderer_);
+            SDL_Rect previousClip{0,0,0,0};
+            if(wasClipped) SDL_RenderGetClipRect(renderer_,&previousClip);
+            SDL_RenderSetClipRect(renderer_,nullptr);
             SDL_SetRenderDrawBlendMode(renderer_,SDL_BLENDMODE_BLEND);
             SDL_SetRenderDrawColor(renderer_,0,0,0,Uint8(dimPercent*255/100));
             int outputW=0,outputH=0;
             SDL_GetRendererOutputSize(renderer_,&outputW,&outputH);
             SDL_Rect cover{0,0,outputW,outputH};
             SDL_RenderFillRect(renderer_,&cover);
+            if(wasClipped) SDL_RenderSetClipRect(renderer_,&previousClip);
             SDL_SetRenderDrawBlendMode(renderer_,oldBlend);
         }
         trace("present_begin");
