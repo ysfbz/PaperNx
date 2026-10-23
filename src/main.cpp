@@ -58,6 +58,11 @@ using namespace papernx;
 
 namespace {
 
+constexpr unsigned thumbnailBurstBeforeMetadata = 3;
+bool shouldProcessCoverMetadata(bool hasThumbnails, bool hasMetadata, unsigned thumbnailBurst) {
+    return hasMetadata && (!hasThumbnails || thumbnailBurst >= thumbnailBurstBeforeMetadata);
+}
+
 // devkitPro SDL2's built-in Switch mapping swaps A/B and X/Y. Keep labels
 // consistent with the native pad_mapping_default[] button indices.
 [[maybe_unused]] std::string switchControllerMapping(const char *guid) {
@@ -653,6 +658,7 @@ private:
     bool coverClearConfirm_{false};
     std::deque<Book> thumbQueue_;
     std::deque<Book> metadataQueue_;
+    unsigned thumbnailJobsSinceMetadata_{};
     std::set<std::string> metadataIndexedIds_;
     std::set<std::string> queuedThumbIds_;
     std::map<std::string, std::chrono::steady_clock::time_point> failedThumbIds_;
@@ -731,8 +737,10 @@ private:
                     coverClearRequested_ = false;
                     clearNow = true;
                 } else {
-                    metadataOnly=thumbQueue_.empty();
+                    metadataOnly=shouldProcessCoverMetadata(!thumbQueue_.empty(),!metadataQueue_.empty(),thumbnailJobsSinceMetadata_);
                     auto &queue=metadataOnly?metadataQueue_:thumbQueue_;b=queue.front();queue.pop_front();
+                    if(metadataOnly)thumbnailJobsSinceMetadata_=0;
+                    else thumbnailJobsSinceMetadata_=std::min(thumbnailJobsSinceMetadata_+1,thumbnailBurstBeforeMetadata);
                 }
             }
             if (clearNow) {

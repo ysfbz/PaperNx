@@ -106,6 +106,11 @@ struct AppTest {
 };
 }
 int main() {
+    assert(shouldProcessCoverMetadata(false,true,0));
+    assert(!shouldProcessCoverMetadata(true,false,9));
+    assert(!shouldProcessCoverMetadata(true,true,0));
+    assert(!shouldProcessCoverMetadata(true,true,2));
+    assert(shouldProcessCoverMetadata(true,true,3));
     assert(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_EVENTS|SDL_INIT_GAMECONTROLLER)==0 && TTF_Init()==0);
     const auto root=fs::temp_directory_path()/"papernx-modern-library";fs::remove_all(root);fs::create_directories(root/"books");fs::create_directories(root/"import"/"nested");
     fs::copy_file("tests/fixtures/sample_book.epub",root/"books"/"base.epub");
