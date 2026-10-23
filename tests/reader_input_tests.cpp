@@ -89,7 +89,11 @@ struct AppTest {
         // The whole persistent plus control owns its corners as well as centre.
         app.openBook(book("english.epub"));app.toolbarVisible_=false;
         touch(app,SDL_FINGERDOWN,1260.f/1280,68.f/720);assert(!app.pageTurnTouch_.tracking);
-        touch(app,SDL_FINGERUP,1260.f/1280,68.f/720);assert(app.quickMenu_);app.quickMenu_=false;app.closeBook();
+        touch(app,SDL_FINGERUP,1260.f/1280,68.f/720);assert(app.quickMenu_);
+        pad(app,SDL_CONTROLLER_BUTTON_START);assert(!app.quickMenu_);
+        pad(app,SDL_CONTROLLER_BUTTON_START);assert(app.quickMenu_);
+        touch(app,SDL_FINGERDOWN,1260.f/1280,68.f/720);touch(app,SDL_FINGERUP,1260.f/1280,68.f/720);assert(!app.quickMenu_);
+        app.closeBook();
         // The 0.16 external menu geometry and scan/settings routes are restored.
         ui::LibraryLayout library(1280);assert(library.top==174 && library.left==32);
         assert(app.quickSheet(1280,720).x==804);
