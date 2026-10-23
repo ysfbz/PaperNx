@@ -5,7 +5,7 @@
 
 **Baseline:** `main@8db85384a1b6c277c74766601ef46e9a672328df` (2026-10-23 audit)  
 **Feature branch:** `feature/v0.9.2-complete-reader-enhancements`  
-**Latest source-bearing HEAD:** `81a3b8c389e7b79ee018343223719cba67992675` (G4 updater checkpoint; later report-only commits may advance branch HEAD).
+**Latest source-bearing HEAD:** `7aa78bc4da9714227a8ea3a9c48ae7d1552b881a` (G5 scanner/history worker checkpoint).
 **Fork reference:** `rtk19/PaperNx@d2b4bcfd10b1a66043c5b8cd36da08340cffec6d`  
 **Version remains:** v0.9.1; do not tag, release or merge to main.
 
@@ -22,7 +22,7 @@
 | 02 | Real EPUB/PDF landscape spreads | CODE COMPLETE / TESTED | `include/papernx/reader_layout.hpp` models landscape spreads, leaf dimensions, content margins and folios. `src/reader_sheets.inc` modularizes spread rendering. Verified with `tests/reader_spread_tests.cpp` and `tests/fixtures/spread_doc.pdf`. Single-page and continuous modes fully preserved. |
 | 03 | Smart comic spreads | CODE COMPLETE / TESTED | `src/comic_document.c` detects `ComicInfo.xml` DoublePage tags and wide-scan aspect ratios (`px_comic_page_is_spread`, `px_comic_remember_size`). `src/comic_spreads.inc` pairs facing pages dynamically with single-page fallback for vertical/non-matching sheets. Tested via `tests/fixtures/comics/smart-spreads.cbz`. |
 | 04 | True-leaf spread curl | CODE COMPLETE / TESTED | `include/papernx/page_curl.hpp` implements `PageCurlRenderer::renderSpread` with `TextureState` RAII modulation restore, underlying page reveal, opposite page projection, and `inkOnly` support. Integrated into `tickPageTurn()`. Tested via `tests/page_curl_tests.cpp` and fallback paths. |
-| 05 | Multiple sources and asynchronous scanning | CODE COMPLETE / TESTED | `include/papernx/library_index.hpp` and `src/library_index.cpp` implement `loadLibraryInventory` (instant startup from `ProgressStore`) and `LibraryScanner` background worker with deduplication, normalization, cancellation, and atomic inventory persistence. Supports up to 32 folders (`LIB_FOLDER_00000..00031`) with `scanOnLaunch` in `include/papernx/app_settings.hpp`. Tested in `tests/library_index_tests.cpp`. |
+| 05 | Multiple sources and asynchronous scanning | TARGETED DESKTOP PASS; full acceptance pending | `scanRoots()` remains the single walker. `LibraryScanner` reports incomplete traversal and does not replace the visible list or inventory on missing/inaccessible roots. UTF-8 paths round-trip through the inventory. Focused evidence: `tests/library_index_tests.cpp` and `tests/modern_library_tests.cpp`; the 100/500/1000/10000 stress, Switch SD permission and full CTest matrices remain open. |
 | 06 | Chapter/page reader chrome | CODE COMPLETE / TESTED | `src/reader_book_chrome.inc` provides chapter titles, page range captions (`bookChapterCaption`, `readerFooterCaption`), scrubber, bookmark indicators, and low-distraction folio. Verified with `tests/book_chrome_tests.cpp`. |
 | 07 | Modern menus, app theme and accent colors | HISTORICAL STATUS WITHDRAWN; palette integrated in shared tokens | `include/papernx/interface_theme.hpp` is deleted; palette resolution now lives in `include/papernx/theme.hpp`. Its fork-derived lineage and Refael Bar attribution remain documented. Current acceptance still requires the dated tests/device matrix below. |
 | 08 | Secure native self-update | HISTORICAL STATUS WITHDRAWN; G4 verified-manual path | Current code verifies and stages the release beside `PaperNX.nro`, but does not mutate the canonical NRO. See dated G4 evidence below. Switch file-manager replacement and legacy boot recovery remain unverified on hardware. |
@@ -144,3 +144,21 @@ The Joy-Con physical `+` maps to SDL `START` and calls the existing `toggleQuick
 | Current release readiness | INCOMPLETE | Full native suite, sanitizer, G5 source redesign, G6 benchmarks, G7 whole-feature regression and physical acceptance remain open. |
 
 **Decision remains INCOMPLETE — BLOCKERS REMAIN.** Self-install is disabled and verified download remains usable. PaperNX makes no claim about external file-manager atomicity or automatic recovery after that external replacement.
+
+## O. 2026-10-24 — G5 scanner/index error boundary and parser contract
+
+**Source commits:** `2411111bce1c23c3dde54d0b300e81eb42432ccd` (`fix(library): preserve index on incomplete scans`) and `7aa78bc4da9714227a8ea3a9c48ae7d1552b881a` (`fix(library): restore history on scan worker`). Scanner/index code remains fork-derived/adapted.
+
+- `scanRoots()` keeps the shared walker and reports incomplete traversal for unavailable roots or filesystem metadata/iteration errors. `LibraryScanner` discards partial results and does not write the inventory; `processLibraryScan()` keeps the visible library and shows an error. A successful traversal with a failed cache write remains distinguishable.
+- Scanned `Book::path` and title use `std::filesystem::path::u8string()`. Tests cover Turkish/UTF-8 scan and inventory restoration. Publication skips redundant progress-file `stat` calls on the UI thread.
+- When scan-on-launch is enabled, progress-only paths are passed to the worker; `init()` does not synchronously `stat` historical books. The modern library test verifies recovered title, author and page position.
+- `update_json.hpp` source was not redesigned. Tests now reject duplicate keys inside ignored nested objects and JSON exceeding its node cap; the parser remains fork-derived.
+
+| Check | Result | Evidence |
+|---|---|---|
+| Desktop build | **PASS** | `docker compose run --rm desktop bash -lc 'cmake --build build-desktop --target PaperNX papernx_library_index_tests papernx_modern_library_tests papernx_localization_tests papernx_catalog_tests papernx_core_tests papernx_self_update_tests --parallel 4'`. |
+| Targeted CTest | **PASS, 7/7** | `papernx_library_index_tests`, `papernx_modern_library_tests`, `papernx_localization_tests`, `papernx_catalog_tests`, `papernx_core_tests`, `papernx_self_update_tests`, `papernx_self_update_network_tests`. |
+| Incomplete-scan safety | **PASS** | Mixed valid/missing roots produce an incomplete result; inventory bytes and visible books remain unchanged. Unicode inventory round-trip passes. |
+| Switch, full CTest, ASan/UBSan, physical Switch and cover benchmark | **NOT RUN / UNVERIFIED** | G5 did not rerun these checks. G4 Switch evidence does not cover G5 sources. |
+
+**Decision remains INCOMPLETE — BLOCKERS REMAIN.** Scanner/index adaptations are safer but are not represented as independent/clean-room source. Parser redesign, full current-HEAD verification, G6 cover measurement and physical-device acceptance remain open. No release, tag, PR, merge or GitHub Actions run was created.

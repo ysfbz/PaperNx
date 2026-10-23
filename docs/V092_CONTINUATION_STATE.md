@@ -2,7 +2,7 @@
 
 **Updated:** 2026-10-24
 **Branch:** `feature/v0.9.2-complete-reader-enhancements`
-**Latest source commit:** `81a3b8c389e7b79ee018343223719cba67992675` (G4 updater manual-staging checkpoint).
+**Latest source commit:** `7aa78bc4da9714227a8ea3a9c48ae7d1552b881a` (G5 scanner/history worker checkpoint).
 **Last source commit before the current hardening changes:** `bb9d8579db9ccf0d10b5843e1929c2e696565c59`
 **Hardening source commits:** `913fb8f` and `1cb06a1`.
 **Audit documentation:** committed on this feature branch; use `git log` for the final report commit SHA.
@@ -13,14 +13,17 @@
 - Fixed the Switch Makefile's recursive sub-make losing `MUPDF_PREFIX`; the verified absolute prefix is exported to the link step.
 - Added `-lcurl`, installed/confirmed devkitPro `switch-curl`, validated the PEM bundle before build, built the AArch64 ELF/NRO, and verified the exact CA bytes inside NRO RomFS.
 - Reworked updater checks/download/install and startup confirmation; added local HTTPS cases for malformed, wrong identity/version/hash, cancellation, truncation, TLS failure and recovery.
+- G4 replaced new self-install transactions with verified manual staging as `PaperNX.nro.new` plus `.ready`; external replacement and rollback are not guaranteed by the app.
 - Aligned brightness preference clamping/persistence, touch/controller slider handling, software fallback and libnx lifecycle paths.
 - Centralized interface palette resolution in the existing theme tokens; corrected reader spread/curl clipping/preference regressions and asynchronous scan test assumptions.
-- Native CTest: 29/29 passed. Focused comic performance CTest: 3/3 passed. Switch build/artifact verification passed.
+- G5 made `scanRoots()` report incomplete filesystem traversal, preserves the current index/library on inaccessible roots, and keeps scanned paths/titles UTF-8. The bounded updater parser remains fork-derived; duplicate-key and node-limit contracts are tested.
+- With scan-on-launch enabled, progress-only file validation runs in the scanner worker rather than during `init()`; saved title, author and progress return after publication.
+- Historical native CTest: 29/29 passed at its recorded earlier snapshot. G5 targeted CTest: 7/7 passed; Switch build/artifact verification passed at G4, not G5.
 
 ## Work that remains open
 
-1. **Independent source redesign:** `src/library_scan.inc`, `src/library_index.cpp`, `include/papernx/library_index.hpp`, and `src/update_json.hpp` still contain fork-identical AGPL source. Their origin is accurately attributed, but the requested independent reimplementation was not completed. `src/self_update.cpp` has a substantial redesign but retains fork ancestry and is still conservatively classified as adapted AGPL code. See [`V092_SOURCE_PROVENANCE_AUDIT.md`](V092_SOURCE_PROVENANCE_AUDIT.md).
-2. **Updater interruption window:** after moving `PaperNX.nro` to `.swap` and before moving `.new` into place, power loss can leave the canonical executable path absent. `.old` is preserved, but automatic recovery cannot run until a file manager or computer restores it. The documented manual path is not physically tested; do not claim power-loss-proof rollback.
+1. **Independent source redesign:** scanner/index have PaperNX-specific safety adaptations but remain fork-derived; updater/parser also retain fork lineage. No module is falsely described as clean-room. See [`V092_SOURCE_PROVENANCE_AUDIT.md`](V092_SOURCE_PROVENANCE_AUDIT.md).
+2. **External update recovery:** the current updater never replaces the canonical NRO. The separate file-manager replacement can still be interrupted; PaperNX cannot guarantee recovery if that external operation leaves no bootable NRO. Keep a backup; physical replacement is untested. Legacy `.boot/.old/.swap` recovery only addresses transactions from older builds.
 3. **Physical Switch validation:** actual TLS/NIFM operation, real backlight changes and restoration, docked/HOME/suspend/resume behavior, touch/Joy-Con slider use, startup rollback and SD-card write/interruption behavior remain `UNVERIFIED`.
 4. **Performance evidence:** no before/after comparison or 100/500/1000-book cold/warm cover benchmark was captured. No archive reopen/metadata reopen counters or Switch FPS/RAM traces were collected. Existing 32 MiB cover and 64 MiB page cache budgets were not retuned without data.
 
@@ -33,7 +36,7 @@
 
 ## Next session starting point
 
-Read the current source-provenance report and latest `FinalDevelopmentResult.md` section first. Continue only on the existing feature branch. Prioritize the source redesign and a recovery design that can restore without the canonical NRO, then run the full native suite and Switch build again. Keep the final decision `INCOMPLETE — BLOCKERS REMAIN` until the independent-origin objective and updater recovery risk are resolved; keep hardware behavior explicitly unverified until tested on a physical console.
+Read the current source-provenance report and latest `FinalDevelopmentResult.md` section first. Continue only on the existing feature branch. Continue with G6 cover cache safety and the 100/500/1000 benchmark, then G7 Ponytail and remaining source redesign. Do not restart the full verification chain prematurely. Keep the final decision `INCOMPLETE — BLOCKERS REMAIN`; hardware behavior remains unverified until tested on a physical console.
 
 ## 2026-10-23 latest continuation checkpoint
 
@@ -109,3 +112,13 @@ The verified/pushed branch HEAD at the start of this note was `ed9e3b69c184de1b4
 - A first localization test caught a missing Turkish-to-English reverse mapping; the map/assertion were fixed and the final 4/4 target run passed. `git diff --check` emits false trailing-whitespace flags for the added CRLF lines in `src/main.cpp`; byte inspection confirmed the file uses consistent CRLF. All other changed files pass whitespace checks.
 - **Not run / unverified:** physical Switch Joy-Con, SD/FAT external replace, interruption during manual replacement, legacy boot recovery on device, full CTest, ASan/UBSan and full cover matrix. These are not hardware PASS.
 - **Next gate:** G5 scanner/index/parser architecture and contract-test review. Do not rewrite the page cache/curl merely to alter hashes; retain fork/AGPL attribution. Keep the untracked execution plan and 43,484,977-byte CBR fixture out of commits. Overall status remains `INCOMPLETE — BLOCKERS REMAIN`.
+
+## 2026-10-24 G5 scanner/index checkpoint
+
+- **Source commits:** `2411111bce1c23c3dde54d0b300e81eb42432ccd` and `7aa78bc4da9714227a8ea3a9c48ae7d1552b881a` on the existing feature branch.
+- `scanRoots()` reports filesystem traversal failures through its optional completion output. A partial multi-root result is discarded by `LibraryScanner`; inventory bytes and the visible list remain untouched. The shared core walker remains the only root enumerator, and scanned paths/titles use UTF-8 conversion.
+- With scan-on-launch enabled, progress-only paths are validated on the worker rather than in `init()`. UI publication also skips re-statting unmatched historical records; the modern test checks title, author and saved page restoration.
+- **Targeted command:** `docker compose run --rm desktop bash -lc 'cmake --build build-desktop --target PaperNX papernx_library_index_tests papernx_modern_library_tests papernx_localization_tests papernx_catalog_tests papernx_core_tests papernx_self_update_tests --parallel 4 && ctest --test-dir build-desktop --output-on-failure -R "^papernx_library_index_tests$|^papernx_modern_library_tests$|^papernx_localization_tests$|^papernx_catalog_tests$|^papernx_core_tests$|^papernx_self_update_tests$|^papernx_self_update_network_tests$"'` — build PASS; CTest **7/7 PASS**.
+- Parser tests now reject duplicate keys inside ignored nested JSON and node-limit overflow. Parser source was not redesigned and remains fork-derived/adapted.
+- **Not run at G5:** full native CTest, Switch cross-build, sanitizers, physical Switch and 100/500/1000 cover benchmark. No speedup claim. No release or workflow was run.
+- **Next:** G6 cover cache safety and measured benchmark, followed by Ponytail/source audit and remaining test gates. Overall decision remains `INCOMPLETE — BLOCKERS REMAIN`.

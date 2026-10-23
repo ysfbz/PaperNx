@@ -337,3 +337,24 @@ Bu bölüm, ana v0.9.2 hardening görevinin devamıdır; release hazırlığı v
 | Switch fiziksel SD, dış dosya yöneticisiyle replace, power-loss, gerçek Joy-Con | **NOT RUN / UNVERIFIED** | Kod artık canonical NRO'ya dokunmuyor; kullanıcının harici değişim adımı ve eski marker recovery donanımda sınanmadı. |
 
 **Karar: INCOMPLETE — BLOCKERS REMAIN.** G4 yeni updater self-install kesinti penceresini uygulama kodundan kaldırdı; external manual replace için rollback/power-loss iddiası yok. G5 scanner/index/parser kökenli tasarım, G6 kapak ölçüm matrisi, G7 11 özellik full-regression, Ponytail final audit, tüm native test seti/sanitizer ve fiziksel Switch senaryoları açık. Tam doğrulama zinciri baştan çalıştırılmadı; release, tag, PR, merge veya GitHub Actions çalıştırılmadı.
+
+## O. 2026-10-24 — G5: Kütüphane taraması ve parser sözleşmesi
+
+- **Branch:** `feature/v0.9.2-complete-reader-enhancements`.
+- **Kaynak commitleri:** `2411111bce1c23c3dde54d0b300e81eb42432ccd` (`fix(library): preserve index on incomplete scans`) ve `7aa78bc4da9714227a8ea3a9c48ae7d1552b881a` (`fix(library): restore history on scan worker`). `docs/V092_FINALIZATION_EXECUTION_PLAN.md` ve `tests/fixtures/comics/performance-37.cbr` untracked bırakıldı ve commit'e alınmadı.
+- `scanRoots()` aynı ortak walker'ı kullanır ve kök/iterasyon/metadata hatalarında tamamlanmama bilgisini verir. `LibraryScanner` kısmi sonucu ve envanter yazımını durdurur; `processLibraryScan()` mevcut kitap listesini koruyup hata gösterir. Cache yazma hatası, taramanın tamamlanma durumundan ayrıdır.
+- `Book::path` ve varsayılan başlık için `u8string()` kullanılır; Unicode/Türkçe yol tarama ve index geri yükleme ile sınanır. Tam tarama sonrası progress yolları UI thread üzerinde yeniden `stat` edilmez.
+- Açılış taraması etkin olduğunda eski progress-only kitap yolları worker’a aday olarak aktarılır; `init()` bunları senkron doğrulamaz. Yeni modern-library testi metadata ve kayıtlı sayfa konumunu worker tamamlandığında doğrular.
+- `update_json.hpp` kaynak kodu değiştirilmedi. Testler bilinmeyen iç içe nesnelerde duplicate-key reddini ve 150.001 node sınırını doğrular; parser fork-derived/adapted kalır. Refael Bar (scanner/index/theme) ve Refael Avramashvili (updater/parser) atıfları ile AGPL-3.0 bildirimi korunur; clean-room köken iddiası yoktur.
+
+### Gerçek doğrulama
+
+| Kontrol | Sonuç | Kanıt |
+|---|---|---|
+| Desktop hedef build | **PASS** | `docker compose run --rm desktop bash -lc 'cmake --build build-desktop --target PaperNX papernx_library_index_tests papernx_modern_library_tests papernx_localization_tests papernx_catalog_tests papernx_core_tests papernx_self_update_tests --parallel 4'`. |
+| Hedefli CTest | **PASS, 7/7** | `papernx_library_index_tests`, `papernx_modern_library_tests`, `papernx_localization_tests`, `papernx_catalog_tests`, `papernx_core_tests`, `papernx_self_update_tests`, `papernx_self_update_network_tests`. |
+| Partial scan / persistence / UI | **PASS** | Karışık geçerli/eksik root girdisi partial walker sonucu üretti; inventory byte içeriği aynı kaldı ve modern UI mevcut kitapları korudu. Unicode inventory round-trip geçti. |
+| Updater JSON / HTTPS | **PASS** | Nested duplicate key ve node-limit assertion'ları eklendi; parser unit ve local HTTPS integration yeniden geçti. |
+| Switch / full CTest / ASan-UBSan / fiziksel cihaz / performans matrisi | **NOT RUN / UNVERIFIED** | G5 değişiklikleri için Switch build tekrarlanmadı; fiziksel SD/izin davranışı, full suite ve 100/500/1000 cover ölçümleri açık. Hızlanma iddiası yok. |
+
+**Karar: INCOMPLETE — BLOCKERS REMAIN.** Güvenli tarama davranışı ve hedefli testler tamamlandı; scanner/index ve parser için talep edilen bağımsız yeniden tasarım tamamlanmış değil. G6 cache ölçümü/temizliği, G7 Ponytail ve reader regresyon audit'i, full current-HEAD test kapısı ve fiziksel Switch doğrulamaları sürüyor. Release, tag, PR, merge veya GitHub Actions çalıştırılmadı.
