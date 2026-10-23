@@ -2,7 +2,9 @@
 #include "../src/main.cpp"
 #undef main
 #include <cassert>
+#include <chrono>
 #include <iostream>
+#include <thread>
 namespace {
 struct AppTest {
 #include "library_fixture_helpers.inc"
@@ -23,7 +25,9 @@ struct AppTest {
   std::cout<<"Four idle/toolbar cycles: "<<SDL_GetTicks()-start<<" ms; UI rasterizations="<<app.comicTextureBuilds_-builds<<std::endl;
   assert(app.comicTextureBuilds_==builds); // Old 0.17.1 performed 12 here.
   drain(app);
-  for(int page=original;page<original+4;++page)assert(app.pageCache_.get(app.comicTextureKey(page)));
+  const auto visibleGroup=app.comicSpreadPages(original);
+  for(int page=visibleGroup.first;page<visibleGroup.first+visibleGroup.second+2 && page<app.pageCount_;++page)
+   assert(app.pageCache_.get(app.comicTextureKey(page)));
   assert(app.pageCache_.currentBytes()<36u*1024u*1024u);
   // Once both neighbours are ready, rendering and a controller turn perform no
   // archive IO/rasterization on the UI thread, even with large native scans.
@@ -41,8 +45,10 @@ struct AppTest {
   fs::rename(held,archive);
   // High zoom sharpens both physical pages asynchronously, without evicting
   // their base images or requiring a decode for each pan/pinch location.
-  app.comicDetailDue_=0;app.refineComicZoom();drain(app);assert(app.comicDetails_.size()==2);
-  for(int i=0;i<2;++i){const int page=app.currentPage_+i;int bw,bh,dw,dh;
+  app.comicDetailDue_=0;app.refineComicZoom();drain(app);
+  const auto detailGroup=app.comicSpreadPages(app.currentPage_);
+  assert(app.comicDetails_.size()==static_cast<std::size_t>(detailGroup.second));
+  for(int i=0;i<detailGroup.second;++i){const int page=detailGroup.first+i;int bw,bh,dw,dh;
    auto base=app.pageCache_.get(app.comicTextureKey(page));assert(base);
    SDL_QueryTexture(base,nullptr,nullptr,&bw,&bh);SDL_QueryTexture(app.comicDetails_.at(page).texture.get(),nullptr,nullptr,&dw,&dh);
    assert(dw>bw && dh>bh);
@@ -50,14 +56,32 @@ struct AppTest {
   for(int i=0;i<10;++i){app.zoomPdf(2+i*.1f,.6f,.4f,true);app.pdfPanY_+=3;app.render();}
   assert(app.comicTextureBuilds_==builds);
   app.closeBook();assert(app.comicDetails_.empty());drain(app);
-  // Configuration replacement discards old queued/completed data. Stop wakes
-  // a producer blocked by the two-result back-pressure limit as well.
+  // Configuration replacement discards old results and closes its worker-owned
+  // document. The open document then survives idle longer than the old timeout.
   ComicPages worker;const auto path=app.books_.front().path;
-  worker.configure({"old",path});for(int i=0;i<6;++i)worker.request(i);SDL_Delay(20);
+  worker.configure({"old",path});for(int i=0;i<6;++i)worker.request(i);
+  const auto openDeadline=SDL_GetTicks()+5000;
+  while(worker.metrics().documentOpens==0 && SDL_GetTicks()<openDeadline)SDL_Delay(1);
+  assert(worker.metrics().documentOpens==1);
   worker.configure({"new",path});worker.request(2);bool received=false;const auto deadline=SDL_GetTicks()+20000;
   while(worker.pending() && SDL_GetTicks()<deadline){for(auto &r:worker.take()){assert(r.identity=="new" && r.page==2 && !r.rgb.empty());received=true;}SDL_Delay(2);}
-  assert(received && !worker.pending());for(int i=0;i<6;++i)worker.request(i);SDL_Delay(20);worker.stop();
-  std::cout<<"PASS: bounded base/detail memory; zero hot-path rasterizations; asynchronous CBR/CBZ neighbours; preserved two-page zoom; stale-result cancellation and stop\n";
+  assert(received && !worker.pending());auto metrics=worker.metrics();assert(metrics.documentOpens==2 && metrics.documentCloses==1);
+  int idleSeconds=0;
+  for(const int interval:{1,2,7,20}) {
+   std::this_thread::sleep_for(std::chrono::seconds(interval));idleSeconds+=interval;
+   metrics=worker.metrics();assert(metrics.documentOpens==2 && metrics.documentCloses==1);
+   std::cout<<"Worker idle "<<idleSeconds<<"s: opens="<<metrics.documentOpens<<", closes="<<metrics.documentCloses<<std::endl;
+  }
+  worker.setSuspended(true);const auto closeDeadline=SDL_GetTicks()+5000;
+  while(worker.metrics().documentCloses<2 && SDL_GetTicks()<closeDeadline)SDL_Delay(1);
+  assert(worker.metrics().documentCloses==2);
+  worker.setSuspended(false);worker.request(3);received=false;const auto resumeDeadline=SDL_GetTicks()+20000;
+  while(worker.pending() && SDL_GetTicks()<resumeDeadline){for(auto &r:worker.take()){assert(r.identity=="new" && r.page==3 && !r.rgb.empty());received=true;}SDL_Delay(2);}
+  assert(received && worker.metrics().documentOpens==3 && worker.metrics().documentCloses==2);
+  worker.stop();metrics=worker.metrics();assert(metrics.documentOpens==3 && metrics.documentCloses==3);
+  worker.request(4);assert(worker.metrics().documentOpens==3);
+  std::cout<<"Worker documents: opens="<<metrics.documentOpens<<", closes="<<metrics.documentCloses<<"; idle session retained and suspend released it\n";
+  std::cout<<"PASS: bounded base/detail memory; zero hot-path rasterizations; asynchronous CBR/CBZ neighbours; preserved two-page zoom; stale-result cancellation; idle and suspend lifecycle\n";
  }
 };
 }

@@ -1,7 +1,7 @@
 #pragma once
 #include "papernx/mupdf_bridge.h"
 #include <algorithm>
-#include <chrono>
+#include <atomic>
 #include <cmath>
 #include <condition_variable>
 #include <cstdint>
@@ -45,6 +45,7 @@ public:
         bool detail{};
         std::vector<unsigned char> rgb;
     };
+    struct Metrics { std::uint64_t documentOpens{}, documentCloses{}; };
     ~ComicPages() { stop(); }
     void configure(Spec spec) {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -83,6 +84,21 @@ public:
         return active_ || !queue_.empty() || !results_.empty();
     }
     void clear() { configure({}); }
+    void setSuspended(bool suspended) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (stopped_ || suspended_ == suspended) return;
+        suspended_ = suspended;
+        if (suspended_) {
+            ++generation_;
+            queue_.clear();
+            results_.clear();
+            requested_.clear();
+        }
+        wake_.notify_one();
+    }
+    Metrics metrics() const noexcept {
+        return {documentOpens_.load(std::memory_order_relaxed), documentCloses_.load(std::memory_order_relaxed)};
+    }
     void stop() {
         {
             std::lock_guard<std::mutex> lock(mutex_);
@@ -100,10 +116,18 @@ private:
     std::thread thread_;
     Spec spec_;
     std::uint64_t generation_{};
-    bool stopped_{false}, active_{false};
+    bool stopped_{false}, suspended_{false}, active_{false};
+    std::atomic<std::uint64_t> documentOpens_{0}, documentCloses_{0};
     std::deque<std::pair<int, bool>> queue_;
     std::set<std::pair<int, bool>> requested_;
     std::deque<Result> results_;
+
+    void closeDocument(PxDocument *&doc) {
+        if (!doc) return;
+        px_document_close(doc);
+        doc = nullptr;
+        documentCloses_.fetch_add(1, std::memory_order_relaxed);
+    }
 
     void run() {
 #ifdef __SWITCH__
@@ -119,24 +143,19 @@ private:
             bool detail;
             {
                 std::unique_lock<std::mutex> lock(mutex_);
-                if (!wake_.wait_for(lock, std::chrono::seconds(3), [&] {
-                    return stopped_ || opened != generation_ || (!queue_.empty() && results_.size() < 2);
-                })) {
-                    lock.unlock();
-                    if (doc) px_document_close(doc);
-                    doc = nullptr;
-                    continue;
-                }
+                wake_.wait(lock, [&] {
+                    return stopped_ || opened != generation_ ||
+                        (!suspended_ && !queue_.empty() && results_.size() < 2);
+                });
                 if (stopped_) break;
                 if (opened != generation_) {
                     opened = generation_;
                     lock.unlock();
-                    if (doc) px_document_close(doc);
-                    doc = nullptr;
+                    closeDocument(doc);
                     lock.lock();
                     if (opened != generation_) continue;
                 }
-                if (queue_.empty() || results_.size() >= 2) continue;
+                if (suspended_ || queue_.empty() || results_.size() >= 2) continue;
                 spec = spec_;
                 generation = generation_;
                 page = queue_.front().first;
@@ -145,7 +164,10 @@ private:
                 active_ = true;
             }
             char error[256]{};
-            if (!doc) doc = px_document_open_limited(spec.path.c_str(), 0, 0, 16, "", error, sizeof error, 96u * 1024u * 1024u);
+            if (!doc) {
+                doc = px_document_open_limited(spec.path.c_str(), 0, 0, 16, "", error, sizeof error, 96u * 1024u * 1024u);
+                if (doc) documentOpens_.fetch_add(1, std::memory_order_relaxed);
+            }
             Result result;
             result.identity = spec.identity;
             result.page = page;
@@ -168,7 +190,7 @@ private:
                 if (generation == generation_ && !stopped_) results_.push_back(std::move(result));
             }
         }
-        if (doc) px_document_close(doc);
+        closeDocument(doc);
     }
 };
 } // namespace papernx

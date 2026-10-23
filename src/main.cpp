@@ -2520,8 +2520,8 @@ private:
             running = false;
             return;
         }
-        if(e.type==SDL_APP_WILLENTERBACKGROUND){restoreSystemBrightness();cancelPageTurn();appBackground_=true;readingStats_.reanchor();readingStats_.save();journal_.pause(SDL_GetTicks(),std::time(nullptr));journal_.save();}
-        if(e.type==SDL_APP_DIDENTERFOREGROUND){appBackground_=false;backlightApplyPending_=true;
+        if(e.type==SDL_APP_WILLENTERBACKGROUND){restoreSystemBrightness();cancelPageTurn();appBackground_=true;comicPages_.setSuspended(true);readingStats_.reanchor();readingStats_.save();journal_.pause(SDL_GetTicks(),std::time(nullptr));journal_.save();}
+        if(e.type==SDL_APP_DIDENTERFOREGROUND){appBackground_=false;comicPages_.setSuspended(false);backlightApplyPending_=true;
 #ifdef __SWITCH__
             backlightUnavailable_=false;
 #endif
