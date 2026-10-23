@@ -124,8 +124,7 @@ struct AppTest {
                     app.pageCache_.clear();
                     for(float p:{0.f,.15f,.35f,.55f,.8f,1.f}) {
                         auto target=app.captureReaderSurface(l.width,l.height,[&]{
-                            PageCurlRenderer::renderSpread(app.renderer_,turn.previous.get(),turn.back.get(),turn.under.get(),turn.viewport,{0,0,l.width,l.height},p,turn.direction,.5f,0,app.comic()?&turn.oppositeViewport:nullptr);
-                            if(app.comic()){const float saved=turn.progress;turn.progress=p;app.renderComicTurnFolios(l.width,l.height);turn.progress=saved;}
+                            PageCurlRenderer::renderSpread(app.renderer_,turn.previous.get(),turn.back.get(),turn.under.get(),turn.viewport,{0,0,l.width,l.height},p,turn.direction,.5f,0,app.comic()?&turn.oppositeViewport:nullptr,false,turn.paperBack.get());
                         });assert(target);const auto frame=read(app,target.get());
                         if(p==0 && !app.comic())assert(frame.pixels==before.pixels);
                         if(app.comic() && (p==0 || p==1)) {
@@ -160,7 +159,7 @@ struct AppTest {
                     app.turnPage(1);if(app.comic())waitComicTurn(app);assert(app.currentPage_==1 && !app.pageTurnAnimation_.spread);
                     auto captured=read(app,app.pageTurnAnimation_.previous.get());
                     if(!app.comic())assert(captured.pixels==portrait.pixels);
-                    else {assert(app.pageTurnAnimation_.comicSheet && app.pageTurnAnimation_.viewport.h<1280);assert(app.pageTurnAnimation_.folioFront);}
+                    else {assert(app.pageTurnAnimation_.comicSheet && app.pageTurnAnimation_.viewport.h<1280);assert(app.pageTurnAnimation_.back && !app.pageTurnAnimation_.comicFolioCaption.empty());}
                     finish(app);
                 }
                 SDL_SetWindowSize(app.window_,1280,720);

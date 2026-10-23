@@ -226,12 +226,14 @@ class PageCurlRenderer {
 public:
     // A leaf turns around the book's centre onto the opposite side. The
     // stationary spread beneath it contains the outgoing and incoming pages;
-    // the reverse carries the next physical page, including its folio.
+    // the reverse texture may show paper ghosting while the endpoint stays exact.
     static void renderSpread(SDL_Renderer *renderer,SDL_Texture *front,SDL_Texture *back,
                              SDL_Texture *under,SDL_Rect page,SDL_Rect book,float progress,
-                             int direction,float anchorY=.78f,float dragY=0.f,const SDL_Rect *oppositePage=nullptr,[[maybe_unused]] bool inkOnly=false) {
+                             int direction,float anchorY=.78f,float dragY=0.f,const SDL_Rect *oppositePage=nullptr,
+                             [[maybe_unused]] bool inkOnly=false,SDL_Texture *paperBack=nullptr) {
         if(!renderer || !front || !back || !under)return;
-        TextureState frontState(front),backState(back),underState(under);
+        SDL_Texture *reverse=paperBack?paperBack:back;
+        TextureState frontState(front),backState(back),underState(under),reverseState(reverse);
         DrawState state(renderer);SDL_Rect clip=book;
         if(state.clipped)SDL_IntersectRect(&book,&state.clip,&clip);
         SDL_RenderSetClipRect(renderer,&clip);
@@ -254,14 +256,14 @@ public:
         }
         Fold fold(float(page.w),float(page.h),progress,direction,std::clamp(anchorY,0.f,1.f),std::clamp(dragY,-.5f,.5f));
 #if SDL_VERSION_ATLEAST(2,0,18) && !defined(PAPERNX_CURL_FORCE_FALLBACK)
-        if(geometry(renderer,front,back,page,fold,true,inkOnly))return;
+        if(geometry(renderer,front,reverse,page,fold,true,inkOnly))return;
 #endif
         // Geometry-less renderers still turn one leaf about the centre seam.
         const float projection=std::cos(pi*progress);
         SDL_Rect destination=projection>=0?page:opposite;
         destination.w=std::max(1,int(destination.w*std::abs(projection)));
         if(direction>0?projection<0:projection>=0)destination.x+= (projection>=0?page.w:opposite.w)-destination.w;
-        SDL_RenderCopy(renderer,projection>=0?front:back,nullptr,&destination);
+        SDL_RenderCopy(renderer,projection>=0?front:reverse,nullptr,&destination);
     }
 
     // progress is geometric (not time-eased): holding a finger holds the sheet.

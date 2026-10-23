@@ -484,7 +484,8 @@ private:
         SDL_Rect viewport{0,0,0,0};
         SDL_Rect nextViewport{0,0,0,0};
         bool comicSheet{false};
-        PageTurnTexture folioFront{nullptr,SDL_DestroyTexture},folioBack{nullptr,SDL_DestroyTexture},folioUnder{nullptr,SDL_DestroyTexture};
+        PageTurnTexture paperBack{nullptr,SDL_DestroyTexture};
+        std::string comicFolioCaption;
         SDL_Rect oppositeViewport{};
     } pageTurnAnimation_;
     struct PageTurnTouch {
@@ -1839,6 +1840,22 @@ private:
         int w,h;getWindowSize(w,h);
         return comic() && std::abs(pdfZoom_-1.f)>.01f?comicPageRect(currentPage_):SDL_Rect{0,0,w,h};
     }
+    SDL_Color comicPaperBackColor() const {
+        const auto bg=palette().bg;
+        const auto paper=[](Uint8 c,Uint8 tint){return Uint8(int(c)+(int(tint)-c)/3);};
+        return {paper(bg.r,250),paper(bg.g,246),paper(bg.b,230),255};
+    }
+    int copyComicTexture(SDL_Texture *texture,const SDL_FRect &destination,bool paperBack=false) {
+        if(!paperBack)return SDL_RenderCopyF(renderer_,texture,nullptr,&destination);
+        Uint8 r,g,b,a;SDL_BlendMode blend{};
+        if(SDL_GetTextureColorMod(texture,&r,&g,&b)!=0 || SDL_GetTextureAlphaMod(texture,&a)!=0 ||
+           SDL_GetTextureBlendMode(texture,&blend)!=0)return -1;
+        auto restore=[&]{SDL_SetTextureColorMod(texture,r,g,b);SDL_SetTextureAlphaMod(texture,a);SDL_SetTextureBlendMode(texture,blend);};
+        if(SDL_SetTextureColorMod(texture,156,150,138)!=0 || SDL_SetTextureAlphaMod(texture,22)!=0 ||
+           SDL_SetTextureBlendMode(texture,SDL_BLENDMODE_BLEND)!=0) {restore();return -1;}
+        const int result=SDL_RenderCopyF(renderer_,texture,nullptr,&destination);
+        restore();return result;
+    }
     PageTurnTexture captureTurnPage(int page, bool underside=false,SDL_Rect canvas={0,0,0,0}) {
         PageTurnTexture snapshot{nullptr, SDL_DestroyTexture};
         int w, h; getWindowSize(w, h);
@@ -1875,26 +1892,13 @@ private:
         SDL_RenderSetScale(renderer_, 1, 1);
         SDL_RenderSetViewport(renderer_, nullptr);
         SDL_RenderSetClipRect(renderer_, nullptr);
-        auto paper = palette().bg;
-        if (underside) {
-            // Translucent paper: subdued mirrored ink, with a visible paper
-            // surface in night themes instead of a featureless black cutout.
-            const bool dark = int(paper.r)+paper.g+paper.b < 240;
-            auto lift = [dark](Uint8 c) { return Uint8(dark ? std::max(15,int(c)+8) : std::min(255,int(c)+3)); };
-            paper = {lift(paper.r),lift(paper.g),lift(paper.b),255};
-        }
+        const auto paper=underside?comicPaperBackColor():palette().bg;
         SDL_SetRenderDrawColor(renderer_, paper.r, paper.g, paper.b, 255);
         SDL_Rect dst{(w-tw)/2-canvas.x,(h-th)/2-canvas.y,tw,th};
         if(zoomedComic)dst={0,0,snapshotW,snapshotH};
-        Uint8 sourceAlpha=255; SDL_BlendMode sourceBlend=SDL_BLENDMODE_NONE;
-        SDL_GetTextureAlphaMod(source,&sourceAlpha); SDL_GetTextureBlendMode(source,&sourceBlend);
-        if (underside) {
-            SDL_SetTextureBlendMode(source,SDL_BLENDMODE_BLEND);
-            SDL_SetTextureAlphaMod(source,int(paper.r)+paper.g+paper.b<240?48:30);
-        }
+        const SDL_FRect copy{float(dst.x),float(dst.y),float(dst.w),float(dst.h)};
         const bool ok = SDL_RenderClear(renderer_) == 0 &&
-                        SDL_RenderCopy(renderer_, source, nullptr, &dst) == 0;
-        if (underside) {SDL_SetTextureAlphaMod(source,sourceAlpha);SDL_SetTextureBlendMode(source,sourceBlend);}
+                        copyComicTexture(source,copy,underside) == 0;
         SDL_SetRenderTarget(renderer_, target);
         SDL_RenderSetScale(renderer_, sx, sy);
         SDL_RenderSetViewport(renderer_, &viewport);
@@ -3749,16 +3753,13 @@ private:
                 PageCurlRenderer::renderSpread(renderer_,pageTurnAnimation_.previous.get(),pageTurnAnimation_.back.get(),
                     pageTurnAnimation_.under.get(),viewport,{0,0,w,h},pageTurnAnimation_.progress,
                     pageTurnAnimation_.direction,pageTurnAnimation_.anchorY,pageTurnAnimation_.dragY,
-                    pageTurnAnimation_.comicSheet?&pageTurnAnimation_.oppositeViewport:nullptr);
+                    pageTurnAnimation_.comicSheet?&pageTurnAnimation_.oppositeViewport:nullptr,false,pageTurnAnimation_.paperBack.get());
             } else PageCurlRenderer::render(renderer_, pageTurnAnimation_.previous.get(),
                                      pageTurnAnimation_.next.get(), viewport,
                                      pageTurnAnimation_.progress, pageTurnAnimation_.direction,
                                      pageTurnAnimation_.anchorY,pageTurnAnimation_.dragY,pageTurnAnimation_.back.get(),
                                      pageTurnAnimation_.comicSheet?&pageTurnAnimation_.nextViewport:nullptr);
-            if(pageTurnAnimation_.comicSheet) {
-                SDL_RenderSetClipRect(renderer_,nullptr);
-                renderComicTurnFolios(w,h);
-            }
+            if(pageTurnAnimation_.comicSheet)SDL_RenderSetClipRect(renderer_,nullptr);
         } else if(gpuComic) {
             if(comicSpreadActive())renderComicSpreadZoom(w,h);else renderComicZoom(w,h);
         } else if(!continuous()) {
@@ -3791,8 +3792,12 @@ private:
 
             renderReaderNavigation(w,h,pal);
         }
-        if(doc_ && (continuous() || gpuComic || toolbarVisible_ || appSettings_.get().toolbar))
-            drawReaderCaption(readerFooterCaption(w,h),{96,h-58,std::max(1,w-192),44},pal);
+        if(doc_ && (continuous() || gpuComic || toolbarVisible_ || appSettings_.get().toolbar ||
+                    (pageTurnAnimation_.active && pageTurnAnimation_.comicSheet))) {
+            const auto caption=pageTurnAnimation_.active && pageTurnAnimation_.comicSheet
+                ? pageTurnAnimation_.comicFolioCaption : readerFooterCaption(w,h);
+            drawReaderCaption(caption,{96,h-58,std::max(1,w-192),44},pal);
+        }
     }
 
     void renderFileBrowserScreen(int w,int h,const ThemePalette &pal) {

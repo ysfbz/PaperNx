@@ -6,6 +6,7 @@
 namespace {
 struct AppTest {
 #include "library_fixture_helpers.inc"
+    struct TextureData {int width{},height{};std::vector<Uint32> pixels;};
     static void touch(PaperNxApp &app,Uint32 type,float x,float y) {
         SDL_Event event{};event.type=type;event.tfinger.fingerId=63;event.tfinger.x=x;event.tfinger.y=y;
         bool running=true;app.handleEvent(event,running);assert(running);
@@ -33,10 +34,30 @@ struct AppTest {
         app.render();int w,h;app.getWindowSize(w,h);std::vector<Uint32> out(w*h);
         assert(SDL_RenderReadPixels(app.renderer_,nullptr,SDL_PIXELFORMAT_ARGB8888,out.data(),w*4)==0);return out;
     }
-    static void screenshot(PaperNxApp &app,const std::string &name) {
+    static void screenshot(PaperNxApp &app,const std::string &name,const std::string &directory="verification/reader-input") {
         auto data=pixels(app);int w,h;app.getWindowSize(w,h);
         auto *image=SDL_CreateRGBSurfaceWithFormatFrom(data.data(),w,h,32,w*4,SDL_PIXELFORMAT_ARGB8888);assert(image);
-        fs::create_directories("verification/reader-input");assert(SDL_SaveBMP(image,("verification/reader-input/"+name+".bmp").c_str())==0);SDL_FreeSurface(image);
+        fs::create_directories(directory);assert(SDL_SaveBMP(image,(directory+"/"+name+".bmp").c_str())==0);SDL_FreeSurface(image);
+    }
+    static std::vector<Uint32> footerPixels(PaperNxApp &app) {
+        const auto frame=pixels(app);int w,h;app.getWindowSize(w,h);
+        return std::vector<Uint32>(frame.begin()+std::max(0,h-64)*w,frame.end());
+    }
+    static TextureData texturePixels(PaperNxApp &app,SDL_Texture *texture) {
+        TextureData data;assert(texture && SDL_QueryTexture(texture,nullptr,nullptr,&data.width,&data.height)==0);
+        data.pixels.resize(data.width*data.height);auto *target=SDL_GetRenderTarget(app.renderer_);
+        SDL_Rect viewport{},clip{};SDL_RenderGetViewport(app.renderer_,&viewport);SDL_RenderGetClipRect(app.renderer_,&clip);
+        const bool clipped=SDL_RenderIsClipEnabled(app.renderer_);float sx=1,sy=1;SDL_RenderGetScale(app.renderer_,&sx,&sy);
+        Uint8 r,g,b,a;SDL_GetRenderDrawColor(app.renderer_,&r,&g,&b,&a);
+        assert(SDL_SetRenderTarget(app.renderer_,texture)==0);
+        assert(SDL_RenderReadPixels(app.renderer_,nullptr,SDL_PIXELFORMAT_ARGB8888,data.pixels.data(),data.width*4)==0);
+        assert(SDL_SetRenderTarget(app.renderer_,target)==0);SDL_RenderSetScale(app.renderer_,sx,sy);
+        SDL_RenderSetViewport(app.renderer_,&viewport);SDL_RenderSetClipRect(app.renderer_,clipped?&clip:nullptr);
+        SDL_SetRenderDrawColor(app.renderer_,r,g,b,a);return data;
+    }
+    static size_t differingPixels(const TextureData &a,const TextureData &b) {
+        assert(a.width==b.width && a.height==b.height);
+        size_t count=0;for(size_t i=0;i<a.pixels.size();++i)count+=a.pixels[i]!=b.pixels[i];return count;
     }
     static void run(const fs::path &root) {
         PaperNxApp app(root);assert(initReady(app));ui::language=1;
@@ -102,9 +123,30 @@ struct AppTest {
         const auto warmDeadline=SDL_GetTicks()+10000;
         while(app.comicPages_.pending() && SDL_GetTicks()<warmDeadline){app.processComicPages();SDL_Delay(2);}
         app.processComicPages();assert(!app.comicPages_.pending());
+        auto prefs=app.appSettings_.get();prefs.toolbar=true;app.appSettings_.put(prefs);
+        app.currentPage_=0;const auto oldFolio=app.comicTurnFolioCaption(app.currentPage_);
         const auto decodes=app.comicTextureBuilds_;app.turnPage(1);waitComicTurn(app);
-        assert(app.pageTurnAnimation_.active && app.pageTurnAnimation_.comicSheet);
+        if(!(app.pageTurnAnimation_.active && app.pageTurnAnimation_.comicSheet && app.pageTurnAnimation_.back))
+            std::cerr<<"comic turn setup: active="<<app.pageTurnAnimation_.active<<" spread="<<app.pageTurnAnimation_.spread
+                     <<" back="<<bool(app.pageTurnAnimation_.back)<<" paperBack="<<bool(app.pageTurnAnimation_.paperBack)
+                     <<" error="<<app.comicTurnError_<<" pageError="<<app.pageRenderError_<<"\n";
+        assert(app.pageTurnAnimation_.active && app.pageTurnAnimation_.comicSheet && app.pageTurnAnimation_.back);
+        assert(!app.pageTurnAnimation_.spread || app.pageTurnAnimation_.paperBack);
+        assert(app.pageTurnAnimation_.comicFolioCaption==oldFolio);
+        auto front=texturePixels(app,app.pageTurnAnimation_.previous.get());
+        auto reverse=texturePixels(app,app.pageTurnAnimation_.spread?app.pageTurnAnimation_.paperBack.get():app.pageTurnAnimation_.back.get());
+        assert(differingPixels(front,reverse)>front.pixels.size()/100);
+        auto fixedFooter=std::vector<Uint32>{};app.pageTurnAnimation_.dragging=true;
+        for(int progress:{0,20,40,60,80,100}) {
+            app.pageTurnAnimation_.progress=progress/100.f;
+            const auto footer=footerPixels(app);
+            if(progress==0)fixedFooter=footer;else assert(footer==fixedFooter);
+            screenshot(app,"comic-turn-"+std::to_string(progress));
+        }
+        app.pageTurnAnimation_.dragging=false;
         assert(app.comicTextureBuilds_==decodes);finish(app);
+        assert(app.currentPage_==2 && footerPixels(app)!=fixedFooter);
+        prefs=app.appSettings_.get();prefs.toolbar=false;app.appSettings_.put(prefs);
         // A touch in the empty outer margin is owned immediately, without
         // folding any background, and grips only after crossing actual paper.
         app.cancelPageTurn();app.currentPage_=0;app.setPdfView(0);app.toolbarVisible_=false;
@@ -127,6 +169,12 @@ struct AppTest {
         app.currentPage_=0;app.pdfPanX_=0;touch(app,SDL_FINGERDOWN,.94f,.5f);touch(app,SDL_FINGERMOTION,.3f,.5f);
         waitTouchTurn(app);
         assert(app.pageTurnAnimation_.dragging);touch(app,SDL_FINGERUP,.3f,.5f);finish(app);
+        auto singlePrefs=app.appSettings_.get();singlePrefs.comicLandscapeSpreads=false;app.appSettings_.put(singlePrefs);
+        app.currentPage_=0;app.pdfZoom_=1;app.pdfPanX_=app.pdfPanY_=0;app.setPdfView(0);
+        app.turnPage(1);waitComicTurn(app);assert(app.pageTurnAnimation_.active && !app.pageTurnAnimation_.spread && app.pageTurnAnimation_.back);
+        front=texturePixels(app,app.pageTurnAnimation_.previous.get());reverse=texturePixels(app,app.pageTurnAnimation_.back.get());
+        assert(differingPixels(front,reverse)>front.pixels.size()/100);
+        finish(app);singlePrefs.comicLandscapeSpreads=true;app.appSettings_.put(singlePrefs);
         app.closeBook();app.openBook(book("paper-bounds.cbz"));app.toolbarVisible_=false;
         for(float zoom:{1.f,1.01f}) {
             app.setPdfView(0);app.currentPage_=0;if(zoom>1)app.zoomPdf(zoom,.5f,.5f,true);
@@ -140,16 +188,18 @@ struct AppTest {
             for(int y=73;y<paper.y-2;++y)for(int x=seam-1;x<=seam;++x)assert((frame[y*1280+x]&0xffffff)==background);
             for(int y=paper.y+paper.h+2;y<676;++y)for(int x=seam-1;x<=seam;++x)assert((frame[y*1280+x]&0xffffff)==background);
             screenshot(app,zoom==1?"fit-bounded-spine":"zoom-bounded-spine");
-            app.turnPage(1);waitComicTurn(app);auto &turn=app.pageTurnAnimation_;assert(turn.spread && turn.comicSheet);
+            app.turnPage(1);waitComicTurn(app);auto &turn=app.pageTurnAnimation_;assert(turn.spread && turn.comicSheet && turn.back && turn.paperBack);
             assert(turn.viewport.y==paper.y && turn.viewport.h==paper.h && turn.viewport.w<640);
-            // Draw at a held progress, proving that the real paper mesh and its
-            // folio snapshots survive eviction and leave the outer chrome clear.
+            // Draw at a held progress, proving that the paper mesh survives
+            // page-cache eviction and stays inside the artwork viewport.
             app.pageCache_.clear();turn.dragging=true;
-            for(float progress:{0.f,.25f,.5f,.75f,1.f}) {
+            std::vector<Uint32> fixedFooter;
+            for(float progress:{0.f,.2f,.4f,.6f,.8f,1.f}) {
                 turn.progress=progress;frame=pixels(app);
                 for(int y=0;y<6;++y)for(int x=0;x<1280;++x)assert((frame[y*1280+x]&0xffffff)==background);
-                int footerInk=0;for(int y=676;y<720;++y)for(int x=0;x<1280;++x)footerInk+=(frame[y*1280+x]&0xffffff)!=background;
-                assert(footerInk<1000); // Folios move as ink, without a folded fullscreen background strip.
+                const std::vector<Uint32> footer(frame.begin()+676*1280,frame.end());
+                if(progress==0)fixedFooter=footer;else assert(footer==fixedFooter);
+                if(zoom==1)screenshot(app,"comic-paired-"+std::to_string(int(progress*100)),"verification/v092/ui/comic-folio");
                 screenshot(app,std::string(zoom==1?"paper-":"zoom-paper-")+std::to_string(int(progress*100)));
             }
             turn.dragging=false;finish(app);

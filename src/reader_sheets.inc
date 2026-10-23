@@ -33,7 +33,7 @@ void drawReaderSheets(int page) {
 }
 
 template<class Draw>
-PageTurnTexture captureReaderSurface(int width,int height,Draw draw,bool transparent=false) {
+PageTurnTexture captureReaderSurface(int width,int height,Draw draw,bool transparent=false,bool paperBack=false) {
     PageTurnTexture result{nullptr,SDL_DestroyTexture};
     if(!SDL_RenderTargetSupported(renderer_))return result;
     result.reset(SDL_CreateTexture(renderer_,SDL_PIXELFORMAT_RGBA8888,SDL_TEXTUREACCESS_TARGET,width,height));
@@ -45,7 +45,7 @@ PageTurnTexture captureReaderSurface(int width,int height,Draw draw,bool transpa
     Uint8 r,g,b,a;SDL_GetRenderDrawColor(renderer_,&r,&g,&b,&a);
     if(SDL_SetRenderTarget(renderer_,result.get())!=0){result.reset();return result;}
     SDL_RenderSetScale(renderer_,1,1);SDL_RenderSetViewport(renderer_,nullptr);SDL_RenderSetClipRect(renderer_,nullptr);
-    const auto paper=palette().bg;SDL_SetRenderDrawColor(renderer_,paper.r,paper.g,paper.b,transparent?0:255);
+    const auto paper=paperBack?comicPaperBackColor():palette().bg;SDL_SetRenderDrawColor(renderer_,paper.r,paper.g,paper.b,transparent?0:255);
     SDL_RenderClear(renderer_);draw();
     SDL_SetRenderTarget(renderer_,oldTarget);SDL_RenderSetScale(renderer_,sx,sy);
     SDL_RenderSetViewport(renderer_,&viewport);SDL_RenderSetClipRect(renderer_,clipped?&clip:nullptr);
@@ -54,75 +54,57 @@ PageTurnTexture captureReaderSurface(int width,int height,Draw draw,bool transpa
     return result;
 }
 
-PageTurnTexture captureComicGroup(int base,SDL_Rect bounds,bool head=false) {
+PageTurnTexture captureComicGroup(int base,SDL_Rect bounds,bool head=false,bool paperBack=false) {
     // A naturally wide scan stays one whole sheet. Pair/single transitions bend
     // its paper rectangle, never a fullscreen image containing empty margins.
     const float scale=std::min({1.f,3072.f/std::max(1,bounds.w),3072.f/std::max(1,bounds.h)});
-    return captureReaderSurface(std::max(1,int(bounds.w*scale)),std::max(1,int(bounds.h*scale)),[&]{
+    bool copied=true;
+    auto result=captureReaderSurface(std::max(1,int(bounds.w*scale)),std::max(1,int(bounds.h*scale)),[&]{
         const auto group=comicSpreadPages(base);
         const int count=comicSpreadActive()?group.second:1;
         for(int side=0;side<count;++side) {
             const int page=count==2?readerSidePage(group.first,side):group.first;
-            auto texture=comicZoomTexture(page);if(!texture)continue;
+            auto texture=comicZoomTexture(page);if(!texture){copied=false;continue;}
             const auto r=comicArtworkRect(base,side,head);
             SDL_FRect dst{(r.x-bounds.x)*scale,(r.y-bounds.y)*scale,r.w*scale,r.h*scale};
-            SDL_RenderCopyF(renderer_,texture,nullptr,&dst);
+            if(copyComicTexture(texture,dst,paperBack)!=0)copied=false;
         }
-    });
+    },false,paperBack);
+    if(!copied){comicTurnError_=catLabel("Sayfa dönüşü hazırlanamadı","Could not prepare comic turn");result.reset();}
+    return result;
 }
-void drawComicFolio(int page,SDL_Rect leaf) {
-    drawReaderCaption(std::to_string(page+1),{leaf.x+16,leaf.y,std::max(1,leaf.w-32),leaf.h},palette());
+std::string comicTurnFolioCaption(int page) {
+    const auto group=comicSpreadPages(page);
+    const int first=group.first+1,last=std::min(pageCount_,group.first+group.second);
+    const std::string range=last>first?std::to_string(first)+"–"+std::to_string(last):std::to_string(first);
+    return range+" / "+std::to_string(pageCount_);
 }
 bool prepareComicTurn(int from,int target,int direction) {
     auto &turn=pageTurnAnimation_;const auto layout=readerLayout();
     const auto oldGroup=comicSpreadPages(from),newGroup=comicSpreadPages(target);
     turn.comicSheet=true;turn.spread=comicSpreadActive() && oldGroup.second==2 && newGroup.second==2;
+    turn.comicFolioCaption=comicTurnFolioCaption(from);
     const int side=direction>0?1:0;
-    const int footer=layout.footerHeight();
     if(turn.spread) {
         turn.viewport=visibleComicRect(comicArtworkRect(from,side));
         turn.oppositeViewport=visibleComicRect(comicArtworkRect(target,1-side,true));
         const int frontPage=readerSidePage(oldGroup.first,side),backPage=readerSidePage(newGroup.first,1-side);
         turn.previous=captureTurnPage(frontPage,false,turn.viewport);
         turn.back=captureTurnPage(backPage,false,turn.oppositeViewport);
+        turn.paperBack=captureTurnPage(frontPage,true,turn.viewport);
         turn.under=captureReaderSurface(layout.width,layout.height,[&]{
             for(auto pair:{std::pair<int,int>{from,1-side},{target,side}}) {
                 const auto group=comicSpreadPages(pair.first);const auto r=comicArtworkRect(pair.first,pair.second,pair.first==target);
                 if(auto texture=comicZoomTexture(readerSidePage(group.first,pair.second)))SDL_RenderCopy(renderer_,texture,nullptr,&r);
             }
         });
-        const int leafWidth=layout.leafWidth();
-        turn.folioFront=captureReaderSurface(leafWidth,footer,[&]{drawComicFolio(frontPage,{0,0,leafWidth,footer});},true);
-        turn.folioBack=captureReaderSurface(leafWidth,footer,[&]{drawComicFolio(backPage,{0,0,leafWidth,footer});},true);
-        turn.folioUnder=captureReaderSurface(layout.width,footer,[&]{
-            drawComicFolio(readerSidePage(oldGroup.first,1-side),{(1-side)*leafWidth,0,leafWidth,footer});
-            drawComicFolio(readerSidePage(newGroup.first,side),{side*leafWidth,0,leafWidth,footer});
-        },true);
-        return turn.previous && turn.back && turn.under;
+        return turn.previous && turn.back && turn.paperBack && turn.under;
     }
     turn.viewport=comicTurnBounds(from);turn.nextViewport=comicTurnBounds(target,true);
     turn.previous=captureComicGroup(from,turn.viewport);
     turn.next=captureComicGroup(target,turn.nextViewport,true);
-    turn.folioFront=captureReaderSurface(layout.width,footer,[&]{
-        const int count=comicSpreadActive()?oldGroup.second:1;
-        for(int side=0;side<count;++side)drawComicFolio(count==2?readerSidePage(oldGroup.first,side):from,{side*layout.width/count,0,layout.width/count,footer});
-    },true);
-    turn.folioBack=captureReaderSurface(layout.width,footer,[&]{
-        const int count=comicSpreadActive()?newGroup.second:1;
-        for(int side=0;side<count;++side)drawComicFolio(count==2?readerSidePage(newGroup.first,side):target,{side*layout.width/count,0,layout.width/count,footer});
-    },true);
-    return turn.previous && turn.next;
-}
-void renderComicTurnFolios(int w,int h) {
-    if(toolbarVisible_ || appSettings_.get().toolbar)return;
-    auto &turn=pageTurnAnimation_;const int footer=readerLayout().footerHeight();
-    if(turn.spread) {
-        const int width=w/2;const SDL_Rect leaf{turn.direction>0?width:0,h-footer,width,footer};
-        PageCurlRenderer::renderSpread(renderer_,turn.folioFront.get(),turn.folioBack.get(),turn.folioUnder.get(),leaf,{0,h-footer,w,footer},turn.progress,turn.direction,.5f,0,nullptr,true);
-    } else {
-        const SDL_Rect folio{0,h-footer,w,footer};
-        PageCurlRenderer::render(renderer_,turn.folioFront.get(),turn.folioBack.get(),folio,turn.progress,turn.direction,.5f,0,nullptr,nullptr,true);
-    }
+    turn.back=captureComicGroup(from,turn.viewport,false,true);
+    return turn.previous && turn.next && turn.back;
 }
 
 bool prepareReaderTurn(int from,int target,int direction) {

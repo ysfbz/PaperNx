@@ -50,6 +50,19 @@ struct AppTest {
         assert(app.pageTurnAnimation_.active);
         app.pageTurnAnimation_.started=SDL_GetTicks()-1000;app.tickPageTurn();
     }
+    static void waitComicTurn(PaperNxApp &app) {
+        const auto deadline=SDL_GetTicks()+20000;
+        while(app.comicPendingTurn_.active && SDL_GetTicks()<deadline){app.processComicPages();SDL_Delay(2);}
+        app.processComicPages();assert(!app.comicPendingTurn_.active);
+    }
+    static void waitTouchTurn(PaperNxApp &app) {
+        const auto deadline=SDL_GetTicks()+20000;
+        while(app.pageTurnTouch_.waitingForTexture && SDL_GetTicks()<deadline) {
+            app.processComicPages();app.tickPageTurn();SDL_Delay(2);
+        }
+        assert(!app.pageTurnTouch_.waitingForTexture);
+    }
+    static void turnComicPage(PaperNxApp &app,int delta) {app.turnPage(delta);waitComicTurn(app);}
     static void touch(PaperNxApp &app,Uint32 type,float x,float y) {
         SDL_Event e{};e.type=type;e.tfinger.fingerId=8;e.tfinger.x=x;e.tfinger.y=y;
         bool running=true;app.handleEvent(e,running);assert(running);
@@ -154,8 +167,8 @@ struct AppTest {
             assert(!(r > 240 && g > 240 && b > 240)); // Absolutely never bright white
             SDL_FreeSurface(surf);
         }
-        app.turnPage(1);assert(app.pageTurnAnimation_.active);finish(app);assert(app.currentPage_==1);
-        app.turnPage(-1);finish(app);
+        turnComicPage(app,1);assert(app.pageTurnAnimation_.active);finish(app);assert(app.currentPage_==1);
+        turnComicPage(app,-1);finish(app);
         touch(app,SDL_FINGERDOWN,.92f,.2f);touch(app,SDL_FINGERMOTION,.55f,.3f);
         if(!app.pageTurnAnimation_.dragging || app.pageTurnAnimation_.anchorY>=.2f || app.currentPage_!=0)
             std::cerr<<"Comic curl state: active="<<app.pageTurnAnimation_.active<<" dragging="<<app.pageTurnAnimation_.dragging
@@ -167,14 +180,14 @@ struct AppTest {
         app.pdfPanY_=150;app.clampPdfPan();
         const auto sheet=app.comicPageRect(app.currentPage_);
         const auto nextSheet=app.comicPageRect(app.currentPage_+1,true);
-        app.turnPage(1);assert(app.pageTurnAnimation_.active && app.pdfZoom_==2 && app.pdfPanY_==0);
+        turnComicPage(app,1);assert(app.pageTurnAnimation_.active && app.pdfZoom_==2 && app.pdfPanY_==0);
         const auto &turn=app.pageTurnAnimation_;
         const auto visibleSheet=app.visibleComicRect(sheet),visibleNext=app.visibleComicRect(nextSheet);
         assert(turn.comicSheet && turn.viewport.x==visibleSheet.x && turn.viewport.y==visibleSheet.y && turn.viewport.w==visibleSheet.w && turn.viewport.h==visibleSheet.h);
         assert(turn.viewport.h>height-144 && turn.nextViewport.y==visibleNext.y && turn.nextViewport.h==visibleNext.h);
         app.pageTurnAnimation_.started=SDL_GetTicks()-210;
         snapshot(app,"zoomed-curl");finish(app);assert(app.currentPage_==2 && app.pdfZoom_==2 && app.pdfPanY_==0);
-        app.turnPage(-1);finish(app);app.turnPage(-1);finish(app);
+        turnComicPage(app,-1);finish(app);turnComicPage(app,-1);finish(app);
         touch(app,SDL_FINGERDOWN,.94f,.4f);touch(app,SDL_FINGERMOTION,.5f,.42f);
         assert(app.pageTurnAnimation_.active && app.pageTurnAnimation_.dragging);
         touch(app,SDL_FINGERUP,.5f,.42f);finish(app);assert(app.currentPage_==1 && app.pdfPanY_==0 && app.pdfZoom_==2);
@@ -227,7 +240,7 @@ struct AppTest {
         int resetW,resetH;app.getWindowSize(resetW,resetH);const auto button=app.zoomResetRect(resetW,resetH);
         app.handleTap(float(button.x+button.w/2)/resetW,float(button.y+button.h/2)/resetH);
         assert(app.pdfZoom_==1 && app.extraStyle_.pdfViewMode==0 && app.canCurlPage());
-        app.turnPage(1);assert(app.pageTurnAnimation_.active);finish(app);
+        turnComicPage(app,1);assert(app.pageTurnAnimation_.active);finish(app);
         app.openSettings(false,0);assert(app.settingsRows()==1);snapshot(app,"artwork-settings");app.dismissSettings();
         app.extraStyle_.pdfColorMode|=COMIC_READING_COLORS;app.queueStyleChange();
         assert(app.comicReadingColors());snapshot(app,"reader-palette");
@@ -250,16 +263,18 @@ struct AppTest {
         snapshot(app,"continuous");app.saveCurrentPosition();app.closeBook();app.openBook(cbz);
         assert(app.continuous() && app.currentPage_==1 && std::abs(app.scrollY_-110)<1);
         app.closeBook();app.openBook(rar);assert(app.comic() && !app.continuous() && !app.comicReadingColors());
-        app.currentPage_=0;app.turnPage(1);finish(app);app.toggleBookmark();app.closeBook();app.openBook(rar);
+        app.currentPage_=0;turnComicPage(app,1);finish(app);app.toggleBookmark();app.closeBook();app.openBook(rar);
         assert(app.currentPage_==1 && app.progressStore_.get(rar.id).bookmarks.size()==1);app.closeBook();
         auto favorite=app.progressStore_.get(manga.id);favorite.favorite=true;app.progressStore_.put(manga.id,favorite);
         app.openBook(manga);assert(app.readingDirection()==-1);app.currentPage_=0;
         touch(app,SDL_FINGERDOWN,.1f,.8f);touch(app,SDL_FINGERMOTION,.7f,.65f);
+        waitTouchTurn(app);
         assert(app.pageTurnAnimation_.dragging && app.pageTurnAnimation_.direction==-1 && app.pageTurnAnimation_.targetPage==1);
         snapshot(app,"manga-curl");touch(app,SDL_FINGERUP,.7f,.65f);finish(app);assert(app.currentPage_==1);
-        app.turnPage(1);assert(app.pageTurnAnimation_.direction==-1);finish(app);app.closeBook();
+        turnComicPage(app,1);assert(app.pageTurnAnimation_.direction==-1);finish(app);app.closeBook();
         app.openBook(broken);app.currentPage_=1;assert(!app.getOrRenderPageTexture(1));assert(!app.pageRenderError_.empty());
-        app.turnPage(1);assert(app.currentPage_==2 && app.getOrRenderPageTexture(2) && app.pageRenderError_.empty());app.closeBook();
+        turnComicPage(app,1);assert(app.currentPage_==1 && !app.pageTurnAnimation_.active && !app.comicTurnError_.empty());
+        app.currentPage_=2;assert(app.getOrRenderPageTexture(2) && app.pageRenderError_.empty());app.closeBook();
         app.browserPath_=root/"external";app.scanBrowserDirectory();assert(app.browserEntries_.size()==1);
         app.handleBrowserSelect();assert(app.comic() && app.books_.size()==7);app.closeBook();
         app.flushProgress();
