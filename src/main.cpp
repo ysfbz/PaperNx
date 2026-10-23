@@ -784,6 +784,11 @@ private:
             return readerChromePalette(presentedStyle(),false,0,0);
         return readerChromePalette(progressStore_.get("PAPERNX_DEFAULTS"),false,0,0);
     }
+    std::string paperPresetLabel(int index) const {
+        if (!ui::language && index==3) return "Doğal Kâğıt";
+        if (!ui::language && index==9) return "Yumuşak E-Mürekkep";
+        return g_paperPresets[index].name;
+    }
     int globalPaperPresetIndex() const {
         const auto defaults=progressStore_.get("PAPERNX_DEFAULTS");
         for(int i=0;i<int(sizeof(g_paperPresets)/sizeof(g_paperPresets[0]));++i) {
@@ -2706,7 +2711,7 @@ private:
                     std::clamp(p.softwareBrightness+(right?5:-5),50,100);
                 appSettings_.put(p); persistAppSettings(); dirty_=true; return;
             }
-            if(row<5) { const int order[]={0,1,4,6,7,8,2,3,5};int index=order[std::min(8,row*2+int(right))]; auto preset=g_paperPresets[index];
+            if(row<5) { const int order[]={0,1,4,6,7,8,2,3,5,9};int index=order[std::min(9,row*2+int(right))]; auto preset=g_paperPresets[index];
                 currentTheme_=preset.theme;extraStyle_.textColor=preset.text;extraStyle_.backgroundColor=preset.background; }
             if(row==5) { editColor(0); return; }
             if(row==6) { editColor(1); return; }
@@ -3340,10 +3345,10 @@ private:
             row(2,extraStyle_.indentation?"Paragraf girintisi: Açık":"Paragraf girintisi: Kapalı");
             row(3,"-    Paragraf aralığı: %"+std::to_string(extraStyle_.paragraphSpacing)+"    +");
         } else if(aaTab_==2) {
-            for(int i=0;i<9;++i) {
+            for(int i=0;i<10;++i) {
                 auto r=l.control(i/2); r.y-=int(settingsScroll_);int half=(r.w-12)/2;r.x+=(i%2)*(half+12);r.w=half;
-                const int order[]={0,1,4,6,7,8,2,3,5};auto preset=g_paperPresets[order[i]];auto colors=g_palettes[preset.theme];colors.bg=readingColor(preset.background,colors.bg);colors.header=colors.bg;colors.fg=readingColor(preset.text,colors.fg);
-                ui::button(renderer_,*typography_,r,preset.name,colors,extraStyle_.backgroundColor==preset.background && extraStyle_.textColor==preset.text);
+                const int order[]={0,1,4,6,7,8,2,3,5,9};auto preset=g_paperPresets[order[i]];auto colors=g_palettes[preset.theme];colors.bg=readingColor(preset.background,colors.bg);colors.header=colors.bg;colors.fg=readingColor(preset.text,colors.fg);
+                ui::button(renderer_,*typography_,r,paperPresetLabel(order[i]),colors,extraStyle_.backgroundColor==preset.background && extraStyle_.textColor==preset.text);
 
             }
             row(5,"Metin rengi \u00b7 Renk paleti");row(6,"Arka plan \u00b7 Renk paleti");row(7,"Tema renklerine s\u0131f\u0131rla");
@@ -3376,7 +3381,7 @@ private:
             auto p=appSettings_.get();
             const int globalPreset=globalPaperPresetIndex();
             row(0,std::string(ui::language?"General theme: ":"Genel tema: ")+
-                (globalPreset>=0?g_paperPresets[globalPreset].name:(ui::language?"Custom colors":"Özel renkler")));
+                (globalPreset>=0?paperPresetLabel(globalPreset):(ui::language?"Custom colors":"Özel renkler")));
             row(1,viewMode_==ViewMode::Grid?"Kitaplık: Kapak ızgarası":"Kitaplık: Ayrıntılı liste");
             const char *sorts[]={"Başlık","Yazar","Dosya adı","Değiştirilme","Son okunan"};
             row(2,std::string("Sıralama: ")+sorts[static_cast<int>(sort_)]);
