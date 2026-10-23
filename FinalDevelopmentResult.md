@@ -358,3 +358,22 @@ Bu bölüm, ana v0.9.2 hardening görevinin devamıdır; release hazırlığı v
 | Switch / full CTest / ASan-UBSan / fiziksel cihaz / performans matrisi | **NOT RUN / UNVERIFIED** | G5 değişiklikleri için Switch build tekrarlanmadı; fiziksel SD/izin davranışı, full suite ve 100/500/1000 cover ölçümleri açık. Hızlanma iddiası yok. |
 
 **Karar: INCOMPLETE — BLOCKERS REMAIN.** Güvenli tarama davranışı ve hedefli testler tamamlandı; scanner/index ve parser için talep edilen bağımsız yeniden tasarım tamamlanmış değil. G6 cache ölçümü/temizliği, G7 Ponytail ve reader regresyon audit'i, full current-HEAD test kapısı ve fiziksel Switch doğrulamaları sürüyor. Release, tag, PR, merge veya GitHub Actions çalıştırılmadı.
+
+## P. 2026-10-24 — G6 kapak cache sayaçları ve sentetik ölçüm
+
+- **Dal:** `feature/v0.9.2-complete-reader-enhancements`.
+- **Kaynak commit:** `52164e7c8eb45ded2898998ea99152400f095979` (`feat(cover): expose disk cache hit and miss stats`).
+- **G6 kanıt/docs commit:** `183718511e6a2c5387bff9347db0d1f96c5b6f3d` (`docs(v0.9.2): record G6 cover cache evidence`). Bu rapor eklentisi sonraki dokümantasyon commit'inde kaydedilecek.
+- Ayarlar ekranı artık disk cache entry/byte toplamının yanında hit/miss sayılarını gösteriyor. `thumbWorkerLoop()` sayaçları hit, miss ve yazımdan sonra yeniliyor; SDL bellek texture hit'leri bu disk istatistiğine dahil edilmiyor. TR/EN etiketler ve sayaç sözleşmesi testli.
+- 32 MiB/512-entry ayarı değişmedi. Beş sentetik koşuda cache 100 placeholder için 100, 500 için 354 ve 1000 için 354 görsel tuttu. 1000 örnekte warm disk lookup 354 hit/646 miss verdi. Ölçüm açıklaması ve sınırları `docs/V092_COVER_BENCHMARK.md`; ham çıktı `verification/v092/cover-benchmark/synthetic-container-runs.txt`.
+
+### Gerçek doğrulama
+
+| Kontrol | Sonuç | Kanıt |
+|---|---|---|
+| Desktop hedef derleme | **PASS** | `docker compose run --rm desktop bash -lc 'cmake --build build-desktop --target PaperNX papernx_cover_tests papernx_cover_performance_tests papernx_localization_tests --parallel 4'`. |
+| Hedefli CTest | **PASS, 3/3** | `papernx_cover_tests`, `papernx_cover_performance_tests`, `papernx_localization_tests`; aynı komut zincirinde CTest çalıştırıldı. Güvenli clear, kullanıcı dosyası korunumu, bütçe/yenileme, hit/miss sayaç state'i ve TR/EN etiketleri kapsandı. |
+| Sentetik 100/500/1000 ölçek ölçümü | **5 koşu kaydedildi; gerçek performans kabulü değil** | Placeholder `.epub` dosyaları ve sabit RGB bitmap'ler; cache repository I/O dışında MuPDF, renderer, gerçek arşiv, UI frame veya Switch SD ölçülmedi. Medyan/p95 ve raw log benchmark belgesinde. |
+| Gerçek belge decode/reopen, UI latency, RAM, baseline, Switch ve tam test zinciri | **NOT RUN / UNVERIFIED** | G6 için yapılmadı. Performans iyileşmesi iddiası yok; `COVER-01` açık. |
+
+**Karar: INCOMPLETE — BLOCKERS REMAIN.** Kapak cache istatistikleri görünür ve ölçüm raporu tekrarlanabilir; gerçek belge ölçeği ve fiziksel cihaz ölçümleri doğrulanmadı. Eski 32 MiB budget korunuyor. Mevcut untracked `docs/V092_FINALIZATION_EXECUTION_PLAN.md` ve `tests/fixtures/comics/performance-37.cbr` bu commitlere alınmadı; release, tag, PR, merge veya workflow çalıştırılmadı.
