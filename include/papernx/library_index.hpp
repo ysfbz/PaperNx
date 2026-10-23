@@ -7,13 +7,14 @@
 namespace papernx {
 // Disposable inventory; rescans never rewrite reading progress or user metadata.
 std::vector<Book> loadLibraryInventory(const fs::path &path);
-struct LibraryScanResult {std::vector<Book> books;std::string error;bool cached{false};};
+struct LibraryScanResult {std::vector<Book> books;std::string error;bool cached{false},cancelled{false};};
 class LibraryScanner {
 public:
     ~LibraryScanner(){stop();}
     bool start(std::vector<fs::path> roots,std::vector<Book> known,fs::path inventory);
     bool pending() const {return worker_.joinable();}
     bool ready() const {return ready_.load();}
+    void cancel() {cancel_.store(true);}
     std::optional<LibraryScanResult> take();
     void stop();
 private:

@@ -58,13 +58,18 @@ bool LibraryScanner::start(std::vector<fs::path> roots,std::vector<Book> known,f
 #if defined(__cpp_exceptions)
         } catch(const std::exception &error) {result.error=error.what();}
 #endif
-        if(!cancel_){result_=std::move(result);ready_.store(true);}
+        result.cancelled=cancel_.load();
+        result_=std::move(result);ready_.store(true);
     });
     return true;
 }
 std::optional<LibraryScanResult> LibraryScanner::take() {
     if(!ready_)return std::nullopt;
-    worker_.join();ready_=false;return std::move(result_);
+    worker_.join();
+    auto result=std::move(result_);
+    result.cancelled=result.cancelled||cancel_.load();
+    ready_=false;cancel_=false;
+    return result;
 }
 void LibraryScanner::stop() {cancel_=true;if(worker_.joinable())worker_.join();ready_=false;}
 } // namespace papernx

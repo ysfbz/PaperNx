@@ -3084,7 +3084,7 @@ private:
         } else if(aaTab_==5) {
             auto p=appSettings_.get();
             if(row==9){openChoice(10,0);return;}
-            if(row==11){startLibraryScan();return;}
+            if(row==11){if(libraryScanner_.pending()){libraryScanAgain_=false;libraryScanner_.cancel();dirty_=true;}else startLibraryScan();return;}
             if(row==12){openChoice(8,p.interfaceStyle);return;}
             if(row==13){openChoice(9,p.interfaceAccent);return;}
             if(row==14){p.automaticUpdateCheck=!p.automaticUpdateCheck;appSettings_.put(p);persistAppSettings();return;}
@@ -3764,7 +3764,7 @@ private:
             row(8,ui::label("Expanded reading area")+": "+ui::label(p.expandedViewport?"On":"Off"));
             row(9,ui::label("Book folders")+": "+std::to_string(p.libraryFolders.size()+1));
             row(10,ui::label("Scan on launch")+": "+ui::label(p.scanOnLaunch?"On":"Off"));
-            row(11,ui::label(libraryScanner_.pending()?"Scanning library...":"Scan library now"));
+            row(11,ui::label(libraryScanner_.pending()?"Cancel library scan":"Scan library now"));
             const char *styles[]={"Dark","Light","Follow reading theme"};
             const char *accents[]={"Purple","Blue","Teal","Green","Orange","Red","Pink"};
             row(12,ui::label("Interface appearance")+": "+ui::label(styles[p.interfaceStyle]));

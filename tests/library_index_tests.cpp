@@ -29,6 +29,12 @@ int main() {
     assert(custom && replaced);
     // Removing a scan root retains already-opened, existing files, without touching progress.
     assert(scanner.start({},second.books,inventory));assert(wait(scanner).books.size()==299);
+    const auto inventoryBeforeCancel=loadLibraryInventory(inventory);
+    assert(scanner.start({root/"books"},second.books,inventory));scanner.cancel();
+    auto cancelled=wait(scanner);assert(cancelled.cancelled);
+    assert(loadLibraryInventory(inventory).size()==inventoryBeforeCancel.size());
+    assert(scanner.start({root/"books"},second.books,inventory));
+    auto restarted=wait(scanner);assert(!restarted.cancelled && restarted.books.size()==299);
     assert(scanner.start({root/"books"},{},inventory));scanner.stop();assert(!scanner.ready() && !scanner.pending());
     assert(loadLibraryInventory(inventory).size()==299);
     const auto broken=root/"data"/"broken-inventory.txt";std::ofstream(broken)<<"damaged inventory";

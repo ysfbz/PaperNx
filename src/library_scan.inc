@@ -26,7 +26,7 @@ void restoreLibraryLabels() {
     }
 }
 void startLibraryScan() {
-    if(libraryScanner_.pending()){libraryScanAgain_=true;return;}
+    if(libraryScanner_.pending()){libraryScanAgain_=true;libraryScanner_.cancel();dirty_=true;return;}
     std::vector<fs::path> roots{root_/"books"};
     for(const auto &folder:appSettings_.get().libraryFolders)roots.push_back(fs::u8path(folder));
     scanKnownIds_.clear();for(const auto &book:books_)scanKnownIds_.insert(book.id);
@@ -35,6 +35,11 @@ void startLibraryScan() {
 void processLibraryScan() {
     if(!activeFingers_.empty() || pointerActive_ || !libraryScanner_.ready())return;
     auto result=libraryScanner_.take();if(!result)return;
+    if(result->cancelled) {
+        dirty_=true;
+        if(libraryScanAgain_){libraryScanAgain_=false;startLibraryScan();}
+        return;
+    }
     std::string selected;
     if(selectedBookIdx_>=0 && selectedBookIdx_<int(visibleBooks_.size()))selected=visibleBooks_[selectedBookIdx_].id;
     std::unordered_map<std::string,Book> current;current.reserve(books_.size());
