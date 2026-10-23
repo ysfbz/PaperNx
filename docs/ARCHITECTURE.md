@@ -5,6 +5,10 @@ Bu doküman mimari tasarım kararlarını ve sistem bileşenlerini içerir. Gün
 PaperNX çevrimdışı, bellek tasarruflu bir C++17 uygulamasıdır:
 - `src/main.cpp`: SDL olay döngüsü, ekran durum makinesi, dokunmatik hareketler ve kumanda yönlendirme ayrıştırması.
 - `src/core.cpp`: Dosya tarama, meta veri ayrıştırma, doğal alfabetik/sayısal sıralama (`compareNatural`) ve kalıcı veri depoları.
+- `src/library_index.cpp` / `src/library_scan.inc`: UI dışı çoklu kök taraması ve disposable envanter önbelleği. Dosya keşfi mevcut `core::scan` yolunu kullanır; sonuçlar SDL olay döngüsünde yayımlanır.
+- `src/self_update.cpp` / `src/self_update_ui.inc`: Sabit PaperNX GitHub kaynağına libcurl TLS erişimi, NRO doğrulama ve kullanıcı onaylı aşamalı kurulum. CA trust dosyası `romfs/cacert.pem` içindedir.
+- `include/papernx/theme.hpp`: Okuma ve uygulama ekranlarının ortak tema token'ları; Light, Dark, Follow Reading ve vurgu paletleri burada çözülür.
+- `src/main.cpp`: App settings girişlerini yönlendirir; yazılımsal dimmer her platformda çalışır ve Switch arka ışığı uygun handheld/service koşullarında geçici olarak değiştirilip eski değerine döndürülür.
 - `src/mupdf_bridge.c`: C11 izolasyon sınırında MuPDF API entegrasyonu (`fz_try`/`fz_catch`), bellek havuzu denetimi, EPUB/PDF belge entegrasyonu ve çizgi roman köprüsü.
 - `src/typography.cpp`: SDL_ttf metin dizimi ve font önbellekleme.
 - `src/page_cache.cpp`: LRU doku (texture) yaşam döngüsü ve bellek bütçesi yönetimi.

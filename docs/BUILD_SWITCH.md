@@ -23,11 +23,11 @@ docker compose run --rm switch bash scripts/verify-switch.sh
 
 The script validates/downloads MuPDF 1.23.11 with pinned source SHA256 `478f2a167feae2a291c8b8bc5205f2ce2f09f09b574a6eb0525bfad95a3cfe66`, verifies/reuses the AArch64 prefix, captures source/build receipts, runs `make all -B -j4`, inspects ELF/NRO/NACP/branding/RomFS, collects SDK/MuPDF license notices, packages `dist/v0.9.1/` and verifies ZIP integrity.
 
-The Dockerfile pins its base-image digest (`devkitpro/devkita64:20240915`).
+The Dockerfile pins the devkitA64 base-image digest and updates the devkitPro package index during image construction. Its declared package set includes `switch-curl`, required by the native updater, plus the Switch SDL, archive and compression dependencies. `Makefile` links `-lcurl` inside the static-library group. The hardening audit used `make all` directly; it did not run the release packaging script.
 
 ## NACP and assets
 
-[Makefile](../Makefile) defines `APP_TITLE = PaperNX`, `APP_AUTHOR = Yusuf Buzrul`, `APP_VERSION = 0.9.1`, `ICON = assets/branding/PaperNX-icon-switch.jpg` and `ROMFS = romfs`. The RomFS bundles Noto Sans Regular/SemiBold, Noto Serif and its OFL notice.
+[Makefile](../Makefile) defines `APP_TITLE = PaperNX`, `APP_AUTHOR = Yusuf Buzrul`, `APP_VERSION = 0.9.1`, `ICON = assets/branding/PaperNX-icon-switch.jpg` and `ROMFS = romfs`. The RomFS bundles Noto Sans Regular/SemiBold, Noto Serif and its OFL notice, plus `cacert.pem` for updater TLS verification. The Switch build requires devkitPro's `switch-curl` package (libcurl's libnx TLS backend); its declared `switch-zlib` and `libnx` dependencies are installed by the build image. The CMake desktop target likewise requires libcurl and links its discovered transitive dependencies.
 
 ## Distribution files
 

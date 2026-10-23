@@ -28,6 +28,51 @@
 | SDL on-screen UX and Joy-Con/manual gesture coverage | UNVERIFIED | No attached desktop/physical Switch session available. |
 | Build and native Switch NRO | SKIP | Explicitly reserved for later verification prompt. |
 | ASan/UBSan, stress archive, full Docker chain | SKIP | Explicitly reserved for later verification prompt. |
+
+---
+
+## G. 2026-10-23 — Complete code hardening and independent reimplementation audit
+
+### Repository state
+
+- Work branch: `feature/v0.9.2-complete-reader-enhancements`.
+- Main comparison base: `8db85384a1b6c277c74766601ef46e9a672328df`; fork reference: `d2b4bcfd10b1a66043c5b8cd36da08340cffec6d`.
+- Source commits from this pass: `913fb8f` (updater/Switch integration) and `1cb06a1` (regression tests). Documentation is being committed separately. No main merge, release, tag, PR or GitHub Actions run.
+- Version remains 0.9.1.
+
+### Implemented changes
+
+- Made desktop CMake require libcurl for the updater, linked Switch `-lcurl`, added `switch-curl` to the build image and validated `romfs/cacert.pem` before packaging. Exported the absolute MuPDF prefix through recursive Make so the actual linker uses it.
+- Added the Mozilla-derived MPL-2.0 CA bundle and its source/checksum/license record. The built Switch NRO contains all 118 certs and the exact 200,116-byte source bundle.
+- Reworked updater trust, bounded HTTPS transfer, cancel/cleanup, NRO identity/version/hash checks, available-space validation, durable staging, deferred install and first-frame startup confirmation. Automatic checks are off by default; manual checks remain available. The installed old NRO is retained until confirmation.
+- Persisted brightness values with consistent 50–100% software and 10–100% system bounds. Added a touch-draggable slider and controller stepping; hardware backlight control is guarded by handheld mode, auto-brightness checks and original-value restoration, with software fallback.
+- Removed the duplicate interface theme header and resolved interface palettes through existing theme tokens. Fixed curl preference handling and clipped spread turns to visible reader bounds.
+- Updated legacy UI tests to wait for the intended asynchronous scan and fixed stale fixture/geometry assertions. Added updater HTTPS integration and settings/slider persistence coverage.
+- Added [`docs/V092_SOURCE_PROVENANCE_AUDIT.md`](docs/V092_SOURCE_PROVENANCE_AUDIT.md), updated [`docs/V092_DEVELOPMENT_MATRIX.md`](docs/V092_DEVELOPMENT_MATRIX.md) and [`docs/UPDATER.md`](docs/UPDATER.md), and recorded outstanding work in [`docs/V092_CONTINUATION_STATE.md`](docs/V092_CONTINUATION_STATE.md).
+
+### Checks actually run
+
+| Check | Result | Evidence |
+|---|---|---|
+| Full native CTest | **PASS — 29/29** | `build-native/Testing/Temporary/LastTest.log`; Docker desktop image. |
+| Comic performance focused CTest | **PASS — 3/3** | 37-page RAR5 fixture; 57 ms idle/toolbar, 486 ms/30 curl frames, 182 ms/30 spread-pan frames; zero UI rasterizations in measured loops. No before/after comparison, so no speedup is claimed. |
+| Switch image/dependencies | **PASS** | `docker compose build switch`; devkitPro confirmed `switch-curl 7.69.1-5` and transitive system packages. |
+| Switch cross-build/link | **PASS** | `docker compose run --rm switch bash -lc 'make all'`; built `PaperNX.elf` and `PaperNX.nro`, with libcurl linked. |
+| NRO/ELF/RomFS validation | **PASS** | Built from source commit `1cb06a135dc30dfff676a7124e2602b2ed06cc4f`; `scripts/verify_artifacts.py --version 0.9.1` confirmed AArch64 ELF, NRO assets and 118 embedded CA certs. NRO SHA-256 `a99bd4f5287a0843d0d8a9aa7087db0bbe0840f33e67122674cacbd8edf8c167`. Report: `verification/artifacts.json`. |
+| Physical Switch runtime/backlight/input/TLS | **UNVERIFIED** | No console was available. |
+| Cover scale benchmark 100/500/1000 books and cold/warm counts | **NOT RUN** | No before/after evidence; cache limits unchanged. |
+
+### Source origin, Ponytail and remaining risks
+
+- Current byte comparison confirms `src/library_scan.inc`, `src/library_index.cpp`, `include/papernx/library_index.hpp`, and `src/update_json.hpp` still match the pinned fork. They remain AGPL-derived/adapted and attributed; they are **not** described as independent reimplementations. `src/self_update.cpp` was materially redesigned but conservatively retains adapted-code classification. `interface_theme.hpp` was removed in favor of the existing theme token owner. Page cache and curl were already shared in v0.9.1 and were not rewritten solely to alter hashes.
+- The user-requested independent reimplementation objective therefore remains incomplete. Historical completion labels are explicitly superseded in the dated matrix section.
+- The updater can roll back a candidate that fails before first-frame confirmation, but there is a power-loss interval between the two install renames. If `PaperNX.nro` is absent, automatic recovery cannot start; restore `.old` manually from a file manager/computer. This path is documented and untested on hardware, so the updater is not power-loss-proof.
+- Measured comic timings use SDL's Docker software renderer and establish no improvement without a baseline. Cover latency, metadata/archive reopen counts, device FPS/RAM and requested library-size scenarios remain unverified.
+- Ponytail changes addressed concrete build-path loss, duplicated theme tokens, reader clipping/preference behavior and test assumptions. The approximately 3,900-line `src/main.cpp` remains large; a broad move was not made without narrower regression boundaries.
+
+### Readiness decision
+
+**INCOMPLETE — BLOCKERS REMAIN.** Native tests and Switch cross-build pass, and the CA/link integration is verified. The independence requirement for fork-identical modules, updater power-loss recovery, requested large-library performance evidence and physical device behavior remain open. Do not call this release-ready. Code commits are `913fb8f` and `1cb06a1`; this report and the other audit documents are committed separately on the feature branch. The final report commit is the active branch HEAD at completion.
 | Hardware backlight API capability | UNVERIFIED | libnx service permissions and HOME/suspend restore have not been verified. |
 
 No CTest PASS count, memory/FPS improvement or NRO-size delta is asserted.
