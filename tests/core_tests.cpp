@@ -572,6 +572,7 @@ int main() {
         assert(settings.get().language == 1);
         AppPreferences app; app.uiTheme = 2; app.language = 0; app.libraryLayout = 1; // set to Turkish (0)
         app.sort = 4; app.toolbar = 1; app.defaultBrowserPath = "sdmc:/Kitaplar/Çiçek";
+        app.softwareBrightness = 65;
         // Old independent chrome settings are migrated into unified mode.
         app.chromePolicy=2;app.customUiTheme=4;
         settings.put(app);
@@ -582,14 +583,18 @@ int main() {
         assert(restart.get().uiTheme == 2 && restart.get().language == 0 && restart.get().libraryLayout == 1);
         assert(restart.get().chromePolicy==0); // Never resurrect legacy custom chrome.
         assert(restart.get().sort == 4 && restart.get().toolbar == 1 && restart.get().defaultBrowserPath == app.defaultBrowserPath);
+        assert(restart.get().softwareBrightness == 65); // Value survives restart.
         std::ofstream(path, std::ios::trunc) << "corrupt cache must recover settings";
         assert(restart.load() && restart.get().sort == 4 && restart.get().language == 0);
         // Switch to English (1) and verify persistence
         app.language = 1;
         settings.put(app); assert(settings.save());
         AppSettingsStore restartEn(path); assert(restartEn.load() && restartEn.get().language == 1);
-        app.uiTheme = -100; app.language = 99; app.sort = 999;
+        app.uiTheme = -100; app.language = 99; app.sort = 999; app.softwareBrightness = -15;
         settings.put(app); assert(settings.get().uiTheme == 0 && settings.get().language == 1 && settings.get().sort == 4);
+        assert(settings.get().softwareBrightness == 50); // Never black out the interface.
+        app.softwareBrightness = 500; settings.put(app);
+        assert(settings.get().softwareBrightness == 100);
     }
     tracker.onFingerDown(.25f, .5f, 1);
     assert(tracker.onFingerUp(.27f, .51f, 1).type == GestureType::TapLeft);
