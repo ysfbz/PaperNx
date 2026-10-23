@@ -259,3 +259,11 @@ Bu bölüm, ana v0.9.2 hardening görevinin devamıdır; release hazırlığı v
 - **Provenance:** current module blobs are refreshed in `V092_SOURCE_PROVENANCE_AUDIT.md`; changed source still retains fork-derived classification and author/license notices. Independent scanner/index redesign remains open.
 
 **Karar: INCOMPLETE — BLOCKERS REMAIN.** Kod commit'i `faecf30`, queued scan test commit'i `8c38513`, provenance/continuation dokümantasyon commit'i `4335ec1`'dir. Bu rapor kaydı ayrı commit olarak eklenecektir. Release/tag/PR/merge/Actions yok.
+
+## K. 2026-10-24 — Güncel Branch HEAD / Kaynak Snapshot Ayrımı
+
+- Kaynak kimliği doğrulanırken remote branch HEAD `ed9e3b69c184de1b488c9726c660dacdef1635b2`, source-bearing commit ise `faecf30eb4fb12fd143d3c1666d91f0b690b484c` idi. `ed9e3b6` rapor-only olduğu için altı fork-path blob karşılaştırması değişmedi. Branch/source HEAD ayrımını düzelten dokümantasyon commit'i `89820d3` source dosyalarını değiştirmez.
+- `V092_SOURCE_PROVENANCE_AUDIT.md` ve `V092_CONTINUATION_STATE.md` bu ayrımı açıkça yazar. Güncel branch HEAD'de beş mevcut dosya fork blob'undan farklı, tema header'ı silinmiş; tüm fork kökeni/attribution korunuyor.
+- Bu ek belge denetimi için test çalıştırılmadı; son kod doğrulaması `faecf30` source checkpoint'inde: hedefli library CTest 2/2 ve Switch build/artifact validation PASS. Full suite güncel checkpoint'te NOT RUN.
+
+**Karar: INCOMPLETE — BLOCKERS REMAIN.** Bağımsız scanner/index/parser yeniden tasarımı, canonical NRO bulunmadığında otomatik güç-kesintisi kurtarması, fiziksel Switch testleri ve kapsamlı performans ölçümleri açık.
