@@ -117,6 +117,7 @@ struct LoadedMetadata {
 
 class PaperNxApp {
 public:
+    static constexpr int QUICK_HEADER_HEIGHT=112;
     explicit PaperNxApp(fs::path rootPath,std::shared_ptr<SelfUpdater> updater=std::make_shared<SelfUpdater>())
         : root_(std::move(rootPath)),
           updater_(std::move(updater)),
@@ -864,7 +865,7 @@ private:
 
     ReaderLayout epubLayout(int w,int h,const ReaderPreferences &style) const {
         const auto &prefs=appSettings_.get();
-        return {w,h,std::clamp(style.margin,0,120),prefs.landscapeSpreads && w>h && !style.readingMode,prefs.expandedViewport};
+        return {w,h,std::clamp(style.margin,0,120),prefs.bookLandscapeSpreads && w>h && !style.readingMode,prefs.expandedViewport};
     }
     ReaderLayout readerLayout() {
         int w,h;getWindowSize(w,h);
@@ -872,7 +873,7 @@ private:
         const bool spread=comic()?comicSpreadPages(currentPage_).second==2:
             (px_document_is_epub(doc_) || std::abs(pdfZoom_-1.f)<.01f);
         return {w,h,std::clamp(presentedStyle().margin,0,120),
-            prefs.landscapeSpreads && w>h && !continuous() && spread,prefs.expandedViewport};
+            (comic()?prefs.comicLandscapeSpreads:prefs.bookLandscapeSpreads) && w>h && !continuous() && spread,prefs.expandedViewport};
     }
     int readerTurnTarget(int page,int steps) {
         if(comicSpreadActive())return comicTurnTarget(page,steps);
@@ -1168,21 +1169,54 @@ private:
             std::string("Sırala: ")+sorts[static_cast<int>(sort_)],viewMode_==ViewMode::Grid?"Liste görünümüne geç":"Kapak ızgarasına geç",
             "Kitaplığı yenile","Yardım / dokunma rehberi","PaperNX’ten çık",catLabel("Yazarlar, türler ve koleksiyonlar","Authors, genres and collections"),catLabel("Ekran yönü · Yatay / Dikey","Display orientation · Landscape / Portrait"),catLabel("Günlüğüm","My journal")};
     }
+    std::string quickSpreadLabel() const {
+        const auto &prefs=appSettings_.get();
+        const bool enabled=doc_&&comic()?prefs.comicLandscapeSpreads:prefs.bookLandscapeSpreads;
+        if(!doc_)return catLabel(enabled?"Kitap · Çift sayfa: Açık":"Kitap · Çift sayfa: Kapalı",
+                                 enabled?"Books · Double page: On":"Books · Double page: Off");
+        return catLabel(enabled?"Çift sayfa: Açık":"Çift sayfa: Kapalı",
+                        enabled?"Double page: On":"Double page: Off");
+    }
+    SDL_Rect quickPageShortcut(SDL_Rect r) const {
+        const int width=(r.w-36)/2;
+        return {r.x+12,r.y+48,width,52};
+    }
+    SDL_Rect quickOrientationShortcut(SDL_Rect r) const {
+        const auto pages=quickPageShortcut(r);
+        return {pages.x+pages.w+12,pages.y,pages.w,pages.h};
+    }
+    bool toggleQuickMenu() {
+        if(quickMenu_) {quickMenu_=helpMenu_=false;dirty_=true;return true;}
+        if(updateDialog_ || choiceKind_>=0 || colorEditing_>=0 || settingsEditing_ || screen_==ScreenState::AaModal || catalogPanel_!=CatalogPanel::None || searchActive_ ||
+           (screen_==ScreenState::ReadingJournal && journalUI_.hasSubpage()) ||
+           coverClearConfirm_ || screen_==ScreenState::TocModal || screen_==ScreenState::BookmarksModal || screen_==ScreenState::JournalPreview)
+            return false;
+        quickMenu_=true;helpMenu_=false;quickScroll_=0;quickFocus_=0;listVelocity_=scrollVelocity_=0;dirty_=true;
+        return true;
+    }
+    void toggleLandscapeSpreads() {
+        if(doc_)saveCurrentPosition();
+        auto prefs=appSettings_.get();
+        if(doc_&&comic())prefs.comicLandscapeSpreads=!prefs.comicLandscapeSpreads;
+        else prefs.bookLandscapeSpreads=!prefs.bookLandscapeSpreads;
+        appSettings_.put(prefs);persistAppSettings();applyReaderLayoutOptions();
+    }
     SDL_Rect quickSheet(int w,int h) const {
-        int width=std::min(460,w-32),height=std::min(h-96,76+int(quickActions().size())*60);
+        int width=std::min(460,w-32),height=std::min(h-96,QUICK_HEADER_HEIGHT+int(quickActions().size())*60);
         if(helpMenu_) height=std::min(560,h-96);
         return {w-width-16,80,width,height};
     }
     void handleQuickMenuTap(int px,int py,int w,int h) {
         auto r=quickSheet(w,h);
         if(helpMenu_ || !ui::contains(r,px,py)) { quickMenu_=helpMenu_=false; dirty_=true; return; }
-        // Fixed header shortcut: visible without scrolling the long action list.
-        if(ui::contains({r.x+r.w-164,r.y+4,148,56},px,py)){
+        // Fixed header shortcuts remain visible while the long action list scrolls.
+        if(ui::contains(quickPageShortcut(r),px,py)) {quickMenu_=false;toggleLandscapeSpreads();return;}
+        if(ui::contains(quickOrientationShortcut(r),px,py)){
             quickMenu_=false;openChoice(1,appSettings_.get().displayOrientation);return;
         }
-        int index=int(py-r.y-64+quickScroll_)/60;
+        int index=int(py-r.y-QUICK_HEADER_HEIGHT+quickScroll_)/60;
         auto actions=quickActions();
-        if(py<r.y+64 || index<0 || index>=int(actions.size())) return;
+        if(py<r.y+QUICK_HEADER_HEIGHT || index<0 || index>=int(actions.size())) return;
         std::string action=actions[index]; quickMenu_=false;
         if(action==ui::label("Add this folder")){addBrowserFolder();return;}
         if(action==ui::label("Check for update")){checkForUpdate();return;}
@@ -1236,9 +1270,11 @@ private:
     }
     void renderQuickMenu(int w,int h,const ThemePalette &pal) {
         auto r=quickSheet(w,h); ui::elevated(renderer_,r,pal);
-        typography_->renderText(renderer_,typography_->smallFont(),ui::label(helpMenu_?"DOKUNMA REHBERİ · Kapatmak için dokun":"HIZLI İŞLEMLER"),r.x+20,r.y+12,pal.muted,r.w-200);
-        if(!helpMenu_)ui::button(renderer_,*typography_,{r.x+r.w-164,r.y+4,148,56},
-                                 catLabel("Yatay / Dikey","Rotate"),pal);
+        typography_->renderText(renderer_,typography_->smallFont(),ui::label(helpMenu_?"DOKUNMA REHBERİ · Kapatmak için dokun":"HIZLI İŞLEMLER"),r.x+20,r.y+12,pal.muted,r.w-40);
+        if(!helpMenu_) {
+            ui::button(renderer_,*typography_,quickPageShortcut(r),quickSpreadLabel(),pal);
+            ui::button(renderer_,*typography_,quickOrientationShortcut(r),catLabel("Yatay / Dikey","Portrait / landscape"),pal);
+        }
         if(helpMenu_) {
             int y=r.y+58; int metadataLines=0;
             std::vector<std::string> lines={"+ tüm işlemleri açar.","Kitaplarınızı dokunarak açın.","Listeleri parmağınızla sürükleyin.","Sayfalı: Kenarlara dokun / yatay kaydır.","Sürekli: Yukarı / aşağı sürükle.","PDF: İki parmakla yakınlaştır, sürükle.","Okuma ayarları tüm kitaplarda ortaktır.","Bu kitap seçeneği özel ayar oluşturur.","Kitaplarınız ve kayıtlarınız cihazda kalır."};
@@ -1254,9 +1290,9 @@ private:
             for(const auto &line:lines) { typography_->renderText(renderer_,typography_->smallFont(),lineIndex++<metadataLines?line:ui::label(line),r.x+20,y,pal.fg,r.w-40); y+=38; }
             SDL_RenderSetClipRect(renderer_,nullptr);
         } else {
-            SDL_Rect clip{r.x,r.y+64,r.w,r.h-64}; SDL_RenderSetClipRect(renderer_,&clip);
+            SDL_Rect clip{r.x,r.y+QUICK_HEADER_HEIGHT,r.w,r.h-QUICK_HEADER_HEIGHT}; SDL_RenderSetClipRect(renderer_,&clip);
             auto actions=quickActions(); for(int i=0;i<int(actions.size());++i)
-                ui::menuRow(renderer_,*typography_,{r.x+12,r.y+64+i*60-int(quickScroll_),r.w-24,56},actions[i],pal,false,i==quickFocus_);
+                ui::menuRow(renderer_,*typography_,{r.x+12,r.y+QUICK_HEADER_HEIGHT+i*60-int(quickScroll_),r.w-24,56},actions[i],pal,false,i==quickFocus_);
             SDL_RenderSetClipRect(renderer_,nullptr);
         }
     }
@@ -1271,7 +1307,7 @@ private:
     }
     float maxUiScroll() {
         int w,h; getWindowSize(w,h);
-        if(quickMenu_) return std::max(0,int(quickActions().size())*60-(quickSheet(w,h).h-64));
+        if(quickMenu_) return std::max(0,int(quickActions().size())*60-(quickSheet(w,h).h-QUICK_HEADER_HEIGHT));
         if(screen_==ScreenState::ReadingJournal) return float(journalUI_.maxScrollY());
         if(screen_==ScreenState::AaModal) return std::max(0,settingsRows()*64-ui::SettingsLayout(w,h).content.h);
         if(screen_==ScreenState::FileBrowser) return std::max(0,int(browserEntries_.size())*64-(h-128));
@@ -2835,7 +2871,7 @@ private:
 
         if(quickMenu_) { handleQuickMenuTap(px,py,w,h); return; }
         listVelocity_=0;
-        if(px>=w-80 && py>=8 && py<72) { quickScroll_=0; quickMenu_=true; helpMenu_=false; scrollVelocity_=0; dirty_=true; return; }
+        if(ui::contains({w-80,8,64,64},px,py)) { toggleQuickMenu(); return; }
         // Dismiss any active error banner on tap
         if (!currentErrorMessage_.empty()) {
             currentErrorMessage_.clear();
@@ -2967,7 +3003,7 @@ private:
         int row=-1; for(int i=0;i<settingsRows();++i) if(ui::contains(l.control(i),px,py+int(settingsScroll_)) && ui::contains(l.content,px,py)) row=i;
         if(row<0) return;
         aaRow_=row;
-        if(aaTab_!=5 || row!=17) coverClearConfirm_=false;
+        if(aaTab_!=5 || row!=16) coverClearConfirm_=false;
         bool right=px>=l.content.x+l.content.w/2;
         if(numericSetting()) {
             auto rect=l.control(row);rect.y-=int(settingsScroll_);int hit=ui::StepperLayout(rect).hit(px,py);
@@ -2991,6 +3027,7 @@ private:
             if(row==1) currentTextAlign_=1-currentTextAlign_;
             if(row==2) extraStyle_.indentation=extraStyle_.indentation?0:120;
             if(row==3) extraStyle_.paragraphSpacing=std::clamp(extraStyle_.paragraphSpacing+(right?20:-20),0,200);
+            if(row==4) {toggleLandscapeSpreads();return;}
         } else if(aaTab_==2) {
             if(row<5) { const int order[]={0,1,4,6,7,8,2,3,5,9};int index=order[std::min(9,row*2+int(right))]; auto preset=g_paperPresets[index];
                 currentTheme_=preset.theme;extraStyle_.textColor=preset.text;extraStyle_.backgroundColor=preset.background; }
@@ -3033,6 +3070,7 @@ private:
             if(row==4) extraStyle_.touchZone=std::clamp(extraStyle_.touchZone+(right?5:-5),20,40);
             extraStyle_.modeOverride=doc_ && extraStyle_.styleOverride;
         } else if(aaTab_==4) {
+            if(comic() && row==7) {toggleLandscapeSpreads();return;}
             if(row<3) {
                 extraStyle_.pdfViewMode=row;
                 if(doc_ && !px_document_is_epub(doc_)) setPdfView(row);
@@ -3045,13 +3083,13 @@ private:
             dirty_=true; return;
         } else if(aaTab_==5) {
             auto p=appSettings_.get();
-            if(row==10){openChoice(10,0);return;}
-            if(row==12){startLibraryScan();return;}
-            if(row==13){openChoice(8,p.interfaceStyle);return;}
-            if(row==14){openChoice(9,p.interfaceAccent);return;}
-            if(row==15){p.automaticUpdateCheck=!p.automaticUpdateCheck;appSettings_.put(p);persistAppSettings();return;}
-            if(row==16){checkForUpdate();return;}
-            if(row==17){
+            if(row==9){openChoice(10,0);return;}
+            if(row==11){startLibraryScan();return;}
+            if(row==12){openChoice(8,p.interfaceStyle);return;}
+            if(row==13){openChoice(9,p.interfaceAccent);return;}
+            if(row==14){p.automaticUpdateCheck=!p.automaticUpdateCheck;appSettings_.put(p);persistAppSettings();return;}
+            if(row==15){checkForUpdate();return;}
+            if(row==16){
                 if(!coverClearConfirm_){coverClearConfirm_=true;dirty_=true;return;}
                 coverClearConfirm_=false;requestCoverCacheClear();dirty_=true;return;
             }
@@ -3069,10 +3107,9 @@ private:
             }
             if(row==7) p.paperTexture=(p.paperTexture+1)%3;
             if(row==8) p.expandedViewport=!p.expandedViewport;
-            if(row==9) p.landscapeSpreads=!p.landscapeSpreads;
-            if(row==11) p.scanOnLaunch=!p.scanOnLaunch;
+            if(row==10) p.scanOnLaunch=!p.scanOnLaunch;
             appSettings_.put(p); persistAppSettings();
-            if(row==8 || row==9) {
+            if(row==8) {
                 applyReaderLayoutOptions();
             }
             return;
@@ -3086,7 +3123,7 @@ private:
             panReaderBy(dx*64.f,dy*64.f);
         } else handleDirectional(dx,dy);
     }
-    int settingsRows() const { if(comic()) {if(aaTab_==0 || aaTab_==1)return 1;if(aaTab_==4)return 7;}const int rows[]={6,4,11,6,5,18}; return rows[aaTab_]; }
+    int settingsRows() const { if(comic()) {if(aaTab_==0 || aaTab_==1)return 1;if(aaTab_==4)return 8;}const int rows[]={6,5,11,6,5,17}; return rows[aaTab_]; }
     bool numericSetting() const { if(comic() && aaTab_==0)return false;return (aaTab_==0 && (aaRow_==0 || aaRow_==2 || aaRow_==3)) ||
         (aaTab_==1 && (aaRow_==0 || aaRow_==3)) || (aaTab_==2 && (aaRow_==8 || aaRow_==9)) || (aaTab_==3 && (aaRow_==2 || aaRow_==4)) || (aaTab_==4 && aaRow_==3); }
     void settingsActivate(int direction=1) {
@@ -3102,7 +3139,7 @@ private:
         if(screen_==ScreenState::JournalPreview)return;
         if(moveFocus(dx,dy))return;
         if(quickMenu_) { quickFocus_=std::clamp(quickFocus_+dy,0,std::max(0,int(quickActions().size())-1));
-            int w,h;getWindowSize(w,h);auto r=quickSheet(w,h);quickScroll_=std::clamp(float(quickFocus_*60-(r.h-124)),0.f,maxUiScroll());dirty_=true;return; }
+            int w,h;getWindowSize(w,h);auto r=quickSheet(w,h);quickScroll_=std::clamp(float(quickFocus_*60-(r.h-QUICK_HEADER_HEIGHT-56)),0.f,maxUiScroll());dirty_=true;return; }
         if (screen_ == ScreenState::Reader) {
             if(dx) { if(continuous()) chapterJump(dx*readingDirection()); else turnPage(dx*readingDirection()); }
             else if(continuous()) { scrollBy(dy*80.f); saveCurrentPosition(); }
@@ -3206,8 +3243,14 @@ private:
             return;
         }
 
+        if(match(SDLK_PLUS,SDL_CONTROLLER_BUTTON_START)) {toggleQuickMenu();return;}
+
         if (match(SDLK_RETURN, SDL_CONTROLLER_BUTTON_A)) {
-            if(quickMenu_){int w,h;getWindowSize(w,h);auto rc=quickSheet(w,h);handleQuickMenuTap(rc.x+28,rc.y+64+quickFocus_*60-int(quickScroll_)+24,w,h);return;}
+            if(quickMenu_){
+                rebuildFocus();const auto focused=navigationFocus_.active();
+                if(focused=="quick.pages" || focused=="quick.orientation") {activateFocus();return;}
+                int w,h;getWindowSize(w,h);auto rc=quickSheet(w,h);handleQuickMenuTap(rc.x+28,rc.y+QUICK_HEADER_HEIGHT+quickFocus_*60-int(quickScroll_)+24,w,h);return;
+            }
             if(screen_==ScreenState::JournalPreview){enterJournal(true);return;}
             if(screen_==ScreenState::ReadingJournal){journalAction(journalUI_.activate(0,0,journal_));return;}
             if(activateFocus())return;
@@ -3269,7 +3312,6 @@ private:
         if (screen_ == ScreenState::ReadingJournal) {
             if (match(SDLK_PAGEUP, SDL_CONTROLLER_BUTTON_LEFTSHOULDER)) { journalUI_.prevTab(); dirty_ = true; return; }
             if (match(SDLK_PAGEDOWN, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER)) { journalUI_.nextTab(); dirty_ = true; return; }
-            if (match(SDLK_PLUS, SDL_CONTROLLER_BUTTON_START)) { journalUI_.openGoals(); dirty_ = true; return; }
             if (match(SDLK_x, SDL_CONTROLLER_BUTTON_X)) { journalUI_.openExport(); dirty_ = true; return; }
             if (match(SDLK_y, SDL_CONTROLLER_BUTTON_Y)) { journal_.interaction(SDL_GetTicks()); dirty_ = true; return; }
         }
@@ -3289,7 +3331,6 @@ private:
         if (screen_ == ScreenState::Reader) {
             if (match(SDLK_x, SDL_CONTROLLER_BUTTON_X)) { openContents(); }
             if (match(SDLK_y, SDL_CONTROLLER_BUTTON_Y)) {if(comic() && showZoomReset())returnComicToTop();else toggleBookmark();}
-            if (match(SDLK_PLUS, SDL_CONTROLLER_BUTTON_START)) { openSettings(); }
             if (match(SDLK_EQUALS, -1)) reflowEpub(currentFontSize_ + 2);
             if (match(SDLK_MINUS, -1)) reflowEpub(currentFontSize_ - 2);
         } else if (screen_ == ScreenState::Library) {
@@ -3665,6 +3706,7 @@ private:
             row(1,currentTextAlign_?"Hizalama: Başlangıca yaslı":"Hizalama: İki yana yaslı");
             row(2,extraStyle_.indentation?"Paragraf girintisi: Açık":"Paragraf girintisi: Kapalı");
             row(3,"-    Paragraf aralığı: %"+std::to_string(extraStyle_.paragraphSpacing)+"    +");
+            row(4,catLabel("Yatay ekranda çift sayfa: ","Double pages in landscape: ")+ui::label(appSettings_.get().bookLandscapeSpreads?"On":"Off"));
         } else if(aaTab_==2) {
             for(int i=0;i<10;++i) {
                 auto r=l.control(i/2); r.y-=int(settingsScroll_);int half=(r.w-12)/2;r.x+=(i%2)*(half+12);r.w=half;
@@ -3699,6 +3741,7 @@ private:
             if(comic()) {
                 row(5,comicReadingColors()?catLabel("Çizim renkleri: Okuma paleti","Artwork colors: Reader palette"):catLabel("Çizim renkleri: Özgün","Artwork colors: Original"));
                 row(6,readingDirection()<0?catLabel("Okuma yönü: Sağdan sola","Reading direction: Right to left"):catLabel("Okuma yönü: Soldan sağa","Reading direction: Left to right"));
+                row(7,catLabel("Yatay ekranda çift sayfa: ","Double pages in landscape: ")+ui::label(appSettings_.get().comicLandscapeSpreads?"On":"Off"));
             } else typography_->renderText(renderer_,typography_->smallFont(),
                  catLabel("PDF renkleri Görünüm sekmesinden ayarlanır.","PDF colors are adjusted in Appearance."),
                  l.content.x+16,l.content.y+320,pal.muted,l.content.w-32);
@@ -3719,16 +3762,15 @@ private:
             const char *textureEn[]={"Off","Soft paper","Natural paper"};const char *textureTr[]={"Kapal\u0131","Yumu\u015fak ka\u011f\u0131t","Do\u011fal ka\u011f\u0131t"};
             row(7,std::string(ui::language?"Paper texture: ":"Kağıt dokusu: ")+(ui::language?textureEn:textureTr)[p.paperTexture]);
             row(8,ui::label("Expanded reading area")+": "+ui::label(p.expandedViewport?"On":"Off"));
-            row(9,ui::label("Two pages in landscape")+": "+ui::label(p.landscapeSpreads?"On":"Off"));
-            row(10,ui::label("Book folders")+": "+std::to_string(p.libraryFolders.size()+1));
-            row(11,ui::label("Scan on launch")+": "+ui::label(p.scanOnLaunch?"On":"Off"));
-            row(12,ui::label(libraryScanner_.pending()?"Scanning library...":"Scan library now"));
+            row(9,ui::label("Book folders")+": "+std::to_string(p.libraryFolders.size()+1));
+            row(10,ui::label("Scan on launch")+": "+ui::label(p.scanOnLaunch?"On":"Off"));
+            row(11,ui::label(libraryScanner_.pending()?"Scanning library...":"Scan library now"));
             const char *styles[]={"Dark","Light","Follow reading theme"};
             const char *accents[]={"Purple","Blue","Teal","Green","Orange","Red","Pink"};
-            row(13,ui::label("Interface appearance")+": "+ui::label(styles[p.interfaceStyle]));
-            row(14,ui::label("Accent color")+": "+ui::label(accents[p.interfaceAccent]));
-            row(15,ui::label("Automatic update check")+": "+ui::label(p.automaticUpdateCheck?"On":"Off"));
-            row(16,ui::label("Check for updates"));
+            row(12,ui::label("Interface appearance")+": "+ui::label(styles[p.interfaceStyle]));
+            row(13,ui::label("Accent color")+": "+ui::label(accents[p.interfaceAccent]));
+            row(14,ui::label("Automatic update check")+": "+ui::label(p.automaticUpdateCheck?"On":"Off"));
+            row(15,ui::label("Check for updates"));
             std::string coverLabel;
             if(coverClearStatus_.load()==1) {
                 coverLabel = ui::label("Clearing cover cache...");
@@ -3739,7 +3781,7 @@ private:
                     catLabel("kapak","covers") + " (" + formatBytes(coverDiskBytes_.load()) + ") · " +
                     ui::label("Clear");
             }
-            row(17,coverLabel);
+            row(16,coverLabel);
 
         }
         SDL_RenderSetClipRect(renderer_,nullptr);

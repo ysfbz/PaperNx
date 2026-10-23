@@ -15,8 +15,8 @@
             add("catalog.close",{r.x+r.w-124,r.y+12,108,56});
         } else if(quickMenu_) {
             auto r=quickSheet(w,h);auto actions=quickActions();
-            for(int i=0;i<int(actions.size());++i)add("quick."+std::to_string(i),{r.x+12,r.y+44+i*60-int(quickScroll_),r.w-24,56});
-            add("quick.orientation",{r.x+r.w-164,r.y+4,148,36});
+            for(int i=0;i<int(actions.size());++i)add("quick."+std::to_string(i),{r.x+12,r.y+QUICK_HEADER_HEIGHT+i*60-int(quickScroll_),r.w-24,56});
+            if(!helpMenu_){add("quick.pages",quickPageShortcut(r));add("quick.orientation",quickOrientationShortcut(r));}
             add("quick.close",{w-80,8,64,64});
         } else if(screen_==ScreenState::AaModal) {
             ui::SettingsLayout l(w,h);
@@ -78,7 +78,7 @@
         else if(id.rfind("file.",0)==0){browserSelected_=index("file.");reveal(browserScroll_,browserSelected_*64.f,56,float(h-128));}
         else if(id.rfind("toc.",0)==0){tocSelected_=index("toc.");revealContentsItem();}
         else if(id.rfind("bookmark.",0)==0 && id.rfind("bookmark.delete.",0)!=0 && id!="bookmark.add"){bmSelected_=index("bookmark.");reveal(bookmarkScroll_,bmSelected_*56.f,56,float(h-280));}
-        else if(id.rfind("quick.",0)==0 && id!="quick.close" && id!="quick.orientation"){quickFocus_=index("quick.");auto r=quickSheet(w,h);reveal(quickScroll_,quickFocus_*60.f,56,float(r.h-44));}
+        else if(id.rfind("quick.",0)==0 && id!="quick.close" && id!="quick.orientation" && id!="quick.pages"){quickFocus_=index("quick.");auto r=quickSheet(w,h);reveal(quickScroll_,quickFocus_*60.f,56,float(r.h-QUICK_HEADER_HEIGHT));}
         dirty_=true;
     }
     bool moveFocus(int dx,int dy) {

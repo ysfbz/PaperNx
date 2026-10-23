@@ -47,10 +47,10 @@ struct AppTest {
                 app.openChoice(8,variant);shot(app,"appearance-"+suffix);app.choiceKind_=-1;
                 app.setCatalogPanel(PaperNxApp::CatalogPanel::Browse);shot(app,"catalog-"+suffix);app.closeCatalogPanel();
             }
-            app.openSettings(true,5);setting(app,11);assert(!app.appSettings_.get().scanOnLaunch);
-            setting(app,13);assert(app.choiceKind_==8);app.choiceIndex_=1;app.commitChoice();
-            setting(app,14);assert(app.choiceKind_==9);app.choiceIndex_=2;app.commitChoice();
-            setting(app,10);assert(app.choiceKind_==10 && app.choiceOptions().size()==4);shot(app,"folders");app.choiceKind_=-1;app.dismissSettings();
+            app.openSettings(true,5);setting(app,10);assert(!app.appSettings_.get().scanOnLaunch);
+            setting(app,12);assert(app.choiceKind_==8);app.choiceIndex_=1;app.commitChoice();
+            setting(app,13);assert(app.choiceKind_==9);app.choiceIndex_=2;app.commitChoice();
+            setting(app,9);assert(app.choiceKind_==10 && app.choiceOptions().size()==4);shot(app,"folders");app.choiceKind_=-1;app.dismissSettings();
             const auto item=app.books_.front();app.openBook(item);assert(app.doc_);const int page=app.currentPage_;auto *doc=app.doc_;
             fs::copy_file("tests/fixtures/sample_book.epub",root/"import"/"new.epub");
             app.startLibraryScan();settle(app);assert(app.doc_==doc && app.currentPage_==page && app.books_.size()==5);
@@ -59,7 +59,7 @@ struct AppTest {
             app.screen_=ScreenState::BookmarksModal;shot(app,"bookmarks");app.screen_=ScreenState::Reader;
             // Folder management can also be entered from an open book. Save and
             // close that reader before giving the library/browser ownership.
-            app.openSettings(false,5);setting(app,10);assert(app.choiceKind_==10);
+            app.openSettings(false,5);setting(app,9);assert(app.choiceKind_==10);
             app.choiceIndex_=0;app.commitChoice();assert(app.screen_==ScreenState::FileBrowser && !app.doc_);
             assert(app.progressStore_.get(item.id).page==page);
             app.screen_=ScreenState::Library;SDL_SetWindowSize(app.window_,720,1280);app.openSettings(true,5);shot(app,"portrait-settings");
@@ -72,7 +72,7 @@ struct AppTest {
             assert(app.books_.size()==5);assert(!app.appSettings_.get().scanOnLaunch);
             assert(app.appSettings_.get().interfaceStyle==1 && app.appSettings_.get().interfaceAccent==2);
             assert(app.appSettings_.get().libraryFolders.size()==2);
-            app.openSettings(true,5);setting(app,12);assert(app.libraryScanner_.pending());settle(app);assert(app.books_.size()==6);app.dismissSettings();
+            app.openSettings(true,5);setting(app,11);assert(app.libraryScanner_.pending());settle(app);assert(app.books_.size()==6);app.dismissSettings();
             // Removing a folder only disables scanning; it never deletes sources.
             app.openChoice(10,2);app.commitChoice();assert(app.choiceKind_==11);app.choiceIndex_=1;app.commitChoice();
             assert(app.appSettings_.get().libraryFolders.size()==1 && fs::exists(root/"import"/"new.epub"));

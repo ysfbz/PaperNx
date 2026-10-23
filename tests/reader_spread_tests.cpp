@@ -28,6 +28,12 @@ struct AppTest {
     static void finish(PaperNxApp &app) {
         app.pageTurnAnimation_.started=SDL_GetTicks()-2000;app.tickPageTurn();
     }
+    static void settleLayout(PaperNxApp &app) {
+        for(int i=0;i<1000 && (app.layoutPending_ || app.layoutWorker_.joinable());++i) {
+            app.processLayout();SDL_Delay(2);
+        }
+        app.processLayout();assert(!app.layoutPending_ && !app.layoutWorker_.joinable());
+    }
     static Shot sheet(PaperNxApp &app,int page) {
         auto l=app.readerLayout();auto t=app.captureReaderSurface(l.leafWidth(),l.height,[&]{app.drawReaderLeaf(page,{0,0,l.leafWidth(),l.height});});assert(t);
         return read(app,t.get());
@@ -39,6 +45,47 @@ struct AppTest {
     static void run(const fs::path &root) {
         PaperNxApp app(root);assert(initReady(app));ui::language=1;
         auto book=[&](const char *name){auto i=std::find_if(app.books_.begin(),app.books_.end(),[&](const Book &b){return fs::path(b.path).filename()==name;});assert(i!=app.books_.end());return *i;};
+        assert(!app.appSettings_.get().bookLandscapeSpreads && !app.appSettings_.get().comicLandscapeSpreads);
+        auto tapSettingsRow=[&](int tab,int row) {
+            app.openSettings(false,tab);int w,h;app.getWindowSize(w,h);const auto layout=ui::SettingsLayout(w,h);
+            app.settingsScroll_=std::clamp(float(row*64-(layout.content.h-56)),0.f,app.maxUiScroll());
+            auto control=layout.control(row);control.y-=int(app.settingsScroll_);
+            assert(ui::contains(layout.content,control.x+control.w/2,control.y+control.h/2));
+            app.handleAaModalTap(control.x+control.w/2,control.y+control.h/2,w,h);
+        };
+        auto epub=book("english.epub");app.openBook(epub);app.reflowEpub(24);assert(app.pageCount_>2);app.currentPage_=0;
+        const int originalPage=app.currentPage_;app.saveCurrentPosition();app.toggleBookmark();
+        int chapter=-1,character=-1;double offset=0;
+        assert(px_document_anchor(app.doc_,app.currentPage_,app.scrollY_,&chapter,&character,&offset));
+        const auto originalMarks=app.progressStore_.get(app.currentBookId_).bookmarks.size();
+        tapSettingsRow(1,4);assert(app.appSettings_.get().bookLandscapeSpreads && !app.appSettings_.get().comicLandscapeSpreads);
+        settleLayout(app);int restoredChapter=-1,restoredCharacter=-1;double restoredOffset=0;
+        assert(px_document_anchor(app.doc_,app.currentPage_,app.scrollY_,&restoredChapter,&restoredCharacter,&restoredOffset));
+        assert(chapter==restoredChapter && character==restoredCharacter && std::abs(offset-restoredOffset)<.01);
+        assert(app.progressStore_.get(app.currentBookId_).bookmarks.size()==originalMarks && app.currentPage_>=0);
+        app.dismissSettings();app.currentPage_=originalPage;
+        app.beginPageTurnTouch(.9f,.5f,77);assert(app.movePageTurnTouch(.4f,.5f,77));
+        assert(app.pageTurnAnimation_.active && app.currentPage_==originalPage);
+        int w,h;app.getWindowSize(w,h);app.quickMenu_=true;const auto shortcut=app.quickPageShortcut(app.quickSheet(w,h));
+        app.handleQuickMenuTap(shortcut.x+shortcut.w/2,shortcut.y+shortcut.h/2,w,h);
+        assert(!app.pageTurnAnimation_.active && !app.quickMenu_ && app.currentPage_==originalPage);
+        assert(!app.appSettings_.get().bookLandscapeSpreads && !app.appSettings_.get().comicLandscapeSpreads);
+        tapSettingsRow(1,4);assert(app.appSettings_.get().bookLandscapeSpreads && !app.appSettings_.get().comicLandscapeSpreads);
+        settleLayout(app);app.dismissSettings();app.closeBook();
+        auto pdf=book("sample.pdf");app.openBook(pdf);assert(app.readerLayout().spread);app.closeBook();
+        auto comic=book("comic.cbz");app.openBook(comic);
+        assert(app.appSettings_.get().bookLandscapeSpreads && !app.appSettings_.get().comicLandscapeSpreads && !app.comicSpreadActive());
+        tapSettingsRow(4,7);assert(app.appSettings_.get().comicLandscapeSpreads && app.appSettings_.get().bookLandscapeSpreads && app.comicSpreadActive());
+        app.dismissSettings();app.pdfZoom_=2;app.pdfPanX_=app.pdfPanY_=0;const int comicPage=app.currentPage_;
+        app.quickMenu_=true;const auto comicShortcut=app.quickPageShortcut(app.quickSheet(w,h));
+        app.handleQuickMenuTap(comicShortcut.x+comicShortcut.w/2,comicShortcut.y+comicShortcut.h/2,w,h);
+        assert(!app.appSettings_.get().comicLandscapeSpreads && app.appSettings_.get().bookLandscapeSpreads);
+        assert(app.currentPage_==comicPage && app.pdfZoom_==2 && app.pdfPanX_==0 && app.pdfPanY_==0);
+        auto spreadPrefs=app.appSettings_.get();spreadPrefs.comicLandscapeSpreads=true;app.appSettings_.put(spreadPrefs);
+        SDL_SetWindowSize(app.window_,720,1280);assert(!app.comicSpreadActive() && !app.readerLayout().spread);
+        SDL_SetWindowSize(app.window_,1280,720);assert(app.comicSpreadActive() && app.readerLayout().spread);
+        app.extraStyle_.readingMode=1;assert(app.continuous() && !app.comicSpreadActive());app.extraStyle_.readingMode=0;app.closeBook();
+        auto spreadDefaults=app.appSettings_.get();spreadDefaults.bookLandscapeSpreads=true;spreadDefaults.comicLandscapeSpreads=true;app.appSettings_.put(spreadDefaults);
         for(const char *name:{"english.epub","hebrew.epub","comic.cbz","comic.cbr","manga.cbz","single.cbz","sample.pdf","spread.pdf"}) {
             app.openBook(book(name));app.extraStyle_.readingMode=0;app.documentMode_=0;
             for(int theme:{0,5}) {
@@ -139,18 +186,19 @@ struct AppTest {
         assert(px_document_page_is_spread(app.doc_,5) && !app.readerLayout().spread);
         for(int page:{5,3,2,0}) {app.turnPage(-1);if(app.pageTurnAnimation_.active)finish(app);assert(app.currentPage_==page);}
         app.openSettings(false,5);
-        for(int row:{8,9}) {
+        for(int row:{8}) {
             const auto layout=ui::SettingsLayout(1280,720);
             app.settingsScroll_=std::clamp(float(row*64-(layout.content.h-56)),0.f,app.maxUiScroll());
             auto r=layout.control(row);r.y-=int(app.settingsScroll_);
             assert(ui::contains(layout.content,r.x+r.w/2,r.y+r.h/2));
             app.handleAaModalTap(r.x+r.w/2,r.y+r.h/2,1280,720);
         }
-        assert(!app.appSettings_.get().expandedViewport && !app.appSettings_.get().landscapeSpreads);app.dismissSettings();
+        assert(!app.appSettings_.get().expandedViewport && app.appSettings_.get().bookLandscapeSpreads);app.dismissSettings();
+        auto singleComic=app.appSettings_.get();singleComic.comicLandscapeSpreads=false;app.appSettings_.put(singleComic);
         assert(!app.readerLayout().spread && app.readerLayout().contentHeight()==576);
         assert(app.buildEpubCss().find("@page")==std::string::npos);
         app.turnPage(1);if(app.pageTurnAnimation_.active)finish(app);assert(app.currentPage_==1);
-        auto prefs=app.appSettings_.get();prefs.landscapeSpreads=prefs.expandedViewport=true;app.appSettings_.put(prefs);app.closeBook();
+        auto prefs=app.appSettings_.get();prefs.bookLandscapeSpreads=prefs.expandedViewport=true;app.appSettings_.put(prefs);app.closeBook();
         // Actual shoulder and keyboard events follow each newly opened book in landscape.
         for(const char *name:{"hebrew.epub","english.epub","hebrew.epub"}) {
             app.openBook(book(name));app.currentPage_=2;app.toolbarVisible_=false;

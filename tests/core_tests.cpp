@@ -569,9 +569,10 @@ int main() {
         const auto path = root / "app-settings";
         AppSettingsStore settings(path); assert(!settings.load());
         // PaperNX v0.9 default language is English (1) on clean install
-        assert(settings.get().language == 1);
+        assert(settings.get().language == 1 && !settings.get().bookLandscapeSpreads && !settings.get().comicLandscapeSpreads);
         AppPreferences app; app.uiTheme = 2; app.language = 0; app.libraryLayout = 1; // set to Turkish (0)
         app.sort = 4; app.toolbar = 1; app.defaultBrowserPath = "sdmc:/Kitaplar/Çiçek";
+        app.bookLandscapeSpreads=true;
         app.softwareBrightness = 65;
         app.systemBrightness = 42;
         app.automaticUpdateCheck = true;
@@ -586,7 +587,7 @@ int main() {
         assert(restart.get().chromePolicy==0); // Never resurrect legacy custom chrome.
         assert(restart.get().sort == 4 && restart.get().toolbar == 1 && restart.get().defaultBrowserPath == app.defaultBrowserPath);
         assert(restart.get().softwareBrightness == 65); // Value survives restart.
-        assert(restart.get().systemBrightness == 42 && restart.get().automaticUpdateCheck);
+        assert(restart.get().systemBrightness == 42 && restart.get().automaticUpdateCheck && restart.get().bookLandscapeSpreads && !restart.get().comicLandscapeSpreads);
         std::ofstream(path, std::ios::trunc) << "corrupt cache must recover settings";
         assert(restart.load() && restart.get().sort == 4 && restart.get().language == 0);
         // Switch to English (1) and verify persistence
@@ -602,6 +603,25 @@ int main() {
         assert(settings.get().systemBrightness == 100);
         app.softwareBrightness = 500; settings.put(app);
         assert(settings.get().softwareBrightness == 100);
+    }
+    // An old v015 spread bit cannot distinguish its true default from an explicit choice.
+    {
+        const auto path=root/"legacy-reader-settings";
+        ProgressStore legacy(path);
+        Progress preferences;preferences.fontFamily=0;preferences.textAlign=1;
+        legacy.put("APP_PREFERENCES_",preferences);
+        Progress layout;layout.textAlign=1;layout.publisherStyles=1;
+        legacy.put("APP_READER_V015_",layout);
+        Progress book;book.page=7;book.bookmarks.push_back({7,"Keep this bookmark",1,-1});
+        legacy.put("0123456789abcdef",book);assert(legacy.save());
+        AppSettingsStore migrated(path);assert(migrated.load());
+        assert(migrated.get().expandedViewport && !migrated.get().bookLandscapeSpreads && !migrated.get().comicLandscapeSpreads);
+        assert(migrated.get().language==0 && migrated.save());
+        AppSettingsStore restored(path);assert(restored.load());
+        assert(!restored.get().bookLandscapeSpreads && !restored.get().comicLandscapeSpreads);
+        ProgressStore retained(path);assert(retained.load());
+        const auto saved=retained.get("0123456789abcdef");
+        assert(saved.page==7 && saved.bookmarks.size()==1 && saved.bookmarks[0].title=="Keep this bookmark");
     }
     tracker.onFingerDown(.25f, .5f, 1);
     assert(tracker.onFingerUp(.27f, .51f, 1).type == GestureType::TapLeft);

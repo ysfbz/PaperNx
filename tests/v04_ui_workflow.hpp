@@ -13,7 +13,7 @@ static void v04UiWorkflow(const fs::path &parent) {
     fs::copy_file("tests/fixtures/sample_doc.pdf",root/"books"/"pdf.pdf");
     {
         PaperNxApp app(root);assert(initReady(app));
-        auto testPreferences=app.appSettings_.get();testPreferences.landscapeSpreads=false;app.appSettings_.put(testPreferences);
+        auto testPreferences=app.appSettings_.get();testPreferences.bookLandscapeSpreads=false;testPreferences.comicLandscapeSpreads=false;app.appSettings_.put(testPreferences);
         app.openSettings(true);auto old=app.currentStyle();
         pad(app,SDL_CONTROLLER_BUTTON_DPAD_DOWN);assert(app.aaRow_==1 && app.currentFontFamily_==old.fontFamily);
         pad(app,SDL_CONTROLLER_BUTTON_DPAD_UP);pad(app,SDL_CONTROLLER_BUTTON_A);assert(app.settingsEditing_);
@@ -58,7 +58,7 @@ static void v04UiWorkflow(const fs::path &parent) {
             legacy.customUiTheme=4;legacy.uiTheme=0;app.appSettings_.put(legacy);
             assert(app.appSettings_.get().chromePolicy==0);
             app.openSettings(true,5);
-            assert(app.settingsRows()==18);
+            assert(app.settingsRows()==17);
             app.openChoice(7,0);
             assert(app.choiceOptions().size()==10);
             app.choiceIndex_=4;app.commitChoice(); // Vintage Sepia
@@ -173,16 +173,12 @@ static void v04UiWorkflow(const fs::path &parent) {
         finger(app,SDL_FINGERDOWN,.2f,.5f);finger(app,SDL_FINGERMOTION,.8f,.5f);finger(app,SDL_FINGERUP,.8f,.5f);assert(app.currentPage_==0);
         finger(app,SDL_FINGERDOWN,.5f,.7f);app.pdfGestureStart_=SDL_GetTicks()-600;finger(app,SDL_FINGERMOTION,.3f,.7f);finger(app,SDL_FINGERUP,.3f,.7f);assert(app.currentPage_==0);
         app.closeBook();
-        // + is the touch-only gateway to orientation in both library and reader.
+        // The pinned orientation shortcut remains directly reachable by touch.
         {
-            auto actions=app.quickActions();
-            const auto title=app.catLabel("Ekran yönü · Yatay / Dikey","Display orientation · Landscape / Portrait");
-            auto it=std::find(actions.begin(),actions.end(),title);assert(it!=actions.end());
             app.quickMenu_=true;int qw,qh;app.getWindowSize(qw,qh);
             auto sheet=app.quickSheet(qw,qh);
-            app.quickScroll_=app.maxUiScroll();
-            const auto idx=int(it-actions.begin());
-            app.handleQuickMenuTap(sheet.x+24,sheet.y+44+idx*60-int(app.quickScroll_)+24,qw,qh);
+            const auto shortcut=app.quickOrientationShortcut(sheet);
+            app.handleQuickMenuTap(shortcut.x+shortcut.w/2,shortcut.y+shortcut.h/2,qw,qh);
             assert(app.choiceKind_==1 && !app.quickMenu_);
             app.choiceIndex_=0;app.commitChoice();
         }

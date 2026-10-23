@@ -63,7 +63,7 @@ struct AppTest {
     }
     static void run(const fs::path &root) {
         PaperNxApp app(root);assert(initReady(app));assert(app.typography_->uiFont());ui::language=1;
-        auto preferences=app.appSettings_.get();preferences.landscapeSpreads=false;app.appSettings_.put(preferences);
+        auto preferences=app.appSettings_.get();preferences.bookLandscapeSpreads=false;preferences.comicLandscapeSpreads=false;app.appSettings_.put(preferences);
         SDL_RendererInfo info{};SDL_GetRendererInfo(app.renderer_,&info);std::cout<<"Comic renderer: "<<info.name<<"\n";
         assert(app.books_.size()==6);
         auto book=[&](const char *filename) {return *std::find_if(app.books_.begin(),app.books_.end(),[&](const Book &b){return fs::path(b.path).filename()==filename;});};

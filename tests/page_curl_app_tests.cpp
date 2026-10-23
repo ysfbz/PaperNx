@@ -135,7 +135,7 @@ struct AppTest {
     }
     static void run(const fs::path &root) {
         PaperNxApp app(root); assert(initReady(app));
-        auto preferences=app.appSettings_.get();preferences.landscapeSpreads=false;app.appSettings_.put(preferences);
+        auto preferences=app.appSettings_.get();preferences.bookLandscapeSpreads=false;preferences.comicLandscapeSpreads=false;app.appSettings_.put(preferences);
         SDL_RendererInfo driver{};SDL_GetRendererInfo(app.renderer_,&driver);
         std::cout << "page curl render driver: " << driver.name << '\n';
         auto epub = *std::find_if(app.books_.begin(), app.books_.end(), [](const Book &b) { return b.format == Format::Epub; });

@@ -15,11 +15,11 @@ static void v03MenuItem(PaperNxApp &app,int index) {
     assert(app.quickMenu_); int w,h; app.getWindowSize(w,h);
     auto sheet=app.quickSheet(w,h);
     for(int attempt=0;attempt<8;++attempt) {
-        int y=sheet.y+44+index*60+28-int(app.quickScroll_);
-        if(y>=sheet.y+44 && y<sheet.y+sheet.h-4) {
+        int y=sheet.y+PaperNxApp::QUICK_HEADER_HEIGHT+index*60+28-int(app.quickScroll_);
+        if(y>=sheet.y+PaperNxApp::QUICK_HEADER_HEIGHT && y<sheet.y+sheet.h-4) {
             v03RectTap(app,{sheet.x+20,y-20,sheet.w-40,40}); return;
         }
-        v03Drag(app,float(sheet.x+sheet.w/2)/w,float(sheet.y+sheet.h-24)/h,float(sheet.y+100)/h);
+        v03Drag(app,float(sheet.x+sheet.w/2)/w,float(sheet.y+sheet.h-24)/h,float(sheet.y+PaperNxApp::QUICK_HEADER_HEIGHT+24)/h);
     }
     assert(false && "Quick action must be reachable using finger drag");
 }
@@ -104,7 +104,12 @@ static void v03Workflow(const fs::path &parent) {
         // Global settings and preview are reached through the visible plus action.
         v03Plus(app); snapshot(app,"v03-plus-menu"); v03MenuItem(app,0);
         assert(app.screen_==ScreenState::AaModal && app.globalSettings_ && !app.doc_);
-        // Reopening settings from its own plus sheet must retain the library return route.
+        // A plus press cannot stack a quick menu over the active settings modal.
+        int settingsWidth,settingsHeight;app.getWindowSize(settingsWidth,settingsHeight);
+        v03RectTap(app,{settingsWidth-80,8,64,64});
+        assert(!app.quickMenu_ && app.screen_==ScreenState::AaModal);
+        v03CloseSettings(app);assert(app.screen_==ScreenState::Library);
+        // Reopening from the library keeps the return route intact.
         v03Plus(app); v03MenuItem(app,0);
         assert(app.screen_==ScreenState::AaModal && app.settingsReturn_==ScreenState::Library);
         v03Tab(app,2); v03Control(app,1,false); assert(app.currentTheme_==2);

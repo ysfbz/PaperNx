@@ -2,7 +2,7 @@
 // printed pages and stays whole, rather than being paired with another scan.
 bool comicSpreadActive() {
     int w,h;getWindowSize(w,h);
-    return comic() && !continuous() && appSettings_.get().landscapeSpreads && w>h;
+    return comic() && !continuous() && appSettings_.get().comicLandscapeSpreads && w>h;
 }
 bool comicWidePage(int page) {
     if(px_document_page_is_spread(doc_,page))return true;

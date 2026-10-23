@@ -19,7 +19,8 @@ struct AppPreferences {
     int softwareBrightness{100}; // 50-100%; software dimmer, independent of the backlight
     int systemBrightness{100}; // 10-100%; handheld-only and restored when the app yields
     bool expandedViewport{true};
-    bool landscapeSpreads{true};
+    bool bookLandscapeSpreads{false};
+    bool comicLandscapeSpreads{false};
     int interfaceStyle{0}; // dark, light, follow reading palette
     int interfaceAccent{0}; // purple, blue, teal, green, orange, red, pink
     bool scanOnLaunch{true};

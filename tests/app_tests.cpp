@@ -280,7 +280,7 @@ struct AppTest {
         int savedPage;
         {
             PaperNxApp app(root); assert(initReady(app)); assert(!app.controller_);
-            auto preferences=app.appSettings_.get();preferences.landscapeSpreads=false;preferences.displayOrientation=0;app.appSettings_.put(preferences);assert(app.appSettings_.save());
+            auto preferences=app.appSettings_.get();preferences.bookLandscapeSpreads=false;preferences.comicLandscapeSpreads=false;preferences.displayOrientation=0;app.appSettings_.put(preferences);assert(app.appSettings_.save());
             auto epub = *std::find_if(app.books_.begin(), app.books_.end(), [](const Book &b) { return b.format == Format::Epub; });
             // Open first library card using only finger events.
             tap(app, .06f, .30f); assert(app.doc_ && app.screen_ == ScreenState::Reader);
@@ -405,8 +405,11 @@ struct AppTest {
         PaperNxApp app(root);
         assert(initReady(app));
         assert(app.books_.size() == 2);
+        assert(!app.appSettings_.get().bookLandscapeSpreads && !app.appSettings_.get().comicLandscapeSpreads);
+        pad(app,SDL_CONTROLLER_BUTTON_START);assert(app.quickMenu_);
+        pad(app,SDL_CONTROLLER_BUTTON_START);assert(!app.quickMenu_ && app.screen_==ScreenState::Library);
         brightnessSlider(app);
-        auto preferences=app.appSettings_.get();preferences.landscapeSpreads=false;app.appSettings_.put(preferences);
+        auto preferences=app.appSettings_.get();preferences.bookLandscapeSpreads=false;preferences.comicLandscapeSpreads=false;app.appSettings_.put(preferences);
         int first = SDL_JoystickAttachVirtual(SDL_JOYSTICK_TYPE_GAMECONTROLLER, 6, 21, 0);
         int second = SDL_JoystickAttachVirtual(SDL_JOYSTICK_TYPE_GAMECONTROLLER, 6, 21, 0);
         assert(first >= 0 && second >= 0);
@@ -432,6 +435,8 @@ struct AppTest {
         bool running = true;
         app.handleEvent(text, running);
         assert(app.searchQuery_ == "İıI iŞşĞğÜüÖöÇç");
+        pad(app,SDL_CONTROLLER_BUTTON_START);
+        assert(app.searchActive_ && !app.quickMenu_ && app.searchQuery_=="İıI iŞşĞğÜüÖöÇç");
         key(app, SDLK_BACKSPACE);
         assert(app.searchQuery_ == "İıI iŞşĞğÜüÖöÇ");
         key(app, SDLK_ESCAPE);
@@ -452,7 +457,14 @@ struct AppTest {
         pad(app, SDL_CONTROLLER_BUTTON_A);
         assert(app.screen_ == ScreenState::Reader && app.currentPage_ > 1);
         const auto stableMark = px_document_make_bookmark(app.doc_, app.currentPage_);
-        pad(app, SDL_CONTROLLER_BUTTON_START); assert(app.screen_ == ScreenState::AaModal);
+        const int pageBeforeQuick=app.currentPage_;
+        pad(app, SDL_CONTROLLER_BUTTON_START); assert(app.quickMenu_ && app.screen_ == ScreenState::Reader);
+        pad(app, SDL_CONTROLLER_BUTTON_B); assert(!app.quickMenu_ && app.screen_==ScreenState::Reader && app.currentPage_==pageBeforeQuick);
+        pad(app, SDL_CONTROLLER_BUTTON_START);assert(app.quickMenu_);pad(app,SDL_CONTROLLER_BUTTON_START);assert(!app.quickMenu_);
+        app.openSettings();
+        pad(app,SDL_CONTROLLER_BUTTON_A);assert(app.settingsEditing_);
+        pad(app,SDL_CONTROLLER_BUTTON_START);assert(app.settingsEditing_ && !app.quickMenu_);
+        pad(app,SDL_CONTROLLER_BUTTON_B);assert(!app.settingsEditing_ && !app.quickMenu_);
         const auto original=app.currentStyle();
         pad(app,SDL_CONTROLLER_BUTTON_DPAD_DOWN);assert(app.aaRow_==1 && app.currentFontFamily_==original.fontFamily);
         pad(app,SDL_CONTROLLER_BUTTON_A);assert(app.choiceKind_==0);pad(app,SDL_CONTROLLER_BUTTON_DPAD_DOWN);pad(app,SDL_CONTROLLER_BUTTON_A);assert(app.currentFontFamily_==(original.fontFamily+1)%3);
@@ -499,7 +511,7 @@ struct AppTest {
         SDL_Event pinch{}; pinch.type = SDL_MULTIGESTURE; pinch.mgesture.numFingers = 2; pinch.mgesture.dDist = 0.1f;
         app.handleEvent(pinch, running); assert(app.pdfZoom_ > 1);
         pad(app, SDL_CONTROLLER_BUTTON_RIGHTSTICK);
-        pad(app, SDL_CONTROLLER_BUTTON_START);
+        app.openSettings(false,4);
         settingsTab(app, 4);
         settingsControl(app, 3);
         assert(app.pdfZoom_ == 1.25f);
@@ -520,6 +532,8 @@ struct AppTest {
         app.getOrRenderThumbnail(epub);
         { std::lock_guard<std::mutex> lock(app.queueMutex_); assert(app.queuedThumbIds_.count(epub.id)); }
         app.openBrowser();
+        pad(app,SDL_CONTROLLER_BUTTON_START);assert(app.quickMenu_ && app.screen_==ScreenState::FileBrowser);
+        pad(app,SDL_CONTROLLER_BUTTON_B);assert(!app.quickMenu_ && app.screen_==ScreenState::FileBrowser);
         auto external = std::find_if(app.browserEntries_.begin(), app.browserEntries_.end(), [](const BrowserEntry &e) { return e.path.filename() == "external.pdf"; });
         assert(external != app.browserEntries_.end());
         app.browserSelected_ = static_cast<int>(external - app.browserEntries_.begin());

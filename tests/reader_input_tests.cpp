@@ -10,6 +10,10 @@ struct AppTest {
         SDL_Event event{};event.type=type;event.tfinger.fingerId=63;event.tfinger.x=x;event.tfinger.y=y;
         bool running=true;app.handleEvent(event,running);assert(running);
     }
+    static void pad(PaperNxApp &app,Uint8 button) {
+        SDL_Event event{};event.type=SDL_CONTROLLERBUTTONDOWN;event.cbutton.button=button;
+        bool running=true;app.handleEvent(event,running);assert(running);
+    }
     static void finish(PaperNxApp &app) {
         app.pageTurnAnimation_.started=SDL_GetTicks()-2000;app.tickPageTurn();
     }
@@ -24,6 +28,30 @@ struct AppTest {
     }
     static void run(const fs::path &root) {
         PaperNxApp app(root);assert(initReady(app));ui::language=1;
+        assert(!app.appSettings_.get().bookLandscapeSpreads && !app.appSettings_.get().comicLandscapeSpreads);
+        for(int language:{0,1}) {
+            ui::language=language;
+            for(auto size:{std::pair<int,int>{1280,720},{720,1280}}) {
+                const auto sheet=app.quickSheet(size.first,size.second);
+                const auto pages=app.quickPageShortcut(sheet),orientation=app.quickOrientationShortcut(sheet);
+                assert(ui::contains(sheet,pages.x,pages.y) && ui::contains(sheet,orientation.x+orientation.w-1,orientation.y+orientation.h-1));
+                assert(!SDL_HasIntersection(&pages,&orientation));
+                int height=0;app.typography_->measureText(app.typography_->buttonFont(),app.quickSpreadLabel(),nullptr,&height,pages.w-24);
+                assert(height<=pages.h-8);
+                app.typography_->measureText(app.typography_->buttonFont(),ui::label("Portrait / landscape"),nullptr,&height,orientation.w-24);
+                assert(height<=orientation.h-8);
+            }
+        }
+        ui::language=1;
+        // Joy-Con + opens the library menu; D-pad and A reach its pinned page shortcut.
+        touch(app,SDL_FINGERDOWN,1272.f/1280,40.f/720);touch(app,SDL_FINGERUP,1272.f/1280,40.f/720);assert(!app.quickMenu_);
+        pad(app,SDL_CONTROLLER_BUTTON_START);assert(app.quickMenu_);
+        pad(app,SDL_CONTROLLER_BUTTON_DPAD_UP);assert(app.navigationFocus_.active()=="quick.pages");
+        pad(app,SDL_CONTROLLER_BUTTON_A);assert(!app.quickMenu_ && app.appSettings_.get().bookLandscapeSpreads && !app.appSettings_.get().comicLandscapeSpreads);
+        assert(app.appSettings_.save());
+        pad(app,SDL_CONTROLLER_BUTTON_START);pad(app,SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
+        assert(app.navigationFocus_.active()=="quick.orientation");pad(app,SDL_CONTROLLER_BUTTON_A);assert(app.choiceKind_==1);
+        pad(app,SDL_CONTROLLER_BUTTON_B);assert(app.choiceKind_<0 && !app.quickMenu_);
         auto book=[&](const char *name){auto it=std::find_if(app.books_.begin(),app.books_.end(),[&](const Book &b){return fs::path(b.path).filename()==name;});assert(it!=app.books_.end());return *it;};
         // The whole persistent plus control owns its corners as well as centre.
         app.openBook(book("english.epub"));app.toolbarVisible_=false;
@@ -32,7 +60,7 @@ struct AppTest {
         // The 0.16 external menu geometry and scan/settings routes are restored.
         ui::LibraryLayout library(1280);assert(library.top==174 && library.left==32);
         assert(app.quickSheet(1280,720).x==804);
-        app.openSettings(true,5);assert(app.aaRow_==0 && app.settingsRows()==18);app.dismissSettings();
+        app.openSettings(true,5);assert(app.aaRow_==0 && app.settingsRows()==17);app.dismissSettings();
         for(const char *name:{"english.epub","hebrew.epub"})for(bool landscape:{true,false}) {
             SDL_SetWindowSize(app.window_,landscape?1280:720,landscape?720:1280);
             app.openBook(book(name));app.reflowEpub(24);const int dir=app.readingDirection();
@@ -52,7 +80,9 @@ struct AppTest {
             touch(app,SDL_FINGERDOWN,x,y);assert(!app.pageTurnTouch_.tracking);touch(app,SDL_FINGERUP,x,y);
             assert(app.screen_==ScreenState::TocModal);app.closeContents();app.closeBook();
         }
-        SDL_SetWindowSize(app.window_,1280,720);app.openBook(book("smart.cbz"));
+        SDL_SetWindowSize(app.window_,1280,720);
+        auto preferences=app.appSettings_.get();preferences.comicLandscapeSpreads=true;app.appSettings_.put(preferences);assert(app.appSettings_.save());
+        app.openBook(book("smart.cbz"));assert(app.comicSpreadActive());
         app.toolbarVisible_=false;app.setPdfView(0);app.currentPage_=0;app.render();
         // Warm both pages in the next group; turning must reuse these textures.
         app.prefetchPage_=0;app.prefetchStep_=0;

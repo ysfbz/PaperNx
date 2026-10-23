@@ -559,7 +559,12 @@ bool AppSettingsStore::load() {
     if(store_.all().count("APP_READER_V015_")) {
         const auto layout=store_.get("APP_READER_V015_");
         preferences.expandedViewport=layout.textAlign!=0;
-        preferences.landscapeSpreads=layout.publisherStyles!=0;
+    }
+    // v015's true value was also its default, so it is not a reliable user preference.
+    if(store_.all().count("APP_READER_V092_")) {
+        const auto layout=store_.get("APP_READER_V092_");
+        preferences.bookLandscapeSpreads=layout.textAlign!=0;
+        preferences.comicLandscapeSpreads=layout.publisherStyles!=0;
     }
     if(store_.all().count("APP_DISPLAY_V04_")) {
         const auto display=store_.get("APP_DISPLAY_V04_");
@@ -602,8 +607,12 @@ bool AppSettingsStore::save() const {
     store_.put("APP_DISPLAY_V04_",std::move(display));
     Progress layout;
     layout.textAlign=preferences_.expandedViewport?1:0;
-    layout.publisherStyles=preferences_.landscapeSpreads?1:0;
+    layout.publisherStyles=0;
     store_.put("APP_READER_V015_",std::move(layout));
+    Progress spreads;
+    spreads.textAlign=preferences_.bookLandscapeSpreads?1:0;
+    spreads.publisherStyles=preferences_.comicLandscapeSpreads?1:0;
+    store_.put("APP_READER_V092_",std::move(spreads));
     Progress theme;
     theme.fontFamily=preferences_.interfaceStyle;theme.fontSize=12+preferences_.interfaceAccent;
     theme.scrollInertia=preferences_.scanOnLaunch?1:0;
