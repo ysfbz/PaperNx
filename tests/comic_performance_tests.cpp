@@ -56,9 +56,24 @@ struct AppTest {
   for(int i=0;i<10;++i){app.zoomPdf(2+i*.1f,.6f,.4f,true);app.pdfPanY_+=3;app.render();}
   assert(app.comicTextureBuilds_==builds);
   app.closeBook();assert(app.comicDetails_.empty());drain(app);
+  // A visible request displaces speculative work when the bounded queue is full.
+  ComicPages priorityWorker;const auto path=app.books_.front().path;
+  priorityWorker.configure({"priority",path});priorityWorker.setSuspended(true);
+  for(int page=0;page<6;++page)priorityWorker.request(page,false,ComicPages::Priority::SpeculativeForward);
+  priorityWorker.request(6,false,ComicPages::Priority::Visible);priorityWorker.setSuspended(false);
+  std::vector<int> priorityOrder;const auto priorityDeadline=SDL_GetTicks()+20000;
+  while(priorityWorker.pending() && SDL_GetTicks()<priorityDeadline) {
+   for(auto &result:priorityWorker.take()) {
+    assert(result.identity=="priority" && !result.rgb.empty());priorityOrder.push_back(result.page);
+   }
+   SDL_Delay(2);
+  }
+  assert(priorityOrder.size()==6 && priorityOrder.front()==6 &&
+         std::find(priorityOrder.begin(),priorityOrder.end(),5)==priorityOrder.end());
+  priorityWorker.stop();assert(priorityWorker.metrics().documentOpens==1 && priorityWorker.metrics().documentCloses==1);
   // Configuration replacement discards old results and closes its worker-owned
   // document. The open document then survives idle longer than the old timeout.
-  ComicPages worker;const auto path=app.books_.front().path;
+  ComicPages worker;
   worker.configure({"old",path});for(int i=0;i<6;++i)worker.request(i);
   const auto openDeadline=SDL_GetTicks()+5000;
   while(worker.metrics().documentOpens==0 && SDL_GetTicks()<openDeadline)SDL_Delay(1);

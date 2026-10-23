@@ -6,6 +6,7 @@
 #include <condition_variable>
 #include <cstdint>
 #include <deque>
+#include <iterator>
 #include <mutex>
 #include <set>
 #include <string>
@@ -38,6 +39,7 @@ public:
         unsigned paper{0xffffff}, ink{0};
         int textureLimit{3072};
     };
+    enum class Priority : std::uint8_t { Visible, CurrentSpreadPartner, TurnTarget, SpeculativeForward, ZoomDetail };
     struct Result {
         std::string identity;
         int page{}, width{}, height{}, stride{};
@@ -58,12 +60,33 @@ public:
         wake_.notify_one();
     }
     void request(int page, bool detail = false) {
+        request(page, detail, detail ? Priority::ZoomDetail : Priority::SpeculativeForward);
+    }
+    void request(int page, Priority priority) {
+        request(page, priority == Priority::ZoomDetail, priority);
+    }
+    void request(int page, bool detail, Priority priority) {
         std::lock_guard<std::mutex> lock(mutex_);
         const auto key = std::make_pair(page, detail);
-        if (stopped_ || spec_.identity.empty() || page < 0 || requested_.count(key) || queue_.size() >= 6) return;
+        if (stopped_ || spec_.identity.empty() || page < 0) return;
+        auto queued = std::find_if(queue_.begin(), queue_.end(), [&](const Job &job) {
+            return job.page == page && job.detail == detail;
+        });
+        if (queued != queue_.end()) {
+            if (priority < queued->priority) queued->priority = priority;
+            return;
+        }
+        if (requested_.count(key)) return;
+        if (queue_.size() >= 6) {
+            auto worst = queue_.begin();
+            for (auto it = std::next(queue_.begin()); it != queue_.end(); ++it)
+                if (it->priority >= worst->priority) worst = it;
+            if (priority > worst->priority || (priority == worst->priority && priority != Priority::Visible)) return;
+            requested_.erase({worst->page, worst->detail});
+            queue_.erase(worst);
+        }
         requested_.insert(key);
-        if (detail) queue_.push_back(key);
-        else queue_.insert(std::find_if(queue_.begin(), queue_.end(), [](auto job) { return job.second; }), key);
+        queue_.push_back({page, detail, priority});
         if (!thread_.joinable()) thread_ = std::thread([this] { run(); });
         wake_.notify_one();
     }
@@ -111,6 +134,7 @@ public:
         if (thread_.joinable()) thread_.join();
     }
 private:
+    struct Job { int page; bool detail; Priority priority; };
     mutable std::mutex mutex_;
     std::condition_variable wake_;
     std::thread thread_;
@@ -118,7 +142,7 @@ private:
     std::uint64_t generation_{};
     bool stopped_{false}, suspended_{false}, active_{false};
     std::atomic<std::uint64_t> documentOpens_{0}, documentCloses_{0};
-    std::deque<std::pair<int, bool>> queue_;
+    std::deque<Job> queue_;
     std::set<std::pair<int, bool>> requested_;
     std::deque<Result> results_;
 
@@ -158,9 +182,12 @@ private:
                 if (suspended_ || queue_.empty() || results_.size() >= 2) continue;
                 spec = spec_;
                 generation = generation_;
-                page = queue_.front().first;
-                detail = queue_.front().second;
-                queue_.pop_front();
+                const auto next = std::min_element(queue_.begin(), queue_.end(), [](const Job &a, const Job &b) {
+                    return a.priority < b.priority;
+                });
+                page = next->page;
+                detail = next->detail;
+                queue_.erase(next);
                 active_ = true;
             }
             char error[256]{};
