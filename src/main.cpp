@@ -2682,7 +2682,13 @@ private:
         bool right=px>=l.content.x+l.content.w/2;
         if(numericSetting()) {
             auto rect=l.control(row);rect.y-=int(settingsScroll_);int hit=ui::StepperLayout(rect).hit(px,py);
-            if(hit==0) {if(!settingsEditing_){editOriginal_=currentStyle();editOriginalZoom_=pdfZoom_;settingsEditing_=true;dirty_=true;}return;}
+            if(hit==0) {
+                // Brightness is an app compositor preference, not a book edit;
+                // touching its value must not start the reader style transaction.
+                if(aaTab_==2 && row==8) return;
+                if(!settingsEditing_){editOriginal_=currentStyle();editOriginalZoom_=pdfZoom_;settingsEditing_=true;dirty_=true;}
+                return;
+            }
             right=hit>0;
         }
         if(comic() && aaTab_==0) {
