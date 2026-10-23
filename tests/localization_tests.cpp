@@ -27,6 +27,8 @@ int main() {
     const std::string title="İstanbul Masalları — Çığlık ve Şiir";
     assert(localizeUiText(title,1)==title);
     assert(localizeUiText("EPUB",1)=="EPUB");
+    assert(localizeUiText("Disk hits/misses",0)=="Disk isabet/kaçırma");
+    assert(localizeUiText("Disk isabet/kaçırma",1)=="Disk hits/misses");
     assert(localizeUiText("PaperNX'ten çık",1)=="Exit PaperNX");
     assert(localizeUiText("Yazı boyutu",1)=="Font size");
     assert(localizeUiText("Satır aralığı",1)=="Line height");

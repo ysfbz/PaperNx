@@ -47,8 +47,9 @@ int main() {
         const auto secondAccess = std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - started).count();
         const auto warm = repository.stats();
         assert(warm.hits + (warm.misses - cold.misses) == std::uint64_t(count));
-        std::cout << count << " books: first-access misses=" << firstAccess << " ms, cache population=" << populate
-                  << " ms, second access=" << secondAccess << " ms, warm hits=" << (warm.hits - cold.hits)
+        std::cout << "synthetic disk-cache IO (no document decode), " << count
+                  << " books: cold cache lookup=" << firstAccess << " ms, population=" << populate
+                  << " ms, warm cache lookup=" << secondAccess << " ms, warm hits=" << (warm.hits - cold.hits)
                   << ", warm misses=" << (warm.misses - cold.misses) << ", retained=" << warm.entries
                   << " entries/" << warm.bytes << " bytes\n";
     }

@@ -21,8 +21,16 @@ int main() {
     CoverImage image{2, 3, 6, std::vector<std::uint8_t>(18, 123)};
     CoverRepository repo(cache);
     assert(!fs::exists(cache)); // Construction never scans or creates on the UI thread.
-    assert(!repo.read(book)); assert(repo.write(book, image));
-    assert(repo.read(book)->rgb == image.rgb);
+    assert(!repo.read(book));
+    auto coldStats = repo.stats();
+    assert(coldStats.misses == 1 && coldStats.hits == 0);
+    assert(repo.write(book, image));
+    auto populatedStats = repo.stats();
+    assert(populatedStats.entries == 1 && populatedStats.bytes == 74);
+    auto cached = repo.read(book);
+    assert(cached && cached->rgb == image.rgb);
+    auto warmStats = repo.stats();
+    assert(warmStats.hits == 1 && warmStats.misses == 1);
     auto key = CoverRepository::cacheKey(book);
     auto file = cache / (key + ".pnxc");
     auto modified = fs::last_write_time(file);

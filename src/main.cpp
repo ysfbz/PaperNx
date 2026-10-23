@@ -743,8 +743,9 @@ private:
             }
             if(metadataOnly) {collectBookMetadata(b);continue;}
 
-            if(auto cached=coverRepository_.read(b)) {
-                updateCoverCounters();
+            auto cached = coverRepository_.read(b);
+            updateCoverCounters();
+            if(cached) {
                 LoadedThumb lt; lt.id=b.id; lt.w=cached->width; lt.h=cached->height;
                 lt.stride=cached->stride; lt.rgb=std::move(cached->rgb);
                 lt.state=CoverState::Cached;
@@ -783,6 +784,7 @@ private:
                 lt.rgb.assign(img.rgb, img.rgb + (size_t)img.height * img.stride);
                 px_image_free(&img);
                 coverRepository_.write(b, CoverImage{lt.w,lt.h,lt.stride,lt.rgb});
+                updateCoverCounters();
 
                 {
                     std::lock_guard<std::mutex> lock(completedMutex_);
@@ -3934,7 +3936,8 @@ private:
             } else {
                 coverLabel = ui::label("Cover cache") + ": " + std::to_string(coverDiskEntries_.load()) + " " +
                     catLabel("kapak","covers") + " (" + formatBytes(coverDiskBytes_.load()) + ") · " +
-                    ui::label("Clear");
+                    ui::label("Disk hits/misses") + ": " + std::to_string(coverDiskHits_.load()) + "/" +
+                    std::to_string(coverDiskMisses_.load()) + " · " + ui::label("Clear");
             }
             row(16,coverLabel);
 
