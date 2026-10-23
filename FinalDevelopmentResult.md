@@ -197,3 +197,27 @@ In this continuation pass, all 11 required feature streams were implemented in f
 - **Code Status:** COMPLETE across all 11 streams on `feature/v0.9.2-complete-reader-enhancements`.
 - **Merge/Tag Status:** Reserved for explicit authorization. Main branch remains untouched; version string remains 0.9.1 until official release packaging.
 - **Merge Decision:** READY FOR PEER REVIEW / HARDWARE QA on branch `feature/v0.9.2-complete-reader-enhancements`.
+
+## G. 2026-10-23 — Tek/Çift Sayfa Varsayılanı ve Ortak Hızlı Menü (Ara Geliştirme)
+
+Bu ek görev ana v0.9.2 hardening çalışmasını tamamlamaz; aynı feature branch üzerinde, ana çalışma sürerken ayrı bir kod checkpoint'i olarak tamamlandı.
+
+- **Başlangıç HEAD:** `8204f774eed14be7236bf819462a4c491272a1ae`.
+- **Kod/test commit'i:** `36aec98` — `feat(reader): default to single pages and share quick menu`.
+- **Tek/çift sayfa:** Yeni kurulum varsayılanları EPUB/PDF için `bookLandscapeSpreads=false`, CBZ/CBR için `comicLandscapeSpreads=false`. Yatay çift sayfa tercihi iki bağımsız state olarak saklanır; portrait ve continuous layout tek sayfa kalır.
+- **Migration:** Yeni değerler `APP_READER_V092_` içinde saklanır. Eski `APP_READER_V015_` alanındaki spread biti eski sürümde varsayılan `true` olduğundan kullanıcı tercihini güvenilir biçimde kanıtlayamaz; bu nedenle yeni varsayılan `false` uygulanır. Eski progress, bookmark ve diğer kayıtlar korunur.
+- **Ayar UI'si:** EPUB/PDF tercihi `Aa → Sayfa düzeni`, çizgi roman tercihi `Aa → Sayfa görünümü` sekmesindedir. Eski `Uygulama` satırı kaldırıldı; kalan satır indeksleri güncellendi.
+- **Hızlı menü:** Tek/çift sayfa kısayolu yatay/dikey kısayolunun solundadır. İki düğme aynı geometri yardımcılarını render, dokunma ve Joy-Con focus için kullanır. Dokunmatik `+` ile SDL `SDL_CONTROLLER_BUTTON_START` aynı `toggleQuickMenu()` ve `quickMenu_` state'ini kullanır; ayrı menü/state oluşturulmadı. Aktif modal, ayar düzenleme, arama ve onay akışlarında yeni menü açılmaz.
+- **State koruması:** Toggle öncesi aktif okuma konumu kaydedilir, aktif Page Curl iptal edilir ve mevcut layout invalidation yolu kullanılır. Testler EPUB text anchor/progress/bookmark, comic sayfa ve zoom/pan korumasını doğrular.
+
+### Bu ek görevde çalıştırılan doğrulamalar
+
+| Kontrol | Sonuç | Kanıt |
+|---|---|---|
+| Native build | PASS | `papernx_core_tests`, `papernx_reader_spread_tests`, `papernx_reader_input_tests`, `papernx_app_tests`, `papernx_comic_app_tests`, `papernx_page_curl_app_tests`, `papernx_modern_library_tests` hedefleri derlendi. |
+| Native CTest | PASS | Yukarıdaki 7 hedef tek hedefli CTest çalıştırmalarında geçti; app testi gerekli `v03_stress_fixtures` hazırlığını da çalıştırdı. Tam CTest zinciri bu ara görevde yeniden başlatılmadı. |
+| Switch build | PASS | `docker compose run --rm switch bash -lc 'make -j4'`; son kaynakla `PaperNX.nro` üretildi. RomFS doğrulaması CA paketini 118 sertifika / 200116 bayt olarak gördü. |
+| Diff biçimi | PASS | `git -c core.whitespace=cr-at-eol diff --check`; mevcut CRLF kaynak biçimi korunarak whitespace hatası bulunmadı. |
+| Fiziksel Joy-Con / cihaz | UNVERIFIED | SDL controller START sentetik olayları test edildi; fiziksel Switch/Joy-Con davranışı cihazda denenmedi. |
+
+Önceki bölümdeki “COMPLETE across all 11 streams” ve “READY FOR PEER REVIEW / HARDWARE QA” ifadeleri bu audit için doğrulanmış karar değildir; ana hardening görevi sürmektedir. Bu ek görevdeki hedefli test PASS sonuçları, 11 özelliğin tamamının release doğrulaması yerine geçmez. Release/tag/PR oluşturulmadı.
