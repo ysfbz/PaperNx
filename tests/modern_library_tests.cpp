@@ -27,6 +27,10 @@ struct AppTest {
             PaperNxApp app(root);assert(app.init());
             // init starts a worker and does not synchronously traverse book folders.
             assert(app.libraryScanner_.pending() && app.books_.empty());settle(app);assert(app.books_.size()==1);
+            auto prefs=app.appSettings_.get();prefs.libraryFolders.push_back((root/"missing-sd-library").u8string());app.appSettings_.put(prefs);
+            const auto beforeUnavailableScan=app.books_.size();app.startLibraryScan();settle(app);
+            assert(app.books_.size()==beforeUnavailableScan && !app.currentErrorMessage_.empty());
+            prefs=app.appSettings_.get();prefs.libraryFolders.pop_back();app.appSettings_.put(prefs);
             const auto before=app.completedLibraryScans_;
             app.openBrowser();app.browserPath_=root/"import";app.scanBrowserDirectory();shot(app,"folder-picker");
             const auto add=app.browserFolderButton(1280);app.handleTap(float(add.x+add.w/2)/1280,float(add.y+add.h/2)/720);

@@ -267,7 +267,7 @@ const char *formatName(Format format) {
 }
 
 std::string defaultTitle(const fs::path &path) {
-    std::string title = path.stem().string();
+    std::string title = path.stem().u8string();
     for (char &c : title) {
         if (c == '_') c = ' ';
     }
@@ -280,40 +280,48 @@ std::string documentId(const std::string &path, std::uintmax_t size) {
 
 namespace {
 void scanInto(const fs::path &root, std::size_t maxBooks, const std::function<bool()> &cancelled,
-              std::vector<Book> &books) {
+              std::vector<Book> &books, bool *complete = nullptr) {
+    auto fail = [&] { if (complete) *complete = false; };
     std::error_code ec;
-    if (!fs::is_directory(root, ec)) return;
+    if (!fs::is_directory(root, ec) || ec) { fail(); return; }
 
-    fs::recursive_directory_iterator it(root, fs::directory_options::skip_permission_denied, ec), end;
-    for (; it != end && books.size() < maxBooks; it.increment(ec)) {
+    fs::recursive_directory_iterator it(root, fs::directory_options::none, ec), end;
+    if (ec) { fail(); return; }
+    while (it != end && books.size() < maxBooks) {
         if (cancelled && cancelled()) break;
-        if (ec) { ec.clear(); continue; }
-        if (it.depth() > 16) { it.disable_recursion_pending(); continue; }
-        if (it->is_symlink(ec)) { it.disable_recursion_pending(); ec.clear(); continue; }
-        if (ec) { ec.clear(); continue; }
-        if (!it->is_regular_file(ec)) { ec.clear(); continue; }
-        if (ec) { ec.clear(); continue; }
-
-        const auto path = it->path();
-        const auto type = detectFormat(path);
-        if (type == Format::Unsupported) continue;
-
-        auto size = it->file_size(ec);
-        if (ec) { ec.clear(); continue; }
-
-        Book b;
-        b.path = path.string();
-        b.bytes = size;
-        b.id = documentId(b.path, size);
-        b.title = defaultTitle(path);
-        b.format = type;
-
-        const auto mtime = it->last_write_time(ec);
-        if (!ec) {
-            b.modified = std::chrono::duration_cast<std::chrono::seconds>(mtime.time_since_epoch()).count();
+        if (it.depth() > 16) {
+            it.disable_recursion_pending();
+        } else {
+            const bool symlink = it->is_symlink(ec);
+            if (ec) { fail(); ec.clear(); }
+            else if (symlink) it.disable_recursion_pending();
+            else {
+                const bool regular = it->is_regular_file(ec);
+                if (ec) { fail(); ec.clear(); }
+                else if (regular) {
+                    const auto path = it->path();
+                    const auto type = detectFormat(path);
+                    if (type != Format::Unsupported) {
+                        const auto size = it->file_size(ec);
+                        if (ec) { fail(); ec.clear(); }
+                        else {
+                            Book b;
+                            b.path = path.u8string();
+                            b.bytes = size;
+                            b.id = documentId(b.path, size);
+                            b.title = defaultTitle(path);
+                            b.format = type;
+                            const auto mtime = it->last_write_time(ec);
+                            if (!ec) b.modified = std::chrono::duration_cast<std::chrono::seconds>(mtime.time_since_epoch()).count();
+                            else { fail(); ec.clear(); }
+                            books.push_back(std::move(b));
+                        }
+                    }
+                }
+            }
         }
-        ec.clear();
-        books.push_back(std::move(b));
+        it.increment(ec);
+        if (ec) { fail(); break; }
     }
 }
 
@@ -345,12 +353,16 @@ std::vector<Book> scan(const fs::path &root, std::size_t maxBooks,
 }
 
 std::vector<Book> scanRoots(const std::vector<fs::path> &roots, std::size_t maxBooks,
-                            const std::function<bool()> &cancelled) {
+                            const std::function<bool()> &cancelled, bool *complete) {
+    if (complete) *complete = true;
     std::vector<fs::path> candidates;
     for (const auto &root : roots) {
         std::error_code ec;
         auto path = fs::weakly_canonical(root, ec);
-        if (ec || !fs::is_directory(path, ec) || ec) continue;
+        if (ec || !fs::is_directory(path, ec) || ec) {
+            if (complete) *complete = false;
+            continue;
+        }
         candidates.push_back(std::move(path));
     }
     std::sort(candidates.begin(), candidates.end(), [](const fs::path &a, const fs::path &b) {
@@ -369,7 +381,7 @@ std::vector<Book> scanRoots(const std::vector<fs::path> &roots, std::size_t maxB
     std::vector<Book> books;
     for (const auto &root : uniqueRoots) {
         if ((cancelled && cancelled()) || books.size() >= maxBooks) break;
-        scanInto(root, maxBooks, cancelled, books);
+        scanInto(root, maxBooks, cancelled, books, complete);
     }
     std::sort(books.begin(), books.end(), [](const Book &a, const Book &b) {
         const int order = naturalCompare(a.path, b.path);

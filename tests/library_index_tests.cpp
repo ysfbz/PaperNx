@@ -4,6 +4,7 @@
 #include <chrono>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 using namespace papernx;
 static LibraryScanResult wait(LibraryScanner &scanner) {
     const auto until=std::chrono::steady_clock::now()+std::chrono::seconds(10);
@@ -13,11 +14,26 @@ static LibraryScanResult wait(LibraryScanner &scanner) {
 int main() {
     const auto root=fs::temp_directory_path()/"papernx-index-tests";fs::remove_all(root);fs::create_directories(root/"books"/"nested");
     for(int i=0;i<300;++i)std::ofstream(root/"books"/"nested"/("issue-"+std::to_string(i)+".cbz"))<<"fixture";
+    const auto unicodeRoot=root/fs::u8path(u8"Türkçe kitaplar");
+    const auto unicodeBook=unicodeRoot/fs::u8path(u8"İçerik ı-Çözüm.cbz");
+    fs::create_directories(unicodeRoot);std::ofstream(unicodeBook)<<"fixture";
     std::ofstream(root/"books"/"ignored.txt")<<"ignored";
     const auto inventory=root/"data"/"inventory.txt";LibraryScanner scanner;
     assert(scanner.start({root/"books"/"nested",root/"books",root/"books"}, {}, inventory));
-    assert(!scanner.start({}, {}, inventory));auto first=wait(scanner);assert(first.cached && first.error.empty() && first.books.size()==300);
+    assert(!scanner.start({}, {}, inventory));auto first=wait(scanner);assert(first.complete && first.cached && first.error.empty() && first.books.size()==300);
     assert(scanRoots({root/"books"/"nested",root/"books",root/"books"}).size()==300);
+    bool rootsComplete=true;assert(scanRoots({root/"books",root/"missing-root"},100,{},&rootsComplete).size()==100 && !rootsComplete);
+    const auto unicodeBooks=scan(unicodeRoot);
+    assert(unicodeBooks.size()==1 && unicodeBooks.front().path==unicodeBook.u8string() &&
+           unicodeBooks.front().title==unicodeBook.stem().u8string());
+    LibraryScanner unicodeScanner;const auto unicodeInventory=root/"data"/"unicode-inventory.txt";
+    assert(unicodeScanner.start({unicodeRoot},{},unicodeInventory));
+    auto unicodeResult=wait(unicodeScanner);
+    assert(unicodeResult.complete && unicodeResult.cached && unicodeResult.books.size()==1 &&
+           unicodeResult.books.front().path==unicodeBook.u8string());
+    const auto restoredUnicode=loadLibraryInventory(unicodeInventory);
+    assert(restoredUnicode.size()==1 && restoredUnicode.front().id==unicodeResult.books.front().id &&
+           restoredUnicode.front().path==unicodeBook.u8string());
     assert(scanRoots({root/"books"},5).size()==5);
     auto cached=loadLibraryInventory(inventory);assert(cached.size()==300);
     auto known=first.books;known.front().title="Custom title";known.front().author="Author";
@@ -29,10 +45,20 @@ int main() {
     assert(custom && replaced);
     // Removing a scan root retains already-opened, existing files, without touching progress.
     assert(scanner.start({},second.books,inventory));assert(wait(scanner).books.size()==299);
+    auto inventoryBytes=[&] {std::ifstream in(inventory,std::ios::binary);return std::string(std::istreambuf_iterator<char>(in),{});};
+    const auto savedInventory=inventoryBytes();
     const auto inventoryBeforeCancel=loadLibraryInventory(inventory);
+    assert(scanner.start({root/"books",root/"missing-sd-library"},second.books,inventory));
+    auto incomplete=wait(scanner);assert(!incomplete.complete && !incomplete.error.empty());
+    const auto inventoryAfterFailure=loadLibraryInventory(inventory);
+    assert(inventoryAfterFailure.size()==inventoryBeforeCancel.size());
+    for(std::size_t i=0;i<inventoryBeforeCancel.size();++i)
+        assert(inventoryAfterFailure[i].id==inventoryBeforeCancel[i].id && inventoryAfterFailure[i].path==inventoryBeforeCancel[i].path);
+    assert(inventoryBytes()==savedInventory);
     assert(scanner.start({root/"books"},second.books,inventory));scanner.cancel();
     auto cancelled=wait(scanner);assert(cancelled.cancelled);
     assert(loadLibraryInventory(inventory).size()==inventoryBeforeCancel.size());
+    assert(inventoryBytes()==savedInventory);
     assert(scanner.start({root/"books"},second.books,inventory));
     auto restarted=wait(scanner);assert(!restarted.cancelled && restarted.books.size()==299);
     assert(scanner.start({root/"books"},{},inventory));scanner.stop();assert(!scanner.ready() && !scanner.pending());

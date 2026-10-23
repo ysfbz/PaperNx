@@ -8,7 +8,7 @@ void rebuildLibraryLookup() {
     libraryLookup_.clear();libraryLookup_.reserve(books_.size());
     for(std::size_t i=0;i<books_.size();++i)libraryLookup_[books_[i].id]=i;
 }
-void restoreLibraryLabels() {
+void restoreLibraryLabels(bool discoverProgressFiles=true) {
     rebuildLibraryLookup();
     for(const auto &[id,p]:progressStore_.all()) {
         const auto found=libraryLookup_.find(id);
@@ -16,7 +16,7 @@ void restoreLibraryLabels() {
             auto &book=books_[found->second];
             if(!p.bookTitle.empty())book.title=p.bookTitle;
             if(!p.bookAuthor.empty())book.author=p.bookAuthor;
-        } else if(!p.bookPath.empty() && books_.size()<10000) {
+        } else if(discoverProgressFiles && !p.bookPath.empty() && books_.size()<10000) {
             std::error_code ec;const auto path=fs::u8path(p.bookPath);const auto size=fs::file_size(path,ec);
             if(ec || detectFormat(path)==Format::Unsupported || documentId(p.bookPath,size)!=id)continue;
             Book book;book.id=id;book.path=p.bookPath;book.bytes=size;book.format=detectFormat(path);
@@ -40,6 +40,12 @@ void processLibraryScan() {
         if(libraryScanAgain_){libraryScanAgain_=false;startLibraryScan();}
         return;
     }
+    if(!result->complete) {
+        if(!result->error.empty())currentErrorMessage_=ui::label(result->error);
+        dirty_=true;
+        if(libraryScanAgain_){libraryScanAgain_=false;startLibraryScan();}
+        return;
+    }
     std::string selected;
     if(selectedBookIdx_>=0 && selectedBookIdx_<int(visibleBooks_.size()))selected=visibleBooks_[selectedBookIdx_].id;
     std::unordered_map<std::string,Book> current;current.reserve(books_.size());
@@ -51,7 +57,7 @@ void processLibraryScan() {
     }
     // A file opened while the worker was running must survive its older batch.
     for(const auto &book:books_)if(!scanKnownIds_.count(book.id) && !seen.count(book.id) && result->books.size()<10000)result->books.push_back(book);
-    books_=std::move(result->books);restoreLibraryLabels();
+    books_=std::move(result->books);restoreLibraryLabels(false);
     if(!result->error.empty())currentErrorMessage_=ui::label(result->error);
     scheduleMetadataIndex();updateVisibleBooks();
     for(int i=0;i<int(visibleBooks_.size());++i)if(visibleBooks_[i].id==selected){selectedBookIdx_=i;break;}

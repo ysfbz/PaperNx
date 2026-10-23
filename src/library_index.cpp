@@ -37,7 +37,12 @@ bool LibraryScanner::start(std::vector<fs::path> roots,std::vector<Book> known,f
                 auto old=prior.find(book.id);if(old!=prior.end()){book.title=old->second.title;book.author=old->second.author;}
                 result.books.push_back(std::move(book));
             };
-            for(auto &book:scanRoots(roots,10000,[this]{return cancel_.load();}))add(std::move(book));
+            bool scanComplete=true;
+            for(auto &book:scanRoots(roots,10000,[this]{return cancel_.load();},&scanComplete))add(std::move(book));
+            if(!scanComplete) {
+                result.error="Library folder unavailable";result.cancelled=cancel_.load();
+                result_=std::move(result);ready_.store(true);return;
+            }
             // Independently opened files remain available. Missing source files
             // leave the inventory without deleting their progress or metadata.
             for(const auto &[id,old]:prior) {
@@ -50,6 +55,7 @@ bool LibraryScanner::start(std::vector<fs::path> roots,std::vector<Book> known,f
                 add(std::move(book));
             }
             std::sort(result.books.begin(),result.books.end(),[](const Book &a,const Book &b){return naturalCompare(a.path,b.path)<0;});
+            result.complete=true;
             if(!cancel_) {
                 ProgressStore cache(inventory);
                 for(const auto &b:result.books){if(cancel_)break;Progress p;p.bookPath=b.path;p.bookTitle=b.title;p.bookAuthor=std::to_string(b.bytes);p.lastRead=b.modified;cache.put(b.id,std::move(p));}
