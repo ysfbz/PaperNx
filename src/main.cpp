@@ -3284,6 +3284,13 @@ private:
             ui::button(renderer_,*typography_,{w<900?464:w-192,8,w<900?80:96,56},"Aa",pal);
 
             renderReaderNavigation(w,h,pal);
+        } else if(doc_ && !pageTurnAnimation_.active && !scrub_.active) {
+            // The footer is already reserved by the viewport (h-144).
+            // Show only a quiet folio while chrome is hidden, without
+            // shrinking book content or adding a render-cache dependency.
+            const auto number=std::to_string(std::clamp(currentPage_+1,1,std::max(1,pageCount_)));
+            typography_->renderText(renderer_,typography_->smallFont(),number,
+                w-68,h-46,pal.muted,48);
         }
     }
 
