@@ -116,13 +116,6 @@ std::string normalizedHash(std::string value) {
     return value;
 }
 
-std::uint64_t jsonInteger(const update_json::Value &value) {
-    if (value.kind != update_json::Value::Number || !digits(value.text) || value.text.size() > 12) return 0;
-    std::uint64_t result = 0;
-    const auto parsed = std::from_chars(value.text.data(), value.text.data() + value.text.size(), result);
-    return parsed.ec == std::errc{} && parsed.ptr == value.text.data() + value.text.size() ? result : 0;
-}
-
 struct CurlRuntime {
     CURLcode result{curl_global_init(CURL_GLOBAL_DEFAULT)};
     ~CurlRuntime() { curl_global_cleanup(); }
@@ -471,8 +464,8 @@ bool updateVersionNewer(const std::string &candidate, const std::string &current
 
 bool selectUpdateRelease(const std::string &json, const std::string &current, const UpdateSource &source,
                          UpdateRelease &release, std::string &error) {
-    update_json::Value root;
-    if (!update_json::Parser(json).parse(root) || root.kind != update_json::Value::Array) {
+    std::vector<update_json::Release> releases;
+    if (!update_json::Parser(json).parse(releases)) {
         error = "Invalid release response";
         return false;
     }
@@ -482,40 +475,29 @@ bool selectUpdateRelease(const std::string &json, const std::string &current, co
     }
 
     release = {};
-    for (const auto &item : root.items) {
-        if (item.kind != update_json::Value::Object || item.get("tag_name").kind != update_json::Value::String ||
-            item.get("tag_name").str().empty()) {
-            error = "Invalid release response";
-            return false;
-        }
-        if (item.get("draft").yes() || item.get("prerelease").yes()) continue;
-        const auto tag = item.get("tag_name").str();
+    for (const auto &item : releases) {
+        if (item.draft || item.prerelease) continue;
+        const auto &tag = item.tag;
         if (!updateVersionNewer(tag, current) || (!release.version.empty() && !updateVersionNewer(tag, release.version))) continue;
 
         UpdateRelease candidate;
         candidate.version = withoutPrefix(tag);
-        candidate.title = item.get("name").str().substr(0, 256);
-        candidate.notes = item.get("body").str().substr(0, 32768);
-        const auto &assets = item.get("assets");
-        if (assets.kind == update_json::Value::Array) {
-            bool nroSeen = false, checksumSeen = false;
-            for (const auto &asset : assets.items) {
-                const auto name = asset.get("name").str();
-                const auto url = asset.get("browser_download_url").str();
-                if (name == "PaperNX.nro") {
-                    if (nroSeen) { candidate.url.clear(); break; }
-                    nroSeen = true;
-                    const auto bytes = jsonInteger(asset.get("size"));
-                    if (url == source.assetPrefix + tag + "/PaperNX.nro" && bytes >= 0x1000 && bytes <= maxNro) {
-                        candidate.url = url;
-                        candidate.bytes = bytes;
-                        candidate.sha256 = normalizedHash(asset.get("digest").str());
-                    }
-                } else if (name == "PaperNX.nro.sha256") {
-                    if (checksumSeen) { candidate.checksumUrl.clear(); break; }
-                    checksumSeen = true;
-                    if (url == source.assetPrefix + tag + "/PaperNX.nro.sha256") candidate.checksumUrl = url;
+        candidate.title = item.name.substr(0, 256);
+        candidate.notes = item.notes.substr(0, 32768);
+        bool nroSeen = false, checksumSeen = false;
+        for (const auto &asset : item.assets) {
+            if (asset.name == "PaperNX.nro") {
+                if (nroSeen) { candidate.url.clear(); break; }
+                nroSeen = true;
+                if (asset.url == source.assetPrefix + tag + "/PaperNX.nro" && asset.bytes >= 0x1000 && asset.bytes <= maxNro) {
+                    candidate.url = asset.url;
+                    candidate.bytes = asset.bytes;
+                    candidate.sha256 = normalizedHash(asset.digest);
                 }
+            } else if (asset.name == "PaperNX.nro.sha256") {
+                if (checksumSeen) { candidate.checksumUrl.clear(); break; }
+                checksumSeen = true;
+                if (asset.url == source.assetPrefix + tag + "/PaperNX.nro.sha256") candidate.checksumUrl = asset.url;
             }
         }
         release = std::move(candidate);
