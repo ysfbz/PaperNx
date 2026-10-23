@@ -2,7 +2,7 @@
 
 **Updated:** 2026-10-24
 **Branch:** `feature/v0.9.2-complete-reader-enhancements`
-**Latest source commit:** `52164e7c8eb45ded2898998ea99152400f095979` (G6 cover-cache counter checkpoint).
+**Latest source commit:** `0923141c72d543c0c578da539337f5ec4ad6b1a4` (G7 cover-queue fairness checkpoint).
 **Last source commit before the current hardening changes:** `bb9d8579db9ccf0d10b5843e1929c2e696565c59`
 **Hardening source commits:** `913fb8f` and `1cb06a1`.
 **Audit documentation:** committed on this feature branch; use `git log` for the final report commit SHA.
@@ -36,7 +36,7 @@
 
 ## Next session starting point
 
-Read the current source-provenance report and latest `FinalDevelopmentResult.md` section first. Continue only on the existing feature branch. G6 counters and its synthetic scale run are recorded below; continue with G7 reader/UI/brightness regression and Ponytail audit, plus the remaining source redesign. Do not restart the full verification chain prematurely. Keep the final decision `INCOMPLETE — BLOCKERS REMAIN`; hardware behavior remains unverified until tested on a physical console.
+Read the current source-provenance report and latest `FinalDevelopmentResult.md` section first. Continue only on the existing feature branch. G6 counters and synthetic scale evidence and the G7 cover queue fairness/host audit are recorded below. Continue with the remaining source redesign and Ponytail review, then close feasible native gates without restarting completed broad test chains unnecessarily. Physical acceptance remains unverified; use [`V092_DEVICE_ACCEPTANCE.md`](V092_DEVICE_ACCEPTANCE.md) as the device record. Keep the final decision `INCOMPLETE — BLOCKERS REMAIN` until all required gates have evidence.
 
 ## 2026-10-23 latest continuation checkpoint
 
@@ -130,3 +130,12 @@ The verified/pushed branch HEAD at the start of this note was `ed9e3b69c184de1b4
 - **Synthetic benchmark:** five current-source runs at 100/500/1000 placeholder books; raw results at `verification/v092/cover-benchmark/synthetic-container-runs.txt`, summary in [`V092_COVER_BENCHMARK.md`](V092_COVER_BENCHMARK.md). Byte budget retained 100/354/354 generated images. This measures only `CoverRepository` synthetic disk I/O; it is not an end-to-end performance or speedup result.
 - **Not run / unverified:** real EPUB/PDF/CBZ/CBR decode and archive/metadata reopen counts, visible-cover/UI frame timing, actual RAM/texture use, baseline comparison, Switch SD performance, full native suite and sanitizers.
 - **Next:** G7 reader/UI/brightness test audit, then remaining independent-source and Ponytail audit. Overall decision remains `INCOMPLETE — BLOCKERS REMAIN`.
+
+## 2026-10-24 G7 host regression checkpoint
+
+- **Source commit:** `0923141c72d543c0c578da539337f5ec4ad6b1a4` (`perf(cover): prevent metadata queue starvation`). With both queues populated, one metadata job is selected after at most three thumbnail jobs; metadata-only work runs immediately. The viewport queue remains first priority.
+- **Scheduler/library test:** `papernx_modern_library_tests` rebuilt and passed **1/1**, including burst thresholds and prior async scan/library flows.
+- **Reader/device-related host tests:** current G7 run passed **6/6** for `papernx_core_tests`, `papernx_reader_input_tests`, `papernx_reader_spread_tests`, `papernx_page_curl_app_tests`, `papernx_app_tests`, and `v03_stress_fixtures` (CTest fixture dependency). The app test took 134.64 seconds.
+- **Switch cross-build:** `docker compose run --rm switch bash -lc 'export MUPDF_PREFIX=/work/prefix-mupdf-switch; make all -j4'` completed from this source worktree. Build output confirmed AArch64 ELF/NRO link and validated RomFS CA/fonts; no release/distribution or GitHub Actions run.
+- **Device matrix:** added [`V092_DEVICE_ACCEPTANCE.md`](V092_DEVICE_ACCEPTANCE.md). All inherited 38 checks and 23 v0.9.2-specific scenarios are UNVERIFIED; no physical Switch evidence is available.
+- **Still open:** full native/sanitizer suites, physical Joy-Con/backlight/SD, real-document cover performance, and the source redesign/Ponytail audit. Overall decision remains `INCOMPLETE — BLOCKERS REMAIN`.

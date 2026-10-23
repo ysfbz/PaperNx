@@ -5,7 +5,7 @@
 
 **Baseline:** `main@8db85384a1b6c277c74766601ef46e9a672328df` (2026-10-23 audit)  
 **Feature branch:** `feature/v0.9.2-complete-reader-enhancements`  
-**Latest source-bearing HEAD:** `52164e7c8eb45ded2898998ea99152400f095979` (G6 cover-cache counter checkpoint).
+**Latest source-bearing HEAD:** `0923141c72d543c0c578da539337f5ec4ad6b1a4` (G7 cover-queue fairness checkpoint).
 **Fork reference:** `rtk19/PaperNx@d2b4bcfd10b1a66043c5b8cd36da08340cffec6d`  
 **Version remains:** v0.9.1; do not tag, release or merge to main.
 
@@ -80,6 +80,19 @@ Five runs of `papernx_cover_performance_tests` measured repository-only I/O for 
 | 100/500/1000 real-document cold/warm, decode/reopen, UI/FPS/RAM, Switch SD | NOT RUN / UNVERIFIED | The five-run scale test uses placeholder `.epub` files and fixed RGB buffers. No real document decode or renderer is involved. |
 
 **Decision remains INCOMPLETE — BLOCKERS REMAIN.** Continue with G7 reader/UI/brightness regression and Ponytail audit, then close feasible native and Switch gates. Keep real-document cover performance and physical Switch measurements explicitly open.
+
+## Q. 2026-10-24 — G7 host regression and cover-worker fairness
+
+`thumbWorkerLoop()` previously consumed thumbnails whenever any were queued, so a continuously replenished visible-cover queue could delay metadata indexing indefinitely. A small three-thumbnail burst limit now gives one metadata job a turn when both queues have work; metadata still runs immediately when there are no thumbnails. The visible viewport remains prioritized, and no second worker or queue was added. `shouldProcessCoverMetadata()` has direct boundary assertions in `tests/modern_library_tests.cpp`.
+
+| Area | G7 result | Evidence |
+|---|---|---|
+| Cover worker scheduling | TARGETED DESKTOP PASS | `papernx_modern_library_tests` passed **1/1** including metadata-turn boundaries and existing async library flows. |
+| Reader, settings migration, brightness, Joy-Con, spreads and Page Curl | TARGETED DESKTOP PASS | Current G7 set passed **6/6**: core, reader input, reader spread, Page Curl app, application test, and its fixture setup test. |
+| Switch cross-build/link | PASS | `docker compose run --rm switch bash -lc 'export MUPDF_PREFIX=/work/prefix-mupdf-switch; make all -j4'` built `PaperNX.elf` and NRO from the G7 source worktree; CA and font RomFS validation ran. |
+| Physical console / Switch rendering, input, brightness and SD | NOT RUN / UNVERIFIED | No device was available; the expanded v0.9.2 test record is [`V092_DEVICE_ACCEPTANCE.md`](V092_DEVICE_ACCEPTANCE.md). |
+
+**Decision remains INCOMPLETE — BLOCKERS REMAIN.** This checkpoint covers a starvation edge case and targeted host/cross-build checks only. Real-document cover timing, full acceptance, physical device evidence, independent source redesign, and full current-HEAD sanitizer/native gates remain open.
 
 ### Ponytail full audit findings and code decisions
 
