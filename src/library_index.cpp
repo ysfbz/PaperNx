@@ -52,8 +52,8 @@ bool LibraryScanner::start(std::vector<fs::path> roots,std::vector<Book> known,f
             std::sort(result.books.begin(),result.books.end(),[](const Book &a,const Book &b){return naturalCompare(a.path,b.path)<0;});
             if(!cancel_) {
                 ProgressStore cache(inventory);
-                for(const auto &b:result.books){Progress p;p.bookPath=b.path;p.bookTitle=b.title;p.bookAuthor=std::to_string(b.bytes);p.lastRead=b.modified;cache.put(b.id,std::move(p));}
-                result.cached=cache.save();if(!result.cached)result.error="Library cache could not be saved";
+                for(const auto &b:result.books){if(cancel_)break;Progress p;p.bookPath=b.path;p.bookTitle=b.title;p.bookAuthor=std::to_string(b.bytes);p.lastRead=b.modified;cache.put(b.id,std::move(p));}
+                if(!cancel_){result.cached=cache.save();if(!result.cached)result.error="Library cache could not be saved";}
             }
 #if defined(__cpp_exceptions)
         } catch(const std::exception &error) {result.error=error.what();}
