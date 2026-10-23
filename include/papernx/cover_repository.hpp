@@ -14,6 +14,11 @@ struct CoverImage {
     int width{}, height{}, stride{};
     std::vector<std::uint8_t> rgb;
 };
+struct CoverCacheStats {
+    std::size_t entries{};
+    std::uintmax_t bytes{};
+    std::uint64_t hits{}, misses{};
+};
 
 // Worker-thread only. Construction performs no disk IO. Never stores book data
 // or changes progress. Cache failures are ordinary misses, never reader errors.
@@ -24,6 +29,10 @@ public:
     std::optional<CoverImage> read(const Book &book);
     bool write(const Book &book, const CoverImage &image);
     void trim();
+    // Worker-thread only, just like read/write. Never removes source books or
+    // unknown files; callers must stop/drain pending cover jobs before clearing.
+    bool clear();
+    CoverCacheStats stats();
     static std::string cacheKey(const Book &book);
     static constexpr int maxWidth = 150, maxHeight = 210;
 private:
@@ -32,6 +41,7 @@ private:
     std::uintmax_t maxBytes_;
     std::size_t maxEntries_;
     std::uint64_t clock_{};
+    std::uint64_t hits_{}, misses_{};
     bool initialized_{};
     bool available_{};
     std::map<std::string, Entry> entries_;
