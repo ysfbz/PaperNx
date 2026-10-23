@@ -460,6 +460,7 @@ void AppSettingsStore::put(AppPreferences preferences) {
     preferences.customUiTheme = std::clamp(preferences.customUiTheme, 0, 5);
     preferences.displayOrientation = std::clamp(preferences.displayOrientation, 0, 2);
     preferences.paperTexture = std::clamp(preferences.paperTexture, 0, 2);
+    preferences.softwareBrightness = std::clamp(preferences.softwareBrightness, 50, 100);
     preferences.defaultBrowserPath = utf8SafeTruncate(preferences.defaultBrowserPath, 4096);
     preferences_ = std::move(preferences);
 }
@@ -483,6 +484,7 @@ bool AppSettingsStore::load() {
         preferences.shoulderPageTurns=display.publisherStyles==0;
         preferences.pageCurlAnimation=display.readingMode==0;
         preferences.paperTexture=display.pdfColorMode;
+        preferences.softwareBrightness=display.scrollSensitivity; // Previously unused in APP_DISPLAY_V04_.
     }
     put(std::move(preferences));
     return true;
@@ -505,6 +507,7 @@ bool AppSettingsStore::save() const {
     display.publisherStyles=preferences_.shoulderPageTurns?0:1;
     display.readingMode=preferences_.pageCurlAnimation?0:1;
     display.pdfColorMode=preferences_.paperTexture;
+    display.scrollSensitivity=preferences_.softwareBrightness;
     store_.put("APP_DISPLAY_V04_",std::move(display));
     return store_.save();
 }
