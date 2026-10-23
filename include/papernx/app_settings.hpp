@@ -16,6 +16,7 @@ struct AppPreferences {
     bool shoulderPageTurns{true};
     bool pageCurlAnimation{true};
     int paperTexture{0}; // off, soft, natural; EPUB canvas only
+    int softwareBrightness{100}; // 50-100%; non-hardware dimming, default 100
     std::string defaultBrowserPath;
 };
 
