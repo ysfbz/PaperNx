@@ -8,6 +8,7 @@
 #include <limits>
 #include <fstream>
 #include <iomanip>
+#include <iterator>
 #include <sstream>
 #include <system_error>
 #include <cstdio>
@@ -277,19 +278,21 @@ std::string documentId(const std::string &path, std::uintmax_t size) {
     return hex(fnv1a(path + "\n" + std::to_string(size)));
 }
 
-std::vector<Book> scan(const fs::path &root, std::size_t maxBooks,
-                       const std::function<bool()> &cancelled) {
-    std::vector<Book> books;
+namespace {
+void scanInto(const fs::path &root, std::size_t maxBooks, const std::function<bool()> &cancelled,
+              std::vector<Book> &books) {
     std::error_code ec;
-    if (!fs::is_directory(root, ec)) return books;
+    if (!fs::is_directory(root, ec)) return;
 
     fs::recursive_directory_iterator it(root, fs::directory_options::skip_permission_denied, ec), end;
     for (; it != end && books.size() < maxBooks; it.increment(ec)) {
         if (cancelled && cancelled()) break;
         if (ec) { ec.clear(); continue; }
         if (it.depth() > 16) { it.disable_recursion_pending(); continue; }
-        if (it->is_symlink(ec)) { it.disable_recursion_pending(); continue; }
-        if (!it->is_regular_file(ec)) continue;
+        if (it->is_symlink(ec)) { it.disable_recursion_pending(); ec.clear(); continue; }
+        if (ec) { ec.clear(); continue; }
+        if (!it->is_regular_file(ec)) { ec.clear(); continue; }
+        if (ec) { ec.clear(); continue; }
 
         const auto path = it->path();
         const auto type = detectFormat(path);
@@ -312,9 +315,64 @@ std::vector<Book> scan(const fs::path &root, std::size_t maxBooks,
         ec.clear();
         books.push_back(std::move(b));
     }
+}
 
+std::size_t pathDepth(const fs::path &path) {
+    return static_cast<std::size_t>(std::distance(path.begin(), path.end()));
+}
+
+bool containsPath(const fs::path &parent, const fs::path &child) {
+    for (auto current = child; !current.empty();) {
+        std::error_code ec;
+        if (fs::equivalent(parent, current, ec) && !ec) return true;
+        auto next = current.parent_path();
+        if (next == current) break;
+        current = std::move(next);
+    }
+    return false;
+}
+}
+
+std::vector<Book> scan(const fs::path &root, std::size_t maxBooks,
+                       const std::function<bool()> &cancelled) {
+    std::vector<Book> books;
+    scanInto(root, maxBooks, cancelled, books);
     std::sort(books.begin(), books.end(), [](const Book &a, const Book &b) {
         const int order = compareNatural(a.title, b.title);
+        return order ? order < 0 : a.id < b.id;
+    });
+    return books;
+}
+
+std::vector<Book> scanRoots(const std::vector<fs::path> &roots, std::size_t maxBooks,
+                            const std::function<bool()> &cancelled) {
+    std::vector<fs::path> candidates;
+    for (const auto &root : roots) {
+        std::error_code ec;
+        auto path = fs::weakly_canonical(root, ec);
+        if (ec || !fs::is_directory(path, ec) || ec) continue;
+        candidates.push_back(std::move(path));
+    }
+    std::sort(candidates.begin(), candidates.end(), [](const fs::path &a, const fs::path &b) {
+        const auto leftDepth = pathDepth(a), rightDepth = pathDepth(b);
+        return leftDepth == rightDepth ? a < b : leftDepth < rightDepth;
+    });
+
+    std::vector<fs::path> uniqueRoots;
+    uniqueRoots.reserve(candidates.size());
+    for (const auto &candidate : candidates) {
+        if (std::none_of(uniqueRoots.begin(), uniqueRoots.end(), [&](const fs::path &root) {
+                return containsPath(root, candidate);
+            })) uniqueRoots.push_back(candidate);
+    }
+
+    std::vector<Book> books;
+    for (const auto &root : uniqueRoots) {
+        if ((cancelled && cancelled()) || books.size() >= maxBooks) break;
+        scanInto(root, maxBooks, cancelled, books);
+    }
+    std::sort(books.begin(), books.end(), [](const Book &a, const Book &b) {
+        const int order = naturalCompare(a.path, b.path);
         return order ? order < 0 : a.id < b.id;
     });
     return books;

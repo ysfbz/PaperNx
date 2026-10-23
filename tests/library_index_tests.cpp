@@ -17,6 +17,8 @@ int main() {
     const auto inventory=root/"data"/"inventory.txt";LibraryScanner scanner;
     assert(scanner.start({root/"books"/"nested",root/"books",root/"books"}, {}, inventory));
     assert(!scanner.start({}, {}, inventory));auto first=wait(scanner);assert(first.cached && first.error.empty() && first.books.size()==300);
+    assert(scanRoots({root/"books"/"nested",root/"books",root/"books"}).size()==300);
+    assert(scanRoots({root/"books"},5).size()==5);
     auto cached=loadLibraryInventory(inventory);assert(cached.size()==300);
     auto known=first.books;known.front().title="Custom title";known.front().author="Author";
     const auto changed=known.back();std::ofstream(changed.path,std::ios::app)<<"new bytes";
@@ -29,11 +31,19 @@ int main() {
     assert(scanner.start({},second.books,inventory));assert(wait(scanner).books.size()==299);
     assert(scanner.start({root/"books"},{},inventory));scanner.stop();assert(!scanner.ready() && !scanner.pending());
     assert(loadLibraryInventory(inventory).size()==299);
+    const auto broken=root/"data"/"broken-inventory.txt";std::ofstream(broken)<<"damaged inventory";
+    assert(loadLibraryInventory(broken).empty());
+    ProgressStore reading(root/"data"/"reading-progress.txt");Progress progress;progress.page=7;progress.bookPath=changed.path;reading.put(changed.id,progress);assert(reading.save());
+    assert(scanner.start({root/"books"},second.books,broken));auto recovered=wait(scanner);
+    assert(recovered.cached && recovered.books.size()==299 && loadLibraryInventory(broken).size()==299);
+    ProgressStore restoredReading(root/"data"/"reading-progress.txt");assert(restoredReading.load() && restoredReading.get(changed.id).page==7);
     assert(scan(root/"books",5).size()==5);assert(scan(root/"books",100,[]{return true;}).empty());
     std::size_t checks=0;const auto interrupted=scan(root/"books",300,[&]{return ++checks==12;});
     assert(checks==12 && interrupted.size()<300);
+    checks=0;const auto multiRootInterrupted=scanRoots({root/"books",root/"books"/"nested"},300,[&]{return ++checks==12;});
+    assert(checks==12 && multiRootInterrupted.size()<300);
     AppSettingsStore settings(root/"settings.txt");auto prefs=settings.get();assert(prefs.scanOnLaunch && prefs.interfaceStyle==0 && prefs.interfaceAccent==0);
     prefs.libraryFolders={"/books/a","/books/a","/books/b"};prefs.interfaceStyle=1;prefs.interfaceAccent=5;prefs.scanOnLaunch=false;settings.put(prefs);assert(settings.save());
     AppSettingsStore restored(root/"settings.txt");assert(restored.load());assert(restored.get().libraryFolders.size()==2 && !restored.get().scanOnLaunch && restored.get().interfaceStyle==1 && restored.get().interfaceAccent==5);
-    fs::remove_all(root);std::cout<<"PASS: batch inventory, nested root deduplication, changed/missing files, atomic cache, cancellation and persisted scan/theme preferences\n";
+    fs::remove_all(root);std::cout<<"PASS: multi-root scan, nested-root deduplication, corrupt inventory recovery, progress isolation, cancellation and persisted preferences\n";
 }

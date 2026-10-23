@@ -37,21 +37,7 @@ bool LibraryScanner::start(std::vector<fs::path> roots,std::vector<Book> known,f
                 auto old=prior.find(book.id);if(old!=prior.end()){book.title=old->second.title;book.author=old->second.author;}
                 result.books.push_back(std::move(book));
             };
-            std::vector<fs::path> canonical;
-            for(auto &root:roots) {
-                std::error_code ec;auto path=fs::weakly_canonical(root,ec);if(ec)continue;
-                if(std::find(canonical.begin(),canonical.end(),path)==canonical.end())canonical.push_back(std::move(path));
-            }
-            std::sort(canonical.begin(),canonical.end());std::vector<fs::path> uniqueRoots;
-            for(const auto &path:canonical) {
-                bool nested=false;
-                for(const auto &parent:uniqueRoots){auto relative=path.lexically_relative(parent);if(!relative.empty() && *relative.begin()!=".."){nested=true;break;}}
-                if(!nested)uniqueRoots.push_back(path);
-            }
-            for(const auto &root:uniqueRoots) {
-                if(cancel_)break;
-                for(auto &book:scan(root,10000-result.books.size(),[this]{return cancel_.load();}))add(std::move(book));
-            }
+            for(auto &book:scanRoots(roots,10000,[this]{return cancel_.load();}))add(std::move(book));
             // Independently opened files remain available. Missing source files
             // leave the inventory without deleting their progress or metadata.
             for(const auto &[id,old]:prior) {
