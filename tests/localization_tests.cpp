@@ -43,6 +43,9 @@ int main() {
     assert(localizeUiText("Ekran yönü",1)=="Display orientation");
     assert(localizeUiText("Günlüğüm",1)=="My journal");
     assert(localizeUiText("Kitabı sil",1)=="Delete book");
+    assert(localizeUiText("Update verified and saved as PaperNX.nro.new.",0)=="Güncelleme doğrulandı ve PaperNX.nro.new olarak kaydedildi.");
+    assert(localizeUiText("Güncelleme klasörü",1)=="Update folder");
+    assert(localizeUiText("Close",0)=="Kapat");
     assert(localizeUiText("Kitaplık",42)=="Kitaplık");
     assert(localizeUiText("Kitaplık",0)=="Kitaplık");
 

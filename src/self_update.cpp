@@ -17,7 +17,7 @@
 namespace papernx {
 namespace {
 constexpr std::uint64_t maxNro = 256ull * 1024 * 1024;
-constexpr std::uint64_t installReserve = 1024ull * 1024;
+constexpr std::uint64_t stagingReserve = 1024ull * 1024;
 
 struct Version {
     std::array<std::uint64_t, 3> core{};
@@ -248,30 +248,6 @@ bool writeAtomicText(const std::filesystem::path &path, const std::string &text,
     return false;
 }
 
-bool copyDurable(const std::filesystem::path &source, const std::filesystem::path &destination) {
-    FILE *input = std::fopen(source.string().c_str(), "rb");
-    if (!input) return false;
-    FILE *output = std::fopen(destination.string().c_str(), "wb");
-    if (!output) {
-        std::fclose(input);
-        return false;
-    }
-    std::array<unsigned char, 32768> buffer{};
-    bool ok = true;
-    while (ok) {
-        const auto count = std::fread(buffer.data(), 1, buffer.size(), input);
-        if (count && std::fwrite(buffer.data(), 1, count, output) != count) ok = false;
-        if (count < buffer.size()) {
-            if (std::ferror(input)) ok = false;
-            break;
-        }
-    }
-    ok = ok && durable(output);
-    if (std::fclose(input) != 0) ok = false;
-    if (std::fclose(output) != 0) ok = false;
-    return ok;
-}
-
 std::uint32_t readLe32(const unsigned char *data) {
     return std::uint32_t(data[0]) | (std::uint32_t(data[1]) << 8) |
            (std::uint32_t(data[2]) << 16) | (std::uint32_t(data[3]) << 24);
@@ -406,13 +382,13 @@ bool readBootRecord(const std::filesystem::path &path, BootRecord &record) {
     return parsed.ec == std::errc{} && record.bytes >= 0x1000 && record.bytes <= maxNro;
 }
 
-std::string bootRecordText(const BootRecord &record) {
-    return record.hash + "\n" + record.version + "\n" + std::to_string(record.bytes) + "\n";
-}
-
 bool pathExists(const std::filesystem::path &path) {
     std::error_code ec;
     return std::filesystem::exists(path, ec);
+}
+
+bool removeUpdaterFile(const std::filesystem::path &path) {
+    return std::remove(path.string().c_str()) == 0 || errno == ENOENT;
 }
 
 bool restoreBackup(const std::filesystem::path &executable, std::string &error) {
@@ -570,11 +546,20 @@ bool SelfUpdater::check() {
         publish(UpdateState::Error, "Cannot determine the running NRO path");
         return false;
     }
+    if (!removeUpdaterFile(path + ".part") || !removeUpdaterFile(path + ".ready.tmp")) {
+        publish(UpdateState::Error, "Cannot clean incomplete update files");
+        return false;
+    }
     publish(UpdateState::Checking);
     worker_ = std::thread([this] {
         std::string error;
         if (validatePending(error)) {
             publish(UpdateState::Ready);
+            return;
+        }
+        if (!removeUpdaterFile(executable_.string() + ".new") ||
+            !removeUpdaterFile(executable_.string() + ".ready")) {
+            publish(UpdateState::Error, "Cannot clean an invalid pending update");
             return;
         }
         std::string response;
@@ -603,10 +588,8 @@ bool SelfUpdater::download() {
         publish(UpdateState::Error, "A previous update still needs boot recovery");
         return false;
     }
-    std::error_code ec;
-    const auto installedBytes = std::filesystem::file_size(executable_, ec);
-    if (ec || installedBytes > std::numeric_limits<std::uint64_t>::max() - snapshot.release.bytes - installReserve ||
-        !hasSpaceFor(executable_.parent_path(), installedBytes + snapshot.release.bytes + installReserve)) {
+    if (snapshot.release.bytes > maxNro || snapshot.release.bytes > std::numeric_limits<std::uint64_t>::max() - stagingReserve ||
+        !hasSpaceFor(executable_.parent_path(), snapshot.release.bytes + stagingReserve)) {
         publish(UpdateState::Error, "There is not enough free space on the SD card");
         return false;
     }
@@ -778,62 +761,4 @@ bool SelfUpdater::rollbackBoot(std::string &error) {
     return true;
 }
 
-bool SelfUpdater::applyPending(std::string &error) {
-    stop();
-    error.clear();
-    if (!pathExists(executable_.string() + ".ready")) return false;
-    if (!validatePending(error)) {
-        if (error.empty()) error = "Pending update is invalid";
-        return false;
-    }
-
-    const auto path = executable_.string();
-    const auto backup = path + ".old";
-    const auto swap = path + ".swap";
-    const auto marker = std::filesystem::path(path + ".boot");
-    if (pathExists(backup) || pathExists(swap) || pathExists(marker) || pathExists(path + ".boot.started") || pathExists(path + ".boot.ok")) {
-        error = "An earlier update still needs recovery";
-        return false;
-    }
-    if (!copyDurable(executable_, backup)) {
-        std::remove(backup.c_str());
-        error = "Cannot create a durable backup of the installed NRO";
-        return false;
-    }
-    std::ifstream ready(path + ".ready");
-    BootRecord record;
-    if (!(ready >> record.hash >> record.version >> record.bytes) || normalizedHash(record.hash) != record.hash) {
-        std::remove(backup.c_str());
-        error = "Pending update record is invalid";
-        return false;
-    }
-    if (!writeAtomicText(marker, bootRecordText(record), error)) {
-        std::remove(backup.c_str());
-        return false;
-    }
-
-    // shortcut: power loss between FAT renames can hide the NRO; restore .old manually until a bootable recovery tool exists.
-    if (std::rename(path.c_str(), swap.c_str()) != 0) {
-        const auto reason = errno;
-        std::remove(marker.string().c_str());
-        std::remove(backup.c_str());
-        error = std::string("Cannot stage the installed NRO: ") + std::strerror(reason);
-        return false;
-    }
-    if (std::rename((path + ".new").c_str(), path.c_str()) != 0) {
-        const auto reason = errno;
-        if (std::rename(swap.c_str(), path.c_str()) == 0) {
-            std::remove(marker.string().c_str());
-            std::remove(backup.c_str());
-        } else {
-            error = "Update install was interrupted; the previous NRO is preserved as .old";
-            return false;
-        }
-        error = std::string("Cannot install the verified update: ") + std::strerror(reason);
-        return false;
-    }
-    std::remove(swap.c_str());
-    std::remove((path + ".ready").c_str());
-    return true;
-}
 } // namespace papernx

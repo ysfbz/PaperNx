@@ -30,8 +30,8 @@ bool updateVersionNewer(const std::string &candidate,const std::string &current)
 bool selectUpdateRelease(const std::string &json,const std::string &current,
                          const UpdateSource &source,UpdateRelease &release,std::string &error);
 
-// Network/file work stays on one owned worker. The running NRO is never written.
-// applyPending is called only after the app, its fonts and RomFS are destroyed.
+// Network/file work stays on one owned worker. Updates are verified beside the
+// running NRO for manual installation; this process never replaces its executable.
 class SelfUpdater {
 public:
     ~SelfUpdater();
@@ -46,7 +46,7 @@ public:
     UpdateStatus status() const;
     void cancel();
     void stop();
-    bool applyPending(std::string &error);
+    // These boot markers recover transactions created by older self-installing builds.
     enum class BootRecovery {Normal,Candidate,RolledBack,Error};
     BootRecovery prepareBoot(std::string &error);
     bool confirmBoot(std::string &error);

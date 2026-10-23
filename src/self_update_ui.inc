@@ -1,5 +1,5 @@
 // UI state is owned by the SDL thread. The worker exposes value snapshots only.
-bool updateDialog_{false},updateNotes_{false},updateManual_{false},updateRestart_{false};
+bool updateDialog_{false},updateNotes_{false},updateManual_{false};
 int updateFocus_{2},updatePercent_{-1};
 float updateNotesScroll_{0},updateTouchY_{0};
 UpdateState updateSeen_{UpdateState::Idle};
@@ -56,7 +56,7 @@ void pollUpdates() {
 }
 SDL_Rect updatePanel(int w,int h) const {const int width=std::min(660,w-48),height=std::min(540,h-112);return {(w-width)/2,(h-height)/2,width,height};}
 SDL_Rect updateButton(int index,int count,int w,int h) const {const auto r=updatePanel(w,h);const int step=(r.w-48)/count;return {r.x+24+index*step,r.y+r.h-80,step-8,56};}
-int updateButtonCount(const UpdateStatus &s) const {return updateBusy(s)||s.state==UpdateState::Cancelled?1:s.state==UpdateState::Ready?2:!updateNotes_&&s.state==UpdateState::Available&&s.release.installable()?3:1;}
+int updateButtonCount(const UpdateStatus &s) const {return updateBusy(s)||s.state==UpdateState::Cancelled?1:!updateNotes_&&s.state==UpdateState::Available&&s.release.installable()?3:1;}
 bool updateBusy(const UpdateStatus &s) const {return s.state==UpdateState::Checking||s.state==UpdateState::Downloading;}
 void activateUpdate(int index) {
     const auto s=updater_->status();if(updateBusy(s)){updater_->cancel();return;}
@@ -65,7 +65,7 @@ void activateUpdate(int index) {
         if(index==1){updateNotes_=true;updateNotesScroll_=0;updateFocus_=0;}
         else if(index==2){saveCurrentPosition();flushProgress();updater_->download();}
         else {updateDialog_=false;updateManual_=false;}
-    } else if(s.state==UpdateState::Ready) {if(index==1){updateRestart_=true;exitRequested_=true;}else {updateDialog_=false;updateManual_=false;}}
+    } else if(s.state==UpdateState::Ready) {updateDialog_=false;updateManual_=false;}
     else {updateDialog_=false;updateManual_=false;}
     dirty_=true;
 }
@@ -121,7 +121,9 @@ void renderUpdateDialog(int w,int h,const ThemePalette &pal) {
         else if(s.state==UpdateState::Downloading)text=ui::label("Downloading update...")+" "+std::to_string(s.percent)+"%";
         else if(s.state==UpdateState::Current)text=ui::label("You are on the latest version")+"\n\n"+APP_VERSION_FULL;
         else if(s.state==UpdateState::Error)text=ui::label("Could not update PaperNX")+"\n\n"+ui::label(s.error);
-        else if(s.state==UpdateState::Ready)text=ui::label("Update downloaded. Restart to finish installation.");
+        else if(s.state==UpdateState::Ready)text=ui::label("Update verified and saved as PaperNX.nro.new.")+"\n\n"+
+            ui::label("Close PaperNX, then use a file manager to replace PaperNX.nro with PaperNX.nro.new.")+"\n\n"+
+            ui::label("Update folder")+": "+updater_->executable().parent_path().string();
         else if(s.state==UpdateState::Cancelled)text=ui::label("Update cancelled");
         else if(s.state==UpdateState::Available){
             text=ui::label("New version available")+"\n\n"+s.release.version+"\n"+s.release.title;
@@ -135,7 +137,7 @@ void renderUpdateDialog(int w,int h,const ThemePalette &pal) {
     for(int i=0;i<count;++i){
         const char *label=count==3?(i==0?"Later":i==1?"What's new":"Update"):
             updateBusy(s)?s.state==UpdateState::Checking?"Cancel check":"Cancel download":
-            updateNotes_?"Back":s.state==UpdateState::Ready?(i==0?"Later":"Restart"):"Close";
+            updateNotes_?"Back":"Close";
         auto r=updateButton(i,count,w,h);ui::button(renderer_,*typography_,r,ui::label(label),pal,i==std::clamp(updateFocus_,0,count-1));
     }
 }

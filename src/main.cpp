@@ -276,7 +276,6 @@ public:
 #endif
         autoUpdateCheckPending_=appSettings_.get().automaticUpdateCheck;
     }
-    bool restartAfterUpdate() const {return updateRestart_;}
     void showStartupMessage(std::string message) {currentErrorMessage_=std::move(message);dirty_=true;}
     void confirmBootAfterFirstRender() {
         if(bootFrameConfirmed_)return;
@@ -4041,38 +4040,20 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    int result=0;std::string startupMessage;
-    for(;;) {
-        bool restart=false;
-        {
-            PaperNxApp app(root,updater);
-            if(app.init()) {
-                if(!startupMessage.empty())app.showStartupMessage(startupMessage);
-                app.startUpdates(argc,argv);app.run();restart=app.restartAfterUpdate();
-            } else result=1;
-        }
+    int result=0;
+    {
+        PaperNxApp app(root,updater);
+        if(app.init()) {app.startUpdates(argc,argv);app.run();}
+        else result=1;
+    }
 
-        if(boot==SelfUpdater::BootRecovery::Candidate) {
-            const auto recovery=updater->prepareBoot(bootError);
-            if(recovery==SelfUpdater::BootRecovery::RolledBack) {
-                std::fprintf(stderr,"Update recovery: %s\n",bootError.c_str());scheduleRelaunch();result=0;break;
-            }
-            if(recovery==SelfUpdater::BootRecovery::Error) {
-                std::fprintf(stderr,"Update recovery: %s\n",bootError.c_str());result=1;break;
-            }
+    if(boot==SelfUpdater::BootRecovery::Candidate) {
+        const auto recovery=updater->prepareBoot(bootError);
+        if(recovery==SelfUpdater::BootRecovery::RolledBack) {
+            std::fprintf(stderr,"Update recovery: %s\n",bootError.c_str());scheduleRelaunch();result=0;
+        } else if(recovery==SelfUpdater::BootRecovery::Error) {
+            std::fprintf(stderr,"Update recovery: %s\n",bootError.c_str());result=1;
         }
-        if(result || !restart)break;
-
-        std::string updateError;
-        if(updater->applyPending(updateError)) {
-            scheduleRelaunch();break;
-        }
-        if(updateError.empty())updateError="Update installation was not started";
-        std::string recoveryError;
-        startupMessage=updateError;
-        if(updater->rollbackBoot(recoveryError))startupMessage+=" · "+recoveryError;
-        else if(!recoveryError.empty())startupMessage+=" · "+recoveryError;
-        std::fprintf(stderr,"Update: %s\n",startupMessage.c_str());
     }
 
     TTF_Quit();

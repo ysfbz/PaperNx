@@ -121,11 +121,19 @@ def main():
         base = f"https://localhost:{server.server_port}/"
         scenarios = ("current", "downgrade", "missing", "oversized", "success", "checksum-fallback",
                      "corrupt", "badapp", "badversion", "truncated", "cancel", "write-error",
-                     "tampered", "replace-failure", "missing-marker", "recovery", "startup-failure",
+                     "stale-part", "stale-part-error", "orphan-new", "resume-ready", "tampered", "missing-marker",
                      "malformed", "tls-reject", "http")
         try:
             for scenario in scenarios:
                 server.scenario = scenario
+                if scenario == "resume-ready":
+                    executable = root / scenario / "custom folder" / "קורא.nro"
+                    executable.parent.mkdir(parents=True)
+                    payload = make_nro()
+                    pathlib.Path(str(executable) + ".new").write_bytes(payload)
+                    pathlib.Path(str(executable) + ".ready").write_text(
+                        hashlib.sha256(payload).hexdigest() + "\n0.13.0\n" + str(len(payload)) + "\n",
+                        encoding="ascii")
                 if scenario == "checksum-fallback":
                     # Exercise the standalone checksum asset when GitHub omits digest metadata.
                     original = Handler.do_GET
