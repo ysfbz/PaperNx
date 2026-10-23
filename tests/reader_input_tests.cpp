@@ -17,6 +17,18 @@ struct AppTest {
     static void finish(PaperNxApp &app) {
         app.pageTurnAnimation_.started=SDL_GetTicks()-2000;app.tickPageTurn();
     }
+    static void waitComicTurn(PaperNxApp &app) {
+        const auto deadline=SDL_GetTicks()+20000;
+        while(app.comicPendingTurn_.active && SDL_GetTicks()<deadline){app.processComicPages();SDL_Delay(2);}
+        app.processComicPages();assert(!app.comicPendingTurn_.active);
+    }
+    static void waitTouchTurn(PaperNxApp &app) {
+        const auto deadline=SDL_GetTicks()+20000;
+        while(app.pageTurnTouch_.waitingForTexture && SDL_GetTicks()<deadline) {
+            app.processComicPages();app.tickPageTurn();SDL_Delay(2);
+        }
+        assert(!app.pageTurnTouch_.waitingForTexture);
+    }
     static std::vector<Uint32> pixels(PaperNxApp &app) {
         app.render();int w,h;app.getWindowSize(w,h);std::vector<Uint32> out(w*h);
         assert(SDL_RenderReadPixels(app.renderer_,nullptr,SDL_PIXELFORMAT_ARGB8888,out.data(),w*4)==0);return out;
@@ -90,7 +102,7 @@ struct AppTest {
         const auto warmDeadline=SDL_GetTicks()+10000;
         while(app.comicPages_.pending() && SDL_GetTicks()<warmDeadline){app.processComicPages();SDL_Delay(2);}
         app.processComicPages();assert(!app.comicPages_.pending());
-        const auto decodes=app.comicTextureBuilds_;app.turnPage(1);
+        const auto decodes=app.comicTextureBuilds_;app.turnPage(1);waitComicTurn(app);
         assert(app.pageTurnAnimation_.active && app.pageTurnAnimation_.comicSheet);
         assert(app.comicTextureBuilds_==decodes);finish(app);
         // A touch in the empty outer margin is owned immediately, without
@@ -111,8 +123,9 @@ struct AppTest {
         // Zoomed spread keeps two pages and supports controller curls; a
         // horizontal outer-edge drag turns, while an interior drag still pans.
         app.zoomPdf(2,.5f,.5f,true);app.pdfPanY_=0;app.pdfPanX_=0;
-        app.turnPage(1);assert(app.pageTurnAnimation_.active && app.pageTurnAnimation_.comicSheet);finish(app);
+        app.turnPage(1);waitComicTurn(app);assert(app.pageTurnAnimation_.active && app.pageTurnAnimation_.comicSheet);finish(app);
         app.currentPage_=0;app.pdfPanX_=0;touch(app,SDL_FINGERDOWN,.94f,.5f);touch(app,SDL_FINGERMOTION,.3f,.5f);
+        waitTouchTurn(app);
         assert(app.pageTurnAnimation_.dragging);touch(app,SDL_FINGERUP,.3f,.5f);finish(app);
         app.closeBook();app.openBook(book("paper-bounds.cbz"));app.toolbarVisible_=false;
         for(float zoom:{1.f,1.01f}) {
@@ -127,7 +140,7 @@ struct AppTest {
             for(int y=73;y<paper.y-2;++y)for(int x=seam-1;x<=seam;++x)assert((frame[y*1280+x]&0xffffff)==background);
             for(int y=paper.y+paper.h+2;y<676;++y)for(int x=seam-1;x<=seam;++x)assert((frame[y*1280+x]&0xffffff)==background);
             screenshot(app,zoom==1?"fit-bounded-spine":"zoom-bounded-spine");
-            app.turnPage(1);auto &turn=app.pageTurnAnimation_;assert(turn.spread && turn.comicSheet);
+            app.turnPage(1);waitComicTurn(app);auto &turn=app.pageTurnAnimation_;assert(turn.spread && turn.comicSheet);
             assert(turn.viewport.y==paper.y && turn.viewport.h==paper.h && turn.viewport.w<640);
             // Draw at a held progress, proving that the real paper mesh and its
             // folio snapshots survive eviction and leave the outer chrome clear.

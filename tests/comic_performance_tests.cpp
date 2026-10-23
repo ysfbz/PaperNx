@@ -29,6 +29,56 @@ struct AppTest {
   for(int page=visibleGroup.first;page<visibleGroup.first+visibleGroup.second+2 && page<app.pageCount_;++page)
    assert(app.pageCache_.get(app.comicTextureKey(page)));
   assert(app.pageCache_.currentBytes()<36u*1024u*1024u);
+  // Cold controller and touch turns wait for the worker instead of rasterizing
+  // the target synchronously or saving a position before the page is ready.
+  auto settings=app.appSettings_.get();settings.comicLandscapeSpreads=false;settings.pageCurlAnimation=true;app.appSettings_.put(settings);
+  app.cancelPageTurn();app.zoomPdf(1);app.pdfPanX_=app.pdfPanY_=0;app.comicPages_.setSuspended(true);
+  app.pageCache_.clear();app.currentPage_=original;app.render();
+  const int anchor=app.currentPage_,savedPage=app.progressStore_.get(app.currentBookId_).page;
+  const int controllerTarget=app.readerTurnTarget(anchor,1);assert(!app.pageCache_.get(app.comicTextureKey(controllerTarget)));
+  builds=app.comicTextureBuilds_;app.turnPage(1);assert(app.currentPage_==anchor && app.comicPendingTurn_.active);
+  app.turnPage(1);app.turnPage(-1);assert(app.comicPendingTurn_.steps==1 && app.currentPage_==anchor);
+  assert(app.progressStore_.get(app.currentBookId_).page==savedPage && app.comicTextureBuilds_==builds);
+  app.comicPages_.setSuspended(false);auto coldDeadline=SDL_GetTicks()+30000;
+  while((app.comicPendingTurn_.active || app.comicPages_.pending()) && SDL_GetTicks()<coldDeadline) {
+   app.processComicPages();SDL_Delay(2);
+  }
+  app.processComicPages();assert(!app.comicPendingTurn_.active && app.currentPage_==controllerTarget);
+  assert(app.pageTurnAnimation_.active && app.comicTextureBuilds_==builds);
+  assert(app.progressStore_.get(app.currentBookId_).page==controllerTarget);
+  app.pageTurnAnimation_.started=SDL_GetTicks()-2000;app.tickPageTurn();
+
+  app.comicPages_.setSuspended(true);app.pageCache_.clear();app.currentPage_=controllerTarget;app.render();
+  builds=app.comicTextureBuilds_;
+  const int touchAnchor=app.currentPage_,touchTarget=app.readerTurnTarget(touchAnchor,1);
+  assert(!app.pageCache_.get(app.comicTextureKey(touchTarget)));
+  const int touchSaved=app.progressStore_.get(app.currentBookId_).page;
+  app.beginPageTurnTouch(.9f,.5f,91);assert(app.movePageTurnTouch(.4f,.5f,91));
+  assert(app.pageTurnTouch_.waitingForTexture && app.currentPage_==touchAnchor);
+  assert(app.releasePageTurnTouch(.4f,.5f,91) && app.currentPage_==touchAnchor && app.comicPendingTurn_.active);
+  assert(app.progressStore_.get(app.currentBookId_).page==touchSaved);
+  app.comicPages_.setSuspended(false);coldDeadline=SDL_GetTicks()+30000;
+  while((app.comicPendingTurn_.active || app.comicPages_.pending()) && SDL_GetTicks()<coldDeadline) {
+   app.processComicPages();SDL_Delay(2);
+  }
+  app.processComicPages();assert(!app.comicPendingTurn_.active && app.currentPage_==touchTarget);
+  assert(app.pageTurnAnimation_.active && app.comicTextureBuilds_==builds);
+  app.pageTurnAnimation_.started=SDL_GetTicks()-2000;app.tickPageTurn();
+  app.comicPages_.setSuspended(true);app.pageCache_.clear();app.currentPage_=original;app.render();
+  auto currentBook=std::find_if(app.books_.begin(),app.books_.end(),[&](const Book &book){return book.id==app.currentBookId_;});
+  assert(currentBook!=app.books_.end());const auto archivePath=currentBook->path;
+  const int failedAnchor=app.currentPage_,failedProgress=app.progressStore_.get(app.currentBookId_).page;
+  currentBook->path=archivePath+".missing";app.comicPages_.clear();app.comicPagesIdentity_.clear();app.configureComicPages();
+  app.turnPage(1);assert(app.comicPendingTurn_.active && app.currentPage_==failedAnchor);
+  app.comicPages_.setSuspended(false);coldDeadline=SDL_GetTicks()+5000;
+  while((app.comicPendingTurn_.active || app.comicPages_.pending()) && SDL_GetTicks()<coldDeadline) {
+   app.processComicPages();SDL_Delay(2);
+  }
+  app.processComicPages();assert(!app.comicPendingTurn_.active && app.currentPage_==failedAnchor);
+  assert(app.progressStore_.get(app.currentBookId_).page==failedProgress && !app.comicTurnError_.empty());
+  currentBook->path=archivePath;app.comicPages_.clear();app.comicPagesIdentity_.clear();app.configureComicPages();
+  app.currentPage_=original;app.saveCurrentPosition();app.render();
+  app.ensureComicGroup(app.readerTurnTarget(original,1));drain(app);
   // Once both neighbours are ready, rendering and a controller turn perform no
   // archive IO/rasterization on the UI thread, even with large native scans.
   const fs::path archive=app.books_.front().path,held=archive.string()+".held";
