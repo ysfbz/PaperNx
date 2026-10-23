@@ -83,7 +83,8 @@ struct Progress : ReaderPreferences {
 Format detectFormat(const fs::path &path);
 std::string documentId(const std::string &path, std::uintmax_t size);
 std::string defaultTitle(const fs::path &path);
-std::vector<Book> scan(const fs::path &root, std::size_t maxBooks = 10000);
+std::vector<Book> scan(const fs::path &root, std::size_t maxBooks = 10000,
+                       const std::function<bool()> &cancelled = {});
 
 // Unicode & Turkish Support
 std::string turkishCaseFold(const std::string &s);

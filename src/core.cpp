@@ -277,13 +277,15 @@ std::string documentId(const std::string &path, std::uintmax_t size) {
     return hex(fnv1a(path + "\n" + std::to_string(size)));
 }
 
-std::vector<Book> scan(const fs::path &root, std::size_t maxBooks) {
+std::vector<Book> scan(const fs::path &root, std::size_t maxBooks,
+                       const std::function<bool()> &cancelled) {
     std::vector<Book> books;
     std::error_code ec;
     if (!fs::is_directory(root, ec)) return books;
 
     fs::recursive_directory_iterator it(root, fs::directory_options::skip_permission_denied, ec), end;
     for (; it != end && books.size() < maxBooks; it.increment(ec)) {
+        if (cancelled && cancelled()) break;
         if (ec) { ec.clear(); continue; }
         if (it.depth() > 16) { it.disable_recursion_pending(); continue; }
         if (it->is_symlink(ec)) { it.disable_recursion_pending(); continue; }

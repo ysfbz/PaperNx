@@ -30,6 +30,8 @@ int main() {
     assert(scanner.start({root/"books"},{},inventory));scanner.stop();assert(!scanner.ready() && !scanner.pending());
     assert(loadLibraryInventory(inventory).size()==299);
     assert(scan(root/"books",5).size()==5);assert(scan(root/"books",100,[]{return true;}).empty());
+    std::size_t checks=0;const auto interrupted=scan(root/"books",300,[&]{return ++checks==12;});
+    assert(checks==12 && interrupted.size()<300);
     AppSettingsStore settings(root/"settings.txt");auto prefs=settings.get();assert(prefs.scanOnLaunch && prefs.interfaceStyle==0 && prefs.interfaceAccent==0);
     prefs.libraryFolders={"/books/a","/books/a","/books/b"};prefs.interfaceStyle=1;prefs.interfaceAccent=5;prefs.scanOnLaunch=false;settings.put(prefs);assert(settings.save());
     AppSettingsStore restored(root/"settings.txt");assert(restored.load());assert(restored.get().libraryFolders.size()==2 && !restored.get().scanOnLaunch && restored.get().interfaceStyle==1 && restored.get().interfaceAccent==5);
