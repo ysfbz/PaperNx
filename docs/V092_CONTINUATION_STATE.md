@@ -3,7 +3,8 @@
 **Updated:** 2026-10-23
 **Branch:** `feature/v0.9.2-complete-reader-enhancements`
 **Last source commit before the current hardening changes:** `bb9d8579db9ccf0d10b5843e1929c2e696565c59`
-**Hardening source commits:** `913fb8f` and `1cb06a1`; audit-document commit follows.
+**Hardening source commits:** `913fb8f` and `1cb06a1`.
+**Audit documentation:** committed on this feature branch; use `git log` for the final report commit SHA.
 **Version:** still v0.9.1. No release, tag, PR, merge or GitHub Actions run was created.
 
 ## Completed in this pass
