@@ -35,6 +35,20 @@ static void unit(){
     assert(!selectUpdateRelease(std::string(4*1024*1024+1,' '),"0.12.0-reader.4",source,r,error));
     assert(selectUpdateRelease("[{\"tag_name\":\"0.12.0-reader.4\"},{\"tag_name\":\"9.0.0\",\"draft\":true}]","0.12.0-reader.4",source,r,error)&&r.version.empty());
     auto wrong=json;const auto where=wrong.find(source.assetPrefix);wrong.replace(where,source.assetPrefix.size(),"https://evil.invalid/");assert(selectUpdateRelease(wrong,"0.12.0-reader.4",source,r,error)&&!r.installable());
+    const auto recoveryRoot=fs::temp_directory_path()/("papernx-updater-recovery-"+std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    fs::create_directories(recoveryRoot);
+    const auto executable=recoveryRoot/"PaperNX.nro";
+    {std::ofstream(executable)<<"candidate";std::ofstream(executable.string()+".old")<<"previous";std::ofstream(executable.string()+".swap")<<"staged";}
+    SelfUpdater recovery;recovery.configure(executable,"0.12.0-reader.4");
+    assert(recovery.prepareBoot(error)==SelfUpdater::BootRecovery::RolledBack);
+    assert(read(executable)=="previous"&&!fs::exists(executable.string()+".old")&&!fs::exists(executable.string()+".swap"));
+    {std::ofstream(executable.string()+".swap")<<"staged";}
+    assert(recovery.prepareBoot(error)==SelfUpdater::BootRecovery::Error&&!error.empty());
+    fs::remove(executable.string()+".swap");
+    {std::ofstream(executable)<<"current";std::ofstream(executable.string()+".old")<<"orphan";}
+    assert(recovery.prepareBoot(error)==SelfUpdater::BootRecovery::Normal);
+    assert(read(executable)=="current"&&!fs::exists(executable.string()+".old"));
+    fs::remove_all(recoveryRoot);
     std::cout<<"PASS: prerelease/stable version ordering, scoped bounded JSON, Unicode notes, malformed responses, draft filtering and asset origin\n";
 }
 static void network(int argc,char **argv){

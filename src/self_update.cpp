@@ -444,6 +444,7 @@ bool restoreBackup(const std::filesystem::path &executable, std::string &error) 
     std::remove((executable.string() + ".boot").c_str());
     std::remove((executable.string() + ".boot.started").c_str());
     std::remove((executable.string() + ".boot.ok").c_str());
+    std::remove((executable.string() + ".swap").c_str());
     std::remove((executable.string() + ".ready").c_str());
     std::remove((executable.string() + ".part").c_str());
     return true;
@@ -707,7 +708,23 @@ SelfUpdater::BootRecovery SelfUpdater::prepareBoot(std::string &error) {
         std::remove((executable_.string() + ".ready").c_str());
         return BootRecovery::Normal;
     }
-    if (!pathExists(marker)) return BootRecovery::Normal;
+    if (!pathExists(marker)) {
+        const auto backup = executable_.string() + ".old";
+        const bool installMayHaveStarted = pathExists(started) || pathExists(executable_.string() + ".swap");
+        if (installMayHaveStarted && pathExists(backup)) {
+            error = "Update recovery data is missing; restoring the previous PaperNX version";
+            return rollbackBoot(error) ? BootRecovery::RolledBack : BootRecovery::Error;
+        }
+        if (installMayHaveStarted) {
+            error = "Update recovery data is incomplete; preserve the NRO files and restore PaperNX.nro manually";
+            return BootRecovery::Error;
+        }
+        if (pathExists(backup) && pathExists(executable_) && std::remove(backup.c_str()) != 0) {
+            error = "An unused update backup could not be cleaned up";
+            return BootRecovery::Error;
+        }
+        return BootRecovery::Normal;
+    }
 
     BootRecord record;
     if (!readBootRecord(marker, record)) {
