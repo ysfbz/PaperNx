@@ -6,6 +6,7 @@
 
 namespace {
 struct AppTest {
+#include "library_fixture_helpers.inc"
     static void event(PaperNxApp &app,SDL_Event e){bool running=true;app.handleEvent(e,running);assert(running);}
     static void pad(PaperNxApp &app,int button){SDL_Event e{};e.type=SDL_CONTROLLERBUTTONDOWN;e.cbutton.button=Uint8(button);event(app,e);}
     static void touch(PaperNxApp &app,Uint32 type,float x,float y,SDL_FingerID finger=21) {
@@ -30,7 +31,7 @@ struct AppTest {
         fs::create_directories("verification/navigation");assert(SDL_SaveBMP(surface,("verification/navigation/"+name+".bmp").c_str())==0);SDL_FreeSurface(surface);SDL_SetRenderTarget(app.renderer_,target);
     }
     static void run(const fs::path &root) {
-        PaperNxApp app(root);assert(app.init());ui::language=1;
+        PaperNxApp app(root);assert(initReady(app));ui::language=1;
         auto book=[&](const char *name){return *std::find_if(app.books_.begin(),app.books_.end(),[&](const Book &b){return fs::path(b.path).filename()==name;});};
         const auto comic=book("navigation.cbz"),epub=book("sample.epub"),pdf=book("sample.pdf");
         app.openBook(comic);assert(app.pageCount_==40);app.zoomPdf(2.5f);app.pdfPanY_=180;app.toolbarVisible_=true;app.render();

@@ -4,7 +4,7 @@ static void v04CatalogWorkflow(const fs::path &parent){
     fs::create_directory_symlink(fs::absolute("fonts"),root/"fonts");
     fs::copy_file("tests/fixtures/sample_book.epub",root/"books"/"disposable.epub");
     fs::copy_file("tests/fixtures/sample_doc.pdf",root/"books"/"disposable.pdf");
-    PaperNxApp app(root);assert(app.init());assert(app.visibleBooks_.size()==2);
+    PaperNxApp app(root);assert(initReady(app));assert(app.visibleBooks_.size()==2);
     const auto selected=std::find_if(app.visibleBooks_.begin(),app.visibleBooks_.end(),[](const Book &b){return b.format==Format::Epub;});assert(selected!=app.visibleBooks_.end());const auto book=*selected;const int bookIndex=int(selected-app.visibleBooks_.begin());
     auto choose=[&](int id){const auto rows=app.catalogRows();auto it=std::find_if(rows.begin(),rows.end(),[&](const auto &r){return r.first==id;});assert(it!=rows.end());int width,height;app.getWindowSize(width,height);const auto panel=app.catalogPanelRect(width,height);const int top=app.catalogContentTop(panel),index=int(it-rows.begin());app.catalogScroll_=float(index*64);tap(app,float(panel.x+80)/width,float(top+28)/height);};
     // Touch hold enters actions before release and release never activates Open.

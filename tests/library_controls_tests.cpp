@@ -50,7 +50,11 @@ struct AppTest {
                 if(control==0){event.type=SDL_KEYDOWN;event.key.keysym.sym=SDL_Keycode(keys[direction]);}
                 else if(control==1){event.type=SDL_CONTROLLERBUTTONDOWN;event.cbutton.button=Uint8(buttons[direction]);}
                 else {event.type=SDL_CONTROLLERAXISMOTION;event.caxis.axis=Uint8((control==2?SDL_CONTROLLER_AXIS_LEFTX:SDL_CONTROLLER_AXIS_RIGHTX)+(direction%2));event.caxis.value=direction<2?32767:-32767;}
-                app.handleEvent(event,running);assert(app.choiceFocusedIndex_==3+expected[orientation][direction]);
+                app.handleEvent(event,running);
+                if(app.choiceFocusedIndex_!=3+expected[orientation][direction])
+                    std::cerr<<"Choice direction mismatch: rotation="<<orientation<<" control="<<control<<" direction="<<direction
+                        <<" actual="<<app.choiceFocusedIndex_<<" expected="<<3+expected[orientation][direction]<<"\n";
+                assert(app.choiceFocusedIndex_==3+expected[orientation][direction]);
                 assert(app.screen_==ScreenState::FileBrowser); // modal owns the action
             }
         }

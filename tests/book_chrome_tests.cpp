@@ -104,7 +104,7 @@ struct AppTest {
                 const auto shown=snapshot(app,prefix+"-shown");assert(equal(hidden,shown,{0,72,w,h-144}));assert(!equal(hidden,shown,{w/2-100,h-48,200,30}));
                 centerTap(app,w,h);assert(!app.toolbarVisible_ && app.readerFooterCaption(w,h)==label);
                 assert(equal(hidden,snapshot(app,prefix+"-closed"),{0,0,w,h}));
-                assert(app.readerHeaderButton(0,w).w==56 && app.readerTrack(w,h).y==h-62);
+                assert(app.readerHeaderButton(0,w).w==56 && app.readerTrack(w,h).y==h-28);
                 app.currentPage_=app.pageCount_-1;app.toolbarVisible_=true;
                 assert(app.readerFooterCaption(w,h)==menuCaption(app,total,total));
             }

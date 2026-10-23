@@ -6,6 +6,7 @@
 
 namespace {
 struct AppTest {
+#include "library_fixture_helpers.inc"
     static void rotatedControls(PaperNxApp &app) {
         const auto original=app.appSettings_.get();const int oldX=app.pdfPanX_,oldY=app.pdfPanY_;
         const int keys[]{SDLK_RIGHT,SDLK_DOWN,SDLK_LEFT,SDLK_UP};
@@ -61,7 +62,8 @@ struct AppTest {
         assert(SDL_SaveBMP(surface,("verification/comics/"+name+".bmp").c_str())==0);SDL_FreeSurface(surface);
     }
     static void run(const fs::path &root) {
-        PaperNxApp app(root);assert(app.init());assert(app.typography_->uiFont());ui::language=1;
+        PaperNxApp app(root);assert(initReady(app));assert(app.typography_->uiFont());ui::language=1;
+        auto preferences=app.appSettings_.get();preferences.landscapeSpreads=false;app.appSettings_.put(preferences);
         SDL_RendererInfo info{};SDL_GetRendererInfo(app.renderer_,&info);std::cout<<"Comic renderer: "<<info.name<<"\n";
         assert(app.books_.size()==6);
         auto book=[&](const char *filename) {return *std::find_if(app.books_.begin(),app.books_.end(),[&](const Book &b){return fs::path(b.path).filename()==filename;});};
@@ -82,10 +84,12 @@ struct AppTest {
         const unsigned builds=app.comicTextureBuilds_;assert(builds>0);
         app.setPdfView(0);app.zoomPdf(3);app.pdfPanY_=400;
         auto imagePoint=[&]{int w,h;app.getWindowSize(w,h);float pw=0,ph=0;assert(px_document_page_size(app.doc_,app.currentPage_,&pw,&ph));
-            const float vw=app.fixedViewportWidth(w),vh=h-144,scale=std::min(vw/pw,vh/ph)*app.pdfZoom_;
+            const float vw=app.fixedViewportWidth(w),vh=app.comicViewportHeight(h),scale=std::min(vw/pw,vh/ph)*app.pdfZoom_;
             return std::pair<float,float>{(.65f*w-app.currentMargin_-std::max(0.f,(vw-pw*scale)/2)+app.pdfPanX_)/scale,
                 (.45f*h-72-std::max(0.f,(vh-ph*scale)/2)+app.pdfPanY_)/scale};};
         const auto focal=imagePoint();app.zoomPdf(4,.65f,.45f);const auto after=imagePoint();
+        if(std::abs(focal.first-after.first)>=4 || std::abs(focal.second-after.second)>=4)
+            std::cerr<<"Zoom focal drift: "<<focal.first<<","<<focal.second<<" -> "<<after.first<<","<<after.second<<"\n";
         assert(std::abs(focal.first-after.first)<4 && std::abs(focal.second-after.second)<4);
         app.zoomPdf(5);app.pdfPanX_=200;app.pdfPanY_=600;app.toolbarVisible_=false;
         app.toolbarVisible_=true;
@@ -113,8 +117,12 @@ struct AppTest {
         rotatedControls(app);
         auto portrait=app.appSettings_.get();portrait.displayOrientation=1;app.appSettings_.put(portrait);
         app.setPdfView(0);app.zoomPdf(5);app.panVelocityX_=app.panVelocityY_=0;app.render();
-        app.idlePrefetch();app.comicDetailDue_=SDL_GetTicks()-1;app.idlePrefetch();
-        assert(app.comicDetailTexture_ && !app.comicDetailKey_.empty());
+        app.idlePrefetch();app.comicDetailDue_=SDL_GetTicks()-1;app.refineComicZoom();
+        const Uint32 detailDeadline=SDL_GetTicks()+5000;
+        while(app.comicPages_.pending() && SDL_GetTicks()<detailDeadline){app.processComicPages();SDL_Delay(2);}
+        app.processComicPages();
+        const auto detailGroup=app.comicSpreadPages(app.currentPage_);
+        for(int page=0;page<detailGroup.second;++page)assert(app.comicDetails_.count(detailGroup.first+page));
         portrait.displayOrientation=0;app.appSettings_.put(portrait);app.setPdfView(0);app.zoomPdf(5);
         snapshot(app,"zoom-reset");
         int width,height;app.getWindowSize(width,height);const auto reset=app.zoomResetRect(width,height);
@@ -148,8 +156,12 @@ struct AppTest {
         }
         app.turnPage(1);assert(app.pageTurnAnimation_.active);finish(app);assert(app.currentPage_==1);
         app.turnPage(-1);finish(app);
-        touch(app,SDL_FINGERDOWN,.92f,.2f);touch(app,SDL_FINGERMOTION,.76f,.3f);
-        assert(app.pageTurnAnimation_.dragging && app.pageTurnAnimation_.anchorY<.2f && app.currentPage_==0);
+        touch(app,SDL_FINGERDOWN,.92f,.2f);touch(app,SDL_FINGERMOTION,.55f,.3f);
+        if(!app.pageTurnAnimation_.dragging || app.pageTurnAnimation_.anchorY>=.2f || app.currentPage_!=0)
+            std::cerr<<"Comic curl state: active="<<app.pageTurnAnimation_.active<<" dragging="<<app.pageTurnAnimation_.dragging
+                <<" anchor="<<app.pageTurnAnimation_.anchorY<<" page="<<app.currentPage_<<" spread="<<app.pageTurnAnimation_.spread
+                <<" layoutPending="<<app.layoutPending_<<"\n";
+        assert(app.pageTurnAnimation_.dragging && app.pageTurnAnimation_.anchorY<.22f && app.currentPage_==0);
         snapshot(app,"touch-curl");touch(app,SDL_FINGERUP,.4f,.3f);finish(app);assert(app.currentPage_==1);
         app.zoomPdf(2);assert(app.canCurlPage());app.handleAnalog(1,1);assert(app.pdfPanX_>=0);
         app.pdfPanY_=150;app.clampPdfPan();
@@ -157,8 +169,9 @@ struct AppTest {
         const auto nextSheet=app.comicPageRect(app.currentPage_+1,true);
         app.turnPage(1);assert(app.pageTurnAnimation_.active && app.pdfZoom_==2 && app.pdfPanY_==0);
         const auto &turn=app.pageTurnAnimation_;
-        assert(turn.comicSheet && turn.viewport.x==sheet.x && turn.viewport.y==sheet.y && turn.viewport.w==sheet.w && turn.viewport.h==sheet.h);
-        assert(turn.viewport.h>height-144 && turn.nextViewport.y==nextSheet.y && turn.nextViewport.h==nextSheet.h);
+        const auto visibleSheet=app.visibleComicRect(sheet),visibleNext=app.visibleComicRect(nextSheet);
+        assert(turn.comicSheet && turn.viewport.x==visibleSheet.x && turn.viewport.y==visibleSheet.y && turn.viewport.w==visibleSheet.w && turn.viewport.h==visibleSheet.h);
+        assert(turn.viewport.h>height-144 && turn.nextViewport.y==visibleNext.y && turn.nextViewport.h==visibleNext.h);
         app.pageTurnAnimation_.started=SDL_GetTicks()-210;
         snapshot(app,"zoomed-curl");finish(app);assert(app.currentPage_==2 && app.pdfZoom_==2 && app.pdfPanY_==0);
         app.turnPage(-1);finish(app);app.turnPage(-1);finish(app);

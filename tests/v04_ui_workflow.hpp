@@ -12,7 +12,8 @@ static void v04UiWorkflow(const fs::path &parent) {
     fs::copy_file("tests/fixtures/sample_book.epub",root/"books"/"paper.epub");
     fs::copy_file("tests/fixtures/sample_doc.pdf",root/"books"/"pdf.pdf");
     {
-        PaperNxApp app(root);assert(app.init());
+        PaperNxApp app(root);assert(initReady(app));
+        auto testPreferences=app.appSettings_.get();testPreferences.landscapeSpreads=false;app.appSettings_.put(testPreferences);
         app.openSettings(true);auto old=app.currentStyle();
         pad(app,SDL_CONTROLLER_BUTTON_DPAD_DOWN);assert(app.aaRow_==1 && app.currentFontFamily_==old.fontFamily);
         pad(app,SDL_CONTROLLER_BUTTON_DPAD_UP);pad(app,SDL_CONTROLLER_BUTTON_A);assert(app.settingsEditing_);
@@ -57,9 +58,9 @@ static void v04UiWorkflow(const fs::path &parent) {
             legacy.customUiTheme=4;legacy.uiTheme=0;app.appSettings_.put(legacy);
             assert(app.appSettings_.get().chromePolicy==0);
             app.openSettings(true,5);
-            assert(app.settingsRows()==8);
+            assert(app.settingsRows()==18);
             app.openChoice(7,0);
-            assert(app.choiceOptions().size()==9);
+            assert(app.choiceOptions().size()==10);
             app.choiceIndex_=4;app.commitChoice(); // Vintage Sepia
             const auto defaults=app.progressStore_.get("PAPERNX_DEFAULTS");
             assert(defaults.theme==2 && defaults.backgroundColor==0xe8d6b3);
@@ -138,7 +139,7 @@ static void v04UiWorkflow(const fs::path &parent) {
             physicalFinger(SDL_FINGERDOWN,.5f,.7f);physicalFinger(SDL_FINGERMOTION,.5f,.4f);physicalFinger(SDL_FINGERUP,.5f,.4f);assert(app.pdfPanY_>0);
             SDL_Event pinch{};pinch.type=SDL_MULTIGESTURE;pinch.mgesture.numFingers=2;pinch.mgesture.dDist=.05f;auto physical=transform.toPhysical(w*.25f,h*.7f);pinch.mgesture.x=physical.first/1280;pinch.mgesture.y=physical.second/720;bool running=true;app.handleEvent(pinch,running);assert(app.pdfZoom_>2);
             snapshot(app,orientation==1?"v04-portrait-cw-pdf":"v04-portrait-ccw-pdf");app.closeBook();
-            assert(app.appSettings_.save());{PaperNxApp resumed(root);assert(resumed.init());assert(resumed.appSettings_.get().displayOrientation==orientation);int rw,rh;resumed.getWindowSize(rw,rh);assert(rw==720 && rh==1280);}
+            assert(app.appSettings_.save());{PaperNxApp resumed(root);assert(initReady(resumed));assert(resumed.appSettings_.get().displayOrientation==orientation);int rw,rh;resumed.getWindowSize(rw,rh);assert(rw==720 && rh==1280);}
 
         }
         auto a=app.appSettings_.get();a.displayOrientation=0;app.appSettings_.put(a);app.persistAppSettings();

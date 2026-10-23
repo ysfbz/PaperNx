@@ -12,6 +12,7 @@
 
 namespace {
 struct AppTest {
+#include "library_fixture_helpers.inc"
     // Workflow assertions describe settled pages. Dedicated curl tests exercise
     // intermediate frames and queued input with the animation still running.
     static void settlePageTurn(PaperNxApp &app) {
@@ -52,6 +53,26 @@ struct AppTest {
             pad(app,SDL_CONTROLLER_BUTTON_A);
         }
     }
+    static void brightnessSlider(PaperNxApp &app) {
+        const auto original=app.appSettings_.get();auto prefs=original;
+        prefs.displayOrientation=1;prefs.softwareBrightness=100;prefs.systemBrightness=100;app.appSettings_.put(prefs);
+        app.openSettings(true,2);int w,h,pw,ph;app.getWindowSize(w,h);SDL_GetWindowSize(app.window_,&pw,&ph);
+        const DisplayTransform transform{pw,ph,1};const auto layout=ui::SettingsLayout(w,h);app.settingsScroll_=app.maxUiScroll();
+        auto drag=[&](int row,int low,int high,int value,SDL_FingerID id) {
+            auto control=layout.control(row);control.y-=int(app.settingsScroll_);const auto track=ui::settingsSliderTrack(control);
+            const int y=control.y+control.h/2;const int x=track.x+(track.w-1)*(value-low)/(high-low);
+            auto send=[&](Uint32 type,int px) {const auto point=transform.toPhysical(float(px),float(y));finger(app,type,point.first/pw,point.second/ph,id);};
+            send(SDL_FINGERDOWN,track.x);send(SDL_FINGERMOTION,x);send(SDL_FINGERUP,x);
+        };
+        drag(8,50,100,80,91);drag(9,10,100,55,92);
+        assert(app.appSettings_.get().softwareBrightness==80 && app.appSettings_.get().systemBrightness==55);
+        assert(app.appSettings_.save());AppSettingsStore restored(app.root_/"data"/"settings.txt");
+        assert(restored.load() && restored.get().softwareBrightness==80 && restored.get().systemBrightness==55);
+        auto reset=layout.control(10);reset.y-=int(app.settingsScroll_);
+        const auto point=transform.toPhysical(reset.x+reset.w/2,reset.y+reset.h/2);tap(app,point.first/pw,point.second/ph);
+        assert(app.appSettings_.get().softwareBrightness==100 && app.appSettings_.get().systemBrightness==100);
+        app.dismissSettings();prefs=app.appSettings_.get();prefs.displayOrientation=original.displayOrientation;app.appSettings_.put(prefs);app.appSettings_.save();
+    }
     static void settingsTab(PaperNxApp &app,int tab) {
         int w,h; app.getWindowSize(w,h); auto r=ui::SettingsLayout(w,h).tab(tab);
         tap(app,float(r.x+r.w/2)/w,float(r.y+28)/h);
@@ -76,7 +97,7 @@ struct AppTest {
         SDL_FreeSurface(surface);
     }
     static void captureV03Screens(const fs::path &root) {
-        PaperNxApp app(root); assert(app.init());
+        PaperNxApp app(root); assert(initReady(app));
         snapshot(app,"v03-library-final");
         v03Plus(app); snapshot(app,"v03-plus-menu"); tap(app,.1f,.5f);
         v03Plus(app); v03MenuItem(app,0); snapshot(app,"v03-settings-final");
@@ -91,7 +112,7 @@ struct AppTest {
     }
     static void captureJournalScreens(const fs::path &root) {
         // Deterministic test fixture, never bundled as a user journal.
-        PaperNxApp app(root); assert(app.init());
+        PaperNxApp app(root); assert(initReady(app));
         assert(!app.books_.empty());
         const auto book = app.books_.front();
         app.journal_.registerBookAlias(book.id, "", book.title, book.author);
@@ -175,7 +196,7 @@ struct AppTest {
         app.appSettings_.put(resetPrefs);
     }
     static void continuousReading(const fs::path &root) {
-        PaperNxApp app(root); assert(app.init());
+        PaperNxApp app(root); assert(initReady(app));
         v03Plus(app); v03MenuItem(app,0); assert(app.globalSettings_ && app.screen_==ScreenState::AaModal);
         settingsTab(app,3); settingsControl(app,1); assert(app.extraStyle_.readingMode==1);
         closeSettings(app); assert(app.screen_==ScreenState::Library);
@@ -247,7 +268,7 @@ struct AppTest {
         y=app.scrollY_; page=app.currentPage_;
         app.closeBook();
         {
-            PaperNxApp reopened(root); assert(reopened.init()); reopened.openBook(epub);
+            PaperNxApp reopened(root); assert(initReady(reopened)); reopened.openBook(epub);
             assert(reopened.continuous() && reopened.extraStyle_.modeOverride==1);
             assert(reopened.currentPage_==page && std::abs(reopened.scrollY_-y)<1);
         }
@@ -258,13 +279,15 @@ struct AppTest {
         std::string epubId, pdfId;
         int savedPage;
         {
-            PaperNxApp app(root); assert(app.init()); assert(!app.controller_);
+            PaperNxApp app(root); assert(initReady(app)); assert(!app.controller_);
+            auto preferences=app.appSettings_.get();preferences.landscapeSpreads=false;preferences.displayOrientation=0;app.appSettings_.put(preferences);assert(app.appSettings_.save());
             auto epub = *std::find_if(app.books_.begin(), app.books_.end(), [](const Book &b) { return b.format == Format::Epub; });
             // Open first library card using only finger events.
             tap(app, .06f, .30f); assert(app.doc_ && app.screen_ == ScreenState::Reader);
             if (!px_document_is_epub(app.doc_)) { app.closeBook(); app.openBook(epub); }
             epubId = app.currentBookId_;
             for (int i = 0; i < 10; ++i) tap(app, .75f, .5f);
+            if(app.currentPage_!=10)std::cerr<<"Single-page touch regression reached page "<<app.currentPage_<<"\n";
             assert(app.currentPage_ == 10);
             tap(app, .25f, .5f); assert(app.currentPage_ == 9);
             finger(app, SDL_FINGERDOWN, .7f, .5f); SDL_Delay(900);
@@ -310,7 +333,9 @@ struct AppTest {
             app.storeDefaults();
             closeSettings(app); assert(app.screen_ == ScreenState::Reader);
             savedPage = app.currentPage_;
-            tap(app, .78f, .04f); assert(app.screen_ == ScreenState::BookmarksModal);
+            int width,height;app.getWindowSize(width,height);const auto bookmark=app.readerHeaderButton(2,width);
+            tap(app,float(bookmark.x+bookmark.w/2)/width,float(bookmark.y+bookmark.h/2)/height);
+            assert(app.screen_ == ScreenState::BookmarksModal);
             tap(app,.5f,636.f/720); assert(app.progressStore_.get(epubId).bookmarks.size() == 1);
             closeNavigation(app); assert(app.screen_ == ScreenState::Reader);
             tap(app, .04f, .04f); assert(app.screen_ == ScreenState::Library && !app.progressDirty_);
@@ -353,7 +378,7 @@ struct AppTest {
             app.closeBook();
         }
         {
-            PaperNxApp restart(root); assert(restart.init());
+            PaperNxApp restart(root); assert(initReady(restart));
             auto epub = *std::find_if(restart.books_.begin(), restart.books_.end(), [&](const Book &b) { return b.id == epubId; });
             restart.openBook(epub); assert(restart.currentPage_ == savedPage);
             assert(restart.extraStyle_.textColor == 0x123456 && restart.extraStyle_.backgroundColor == 0xeeddbb);
@@ -368,7 +393,7 @@ struct AppTest {
         std::cout << "[PASS] Touch-only workflow elapsed_ms=" << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count() << "\n";
     }
     static void checkRestart(const fs::path &root) {
-        PaperNxApp app(root); assert(app.init());
+        PaperNxApp app(root); assert(initReady(app));
         assert(app.books_.size() == 3);
         auto epub = std::find_if(app.books_.begin(), app.books_.end(), [](const Book &b) { return b.format == Format::Epub; });
         assert(epub != app.books_.end() && epub->title.find("İstanbul") != std::string::npos);
@@ -378,8 +403,10 @@ struct AppTest {
     }
     static void run(const fs::path &root) {
         PaperNxApp app(root);
-        assert(app.init());
+        assert(initReady(app));
         assert(app.books_.size() == 2);
+        brightnessSlider(app);
+        auto preferences=app.appSettings_.get();preferences.landscapeSpreads=false;app.appSettings_.put(preferences);
         int first = SDL_JoystickAttachVirtual(SDL_JOYSTICK_TYPE_GAMECONTROLLER, 6, 21, 0);
         int second = SDL_JoystickAttachVirtual(SDL_JOYSTICK_TYPE_GAMECONTROLLER, 6, 21, 0);
         assert(first >= 0 && second >= 0);

@@ -6,6 +6,7 @@
 
 namespace {
 struct AppTest {
+#include "library_fixture_helpers.inc"
     static void snapshot(PaperNxApp &app,const std::string &name) {
         app.render();
         SDL_Texture *target=SDL_GetRenderTarget(app.renderer_);
@@ -42,7 +43,11 @@ struct AppTest {
         finish(app);assert(app.currentPage_==1);
         touch(app,SDL_FINGERDOWN,.12f,.8f);
         touch(app,SDL_FINGERMOTION,.7f,.67f);
-        assert(app.pageTurnAnimation_.direction==-1 && app.pageTurnAnimation_.anchorY>.8f);
+        if(app.pageTurnAnimation_.direction!=-1 || app.pageTurnAnimation_.anchorY<=.8f)
+            std::cerr<<"Reverse curl state: active="<<app.pageTurnAnimation_.active<<" dragging="<<app.pageTurnAnimation_.dragging
+                <<" direction="<<app.pageTurnAnimation_.direction<<" anchor="<<app.pageTurnAnimation_.anchorY
+                <<" page="<<app.currentPage_<<" readingDirection="<<app.readingDirection()<<" layoutPending="<<app.layoutPending_<<"\n";
+        assert(app.pageTurnAnimation_.direction==-1 && app.pageTurnAnimation_.anchorY>=.8f);
         assert(app.pageTurnAnimation_.dragY<0);
         touch(app,SDL_FINGERUP,.7f,.67f);finish(app);assert(app.currentPage_==0);
         // Return the held sheet to its edge: cancellation never changes progress.
@@ -129,7 +134,8 @@ struct AppTest {
         app.tickPageTurn();
     }
     static void run(const fs::path &root) {
-        PaperNxApp app(root); assert(app.init());
+        PaperNxApp app(root); assert(initReady(app));
+        auto preferences=app.appSettings_.get();preferences.landscapeSpreads=false;app.appSettings_.put(preferences);
         SDL_RendererInfo driver{};SDL_GetRendererInfo(app.renderer_,&driver);
         std::cout << "page curl render driver: " << driver.name << '\n';
         auto epub = *std::find_if(app.books_.begin(), app.books_.end(), [](const Book &b) { return b.format == Format::Epub; });

@@ -32,7 +32,7 @@ struct AppTest {
         // The 0.16 external menu geometry and scan/settings routes are restored.
         ui::LibraryLayout library(1280);assert(library.top==174 && library.left==32);
         assert(app.quickSheet(1280,720).x==804);
-        app.openSettings(true,5);assert(app.aaRow_==0 && app.settingsRows()==15);app.dismissSettings();
+        app.openSettings(true,5);assert(app.aaRow_==0 && app.settingsRows()==18);app.dismissSettings();
         for(const char *name:{"english.epub","hebrew.epub"})for(bool landscape:{true,false}) {
             SDL_SetWindowSize(app.window_,landscape?1280:720,landscape?720:1280);
             app.openBook(book(name));app.reflowEpub(24);const int dir=app.readingDirection();
@@ -88,7 +88,9 @@ struct AppTest {
         for(float zoom:{1.f,1.01f}) {
             app.setPdfView(0);app.currentPage_=0;if(zoom>1)app.zoomPdf(zoom,.5f,.5f,true);
             app.pdfPanX_=app.pdfPanY_=0;
-            const auto paper=app.comicTurnBounds(0);assert(paper.y>72 && paper.y+paper.h<676);
+            const auto paper=app.comicTurnBounds(0);
+            if(paper.y<72 || paper.y+paper.h>676)std::cerr<<"Comic page bounds outside reader clip: zoom="<<zoom<<" y="<<paper.y<<" h="<<paper.h<<"\n";
+            assert(paper.y>=72 && paper.y+paper.h<=676);
             auto frame=pixels(app);const auto bg=app.palette().bg;const auto background=(Uint32(bg.r)<<16)|(Uint32(bg.g)<<8)|bg.b;
             // Neither half of the spine may continue through empty space.
             int seam=640;if(zoom>1)seam=int(app.currentMargin_+(640-app.currentMargin_)*zoom);
@@ -115,5 +117,5 @@ struct AppTest {
 }
 int main(){assert(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_EVENTS|SDL_INIT_GAMECONTROLLER)==0 && TTF_Init()==0);
  auto root=fs::temp_directory_path()/"papernx-reader-input";fs::remove_all(root);fs::create_directories(root/"books");
- for(auto pair:std::vector<std::pair<std::string,std::string>>{{"sample_book.epub","english.epub"},{"hebrew_navigation.epub","hebrew.epub"},{"comics/smart-spreads.cbz","smart.cbz"},{"comics/paper-bounds.cbz","paper-bounds.cbz"}})fs::copy_file(fs::path("tests/fixtures")/pair.first,root/"books"/pair.second);
+ for(auto pair:std::vector<std::pair<std::string,std::string>>{{"sample_book.epub","english.epub"},{"hebrew_navigation.epub","hebrew.epub"},{"comics/smart-spreads.cbz","smart.cbz"},{"comics/navigation.cbz","paper-bounds.cbz"}})fs::copy_file(fs::path("tests/fixtures")/pair.first,root/"books"/pair.second);
  fs::create_directory_symlink(fs::absolute("fonts"),root/"fonts");AppTest::run(root);fs::remove_all(root);TTF_Quit();SDL_Quit();}

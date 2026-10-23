@@ -34,29 +34,47 @@ static void network(int argc,char **argv){
     assert(argc>=5);const fs::path root=argv[2],path=root/u8"custom folder"/u8"קורא.nro";const std::string base=argv[3],scenario=argv[4],ca=argc>5?argv[5]:"";
     fs::create_directories(path.parent_path());{std::ofstream f(path);f<<"original application";}
     const auto original=read(path);UpdateSource source{base+"api",base+"download/"};
-    SelfUpdater updater;updater.configure(path,"0.12.0-reader.4",ca,source);assert(updater.check());assert(!updater.check());
+    SelfUpdater updater;updater.configureForTesting(path,"0.12.0-reader.4",ca,source);assert(updater.check());assert(!updater.check());
     auto state=wait(updater);
     if(scenario=="http"||scenario=="malformed"||scenario=="tls-reject"){assert(state.state==UpdateState::Error);assert(read(path)==original);return;}
-    if(scenario=="current"){assert(state.state==UpdateState::Current);return;}
+    if(scenario=="current"||scenario=="downgrade"){assert(state.state==UpdateState::Current);return;}
     assert(state.state==UpdateState::Available&&state.release.version=="0.13.0");
-    if(scenario=="missing"){assert(!state.release.installable()&&!updater.download());return;}
-    if(scenario=="write-error")fs::create_directory(path.string()+".part");
+    if(scenario=="missing"||scenario=="oversized"){assert(!state.release.installable()&&!updater.download());return;}
+    if(scenario=="write-error"){fs::create_directories(path.string()+".part");std::ofstream(path.string()+".part/sentinel")<<"keep";}
     assert(updater.download());assert(!updater.download());
-    if(scenario=="cancel"){std::this_thread::sleep_for(std::chrono::milliseconds(70));updater.stop();state=updater.status();}
+    if(scenario=="cancel"){std::this_thread::sleep_for(std::chrono::milliseconds(70));updater.cancel();state=wait(updater);}
     else state=wait(updater);
     assert(read(path)==original); // No network outcome can overwrite the running app.
-    const bool failed=scenario=="corrupt"||scenario=="badapp"||scenario=="badversion"||scenario=="truncated"||scenario=="oversized"||scenario=="cancel"||scenario=="write-error"||scenario=="downgrade";
-    if(failed){assert(state.state==UpdateState::Error&&!state.error.empty());assert(!fs::exists(path.string()+".new")&&!fs::exists(path.string()+".ready"));return;}
+    const bool failed=scenario=="corrupt"||scenario=="badapp"||scenario=="badversion"||scenario=="truncated"||scenario=="cancel"||scenario=="write-error";
+    if(failed){assert((state.state==UpdateState::Error||state.state==UpdateState::Cancelled)&&!state.error.empty());
+        if(scenario=="write-error")assert(fs::exists(path.string()+".part/sentinel"));else assert(!fs::exists(path.string()+".part"));
+        assert(!fs::exists(path.string()+".new")&&!fs::exists(path.string()+".ready"));return;}
     if(state.state!=UpdateState::Ready)std::cerr<<"Update failed ("<<scenario<<"): "<<state.error<<'\n';
     assert(state.state==UpdateState::Ready);const auto downloaded=read(path.string()+".new");assert(downloaded.size()==state.release.bytes);
     std::string error;
     if(scenario=="tampered"){std::fstream f(path.string()+".new",std::ios::in|std::ios::out|std::ios::binary);f.seekp(0x200);f.put('!');f.close();assert(!updater.applyPending(error)&&!error.empty()&&read(path)==original);return;}
     if(scenario=="replace-failure"){fs::create_directory(path.string()+".old");std::ofstream(path.string()+".old/sentinel")<<"keep";assert(!updater.applyPending(error)&&!error.empty()&&read(path)==original);return;}
     if(scenario=="missing-marker"){fs::remove(path.string()+".ready");assert(!updater.applyPending(error)&&read(path)==original);return;}
+    if(scenario=="startup-failure") {
+        assert(updater.applyPending(error));
+        SelfUpdater startup;startup.configureForTesting(path,"0.13.0",ca,source);
+        auto recovery=startup.prepareBoot(error);
+        if(recovery!=SelfUpdater::BootRecovery::Candidate)std::cerr<<"First startup recovery result="<<int(recovery)<<" error="<<error<<'\n';
+        assert(recovery==SelfUpdater::BootRecovery::Candidate);
+        recovery=startup.prepareBoot(error);
+        if(recovery!=SelfUpdater::BootRecovery::RolledBack)std::cerr<<"Failed startup recovery result="<<int(recovery)<<" error="<<error<<'\n';
+        assert(recovery==SelfUpdater::BootRecovery::RolledBack);
+        assert(read(path)==original&&!fs::exists(path.string()+".old"));
+        return;
+    }
     if(scenario=="recovery"){
-        updater.stop();SelfUpdater recovered;recovered.configure(path,"0.12.0-reader.4",ca,{base+"unavailable-api",base+"download/"});assert(recovered.check());assert(wait(recovered).state==UpdateState::Ready);assert(recovered.applyPending(error));
+        updater.stop();SelfUpdater recovered;recovered.configureForTesting(path,"0.12.0-reader.4",ca,{base+"unavailable-api",base+"download/"});assert(recovered.check());assert(wait(recovered).state==UpdateState::Ready);assert(recovered.applyPending(error));
     }else assert(updater.applyPending(error));
-    assert(error.empty()&&read(path)==downloaded&&!fs::exists(path.string()+".new")&&!fs::exists(path.string()+".ready")&&!fs::exists(path.string()+".old"));
+    assert(error.empty()&&read(path)==downloaded&&!fs::exists(path.string()+".new")&&!fs::exists(path.string()+".ready")&&fs::exists(path.string()+".old"));
+    SelfUpdater startup;startup.configureForTesting(path,"0.13.0",ca,source);
+    assert(startup.prepareBoot(error)==SelfUpdater::BootRecovery::Candidate);
+    assert(startup.confirmBoot(error));
+    assert(!fs::exists(path.string()+".old")&&!fs::exists(path.string()+".boot"));
     std::cout<<"PASS: streamed/verified download, unchanged running file, deferred installation and recovery ("<<scenario<<")\n";
 }
 int main(int argc,char **argv){

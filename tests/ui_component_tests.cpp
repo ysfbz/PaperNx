@@ -64,6 +64,16 @@ int main() {
             assert(focused!=draw(pal,false,false,true,true));
             assert(normal!=draw(pal,false,false,false,false,true));
         }
+        const SDL_Color accentColors[]={{96,60,243,255},{36,104,216,255},{8,127,139,255},{23,125,66,255},
+            {184,81,13,255},{202,51,71,255},{185,46,119,255}};
+        for(int variant=0;variant<3;++variant)for(int accent=0;accent<7;++accent) {
+            const auto themed=resolveInterfacePalette(g_palettes[0],variant,accent);
+            assert(themed.accent.r==accentColors[accent].r && themed.accent.g==accentColors[accent].g && themed.accent.b==accentColors[accent].b);
+            if(variant==2)assert(themed.bg.r==g_palettes[0].bg.r);
+        }
+        ReaderPreferences cssStyle;
+        assert(generateEpubCss(cssStyle,true).find("@page")!=std::string::npos);
+        assert(generateEpubCss(cssStyle,false).find("@page")==std::string::npos);
         for(const auto &preset:g_paperPresets) {
             assert(contrast(rgb(preset.background),rgb(preset.text))>=4.5);
             ReaderPreferences style;style.theme=preset.theme;style.backgroundColor=preset.background;style.textColor=preset.text;
@@ -89,6 +99,16 @@ int main() {
             assert(l.hit(l.minus.x+l.minus.w/2,40)==-1);
             assert(l.hit(l.plus.x+l.plus.w/2,40)==1);
         }
+        for(int minimum:{10,50})for(int width:{200,320,560}) {
+            const SDL_Rect row{20,30,width,56};const auto track=ui::settingsSliderTrack(row);
+            assert(track.x>row.x && track.x+track.w<row.x+row.w);
+            assert(ui::settingsSliderValue(track,track.x,minimum,100)==minimum);
+            assert(ui::settingsSliderValue(track,track.x+track.w-1,minimum,100)==100);
+            assert(ui::settingsSliderValue(track,track.x-20,minimum,100)==minimum);
+            assert(ui::settingsSliderValue(track,track.x+track.w+20,minimum,100)==100);
+        }
+        ui::elevated(renderer,{20,20,260,64},g_palettes[0]);
+        ui::preferenceRow(renderer,type,{20,20,260,64},"Brightness",g_palettes[0]);
         unsigned char texture[]={247,243,232,40,35,30,0,0,0,247,243,232};
         std::vector<unsigned char> original(texture,texture+12);applyPaperTexture(texture,4,1,12,0xf7f3e8,0);assert(std::equal(original.begin(),original.end(),texture));
         applyPaperTexture(texture,4,1,12,0xf7f3e8,2);

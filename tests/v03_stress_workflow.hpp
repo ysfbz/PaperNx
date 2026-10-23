@@ -80,7 +80,7 @@ static void v03StressWorkflow(const fs::path &parent) {
     std::size_t peakTexture=0; std::size_t renderedFrames=0;
     auto elapsed=[](auto start){return std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-start).count();};
     {
-        PaperNxApp app(root); assert(app.init());
+        PaperNxApp app(root); assert(initReady(app));
         auto findBook=[&](const char *name) {
             auto book=std::find_if(app.books_.begin(),app.books_.end(),[&](const Book &b){return fs::path(b.path).filename()==name;});
             assert(book!=app.books_.end()); return *book;
