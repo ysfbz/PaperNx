@@ -315,3 +315,25 @@ Bu bölüm, ana v0.9.2 hardening görevinin devamıdır; release hazırlığı v
 | Performans | **UNVERIFIED** | Folio target texture'ları kaldırıldı, ancak frame-time, texture RAM ve Switch FPS öncesi/sonrası ölçülmedi. |
 
 **Karar: INCOMPLETE — BLOCKERS REMAIN.** G3 kodu commit'i `37d978f0f34ba86f0f1bda95088d061cae946723`. G4 updater kurtarma kapısı, G5 bağımsız kaynak mimarisi, full current-HEAD suite/Switch doğrulaması, fiziksel cihaz testleri ve cover performans ölçümleri açık. Release, tag, PR, merge veya GitHub Actions çalıştırılmadı. Devam planı ve 43,484,977 baytlık RAR fixture untracked bırakıldı ve bu commit'e alınmadı.
+
+## N. 2026-10-24 — G4: Updater self-install kapatıldı, verified-manual staging
+
+- **Branch:** `feature/v0.9.2-complete-reader-enhancements`.
+- **Kod commit'i:** `81a3b8c389e7b79ee018343223719cba67992675` (`fix(updater): stage verified releases for manual install`). Joy-Con/touch `+` ortak menü testi ayrı commit `bff2662d57412f255bc486fdc88e43a3e66ea2b6`.
+- G4 stratejisi: A (Switch SD üzerinde atomic overwrite/durability) kanıtlanmadı; libnx rename/commit arayüzü FAT power-loss sözleşmesini tek başına doğrulamıyor. B (immutable launcher/versioned payload) için PaperNX'te doğrulanmış chainload/boot protokolü yok. Bu nedenle uygulama, NRO'yu indirme sonrası **kendisi değiştirmiyor**: geçerli dosya `PaperNX.nro.new` ve `.ready` ile aynı klasöre bırakılıyor; UI klasörü ve harici değiştirme talimatını TR/EN gösteriyor. Eski kurulumlardan kalan `.boot/.old/.swap` açılış kurtarması korunuyor.
+- `applyPending()` ve ona bağlı `.old/.swap` kurulum/yeniden başlatma döngüsü kaldırıldı. `PaperNX.nro` artık ağ, indirme, kontrol veya app kapanış akışlarında yazılmıyor/rename edilmiyor. Kullanıcı harici dosya yöneticisinde mevcut NRO'yu yedeklemeli; dışarıdaki değiştirme ve güç kesintisi PaperNX tarafından otomatik rollback garantili değildir.
+- Yeni `check()` akışı yetim `.part/.ready.tmp` ve bozuk/eksik marker'lı `.new/.ready` dosyalarını temizler; silme hatasında fail-closed davranır. Geçerli `.new/.ready` restart sonrası Ready durumuna döner. Alan hesabı artık mevcut NRO'nun ikinci kopyasını varsaymaz; indirme boyutu ve staging payını ister. İlerleme, kitap, ayar ve Reading Journal sentinel dosyaları integration testinde korunuyor.
+- **`+` kapsamı:** Ekrandaki dokunmatik `+` ve fiziksel Joy-Con `+` / SDL `START` `toggleQuickMenu()` ile aynı `quickMenu_` state'ini değiştiriyor. Reader input testinde dokunmatik aç → Joy-Con kapat → Joy-Con aç → dokunmatik kapat akışı doğrulandı; yeni menü veya ikinci state eklenmedi.
+
+### G4 gerçek doğrulama
+
+| Kontrol | Sonuç | Kanıt |
+|---|---|---|
+| Desktop hedef build | **PASS** | `docker compose run --rm desktop bash -lc 'cmake --build build-desktop --target PaperNX papernx_self_update_tests papernx_reader_input_tests papernx_localization_tests --parallel 4 && ctest --test-dir build-desktop --output-on-failure -R "^papernx_self_update_tests$|^papernx_self_update_network_tests$|^papernx_reader_input_tests$|^papernx_localization_tests$"'`. |
+| Updater, HTTPS ve `+` hedef testleri | **PASS, 4/4** | CTest `papernx_self_update_tests`, `papernx_self_update_network_tests`, `papernx_reader_input_tests`, `papernx_localization_tests`. Yerel TLS matrix'inde geçerli/bozuk sertifika, HTTP reddi, yanlış hash/NRO identity/version, kesilmiş içerik, iptal, disk yazma hatası, stale partial/orphan staging, valid ready resume, tampered pending cleanup ve legacy boot rollback var. |
+| Switch build/link | **PASS** | `docker compose run --build --rm switch bash -lc 'export MUPDF_PREFIX=/work/prefix-mupdf-switch; make all -j4'`; devkitA64/libnx ile ELF ve NRO linklendi. ELF'de `curl_easy_init`, `curl_easy_perform`, `curl_easy_cleanup` bulundu. |
+| Switch ELF/NRO/CA | **PASS** | Salt-okunur artifact doğrulaması: AArch64, NRO `49,580,479` bayt, SHA-256 `9f2e05997fc1d1336ad68c6ddd6af251c7739786a495f76732c5de6f4bcca1b6`; embedded RomFS CA source ile eşleşti, `118` sertifika / `200,116` bayt. NACP sürümü test build'inde mevcut `0.9.1`; sürüm bump veya dağıtım ZIP'i yapılmadı. Var olan `verification/artifacts.json` dosyasının üstüne yazılmadı. |
+| İlk localizasyon denemesi | **FAIL yakalandı, düzeltildi** | Türkçe→İngilizce ters sözlük girdileri eksikti; sözlük ve assertion eklendi. Son localization CTest **1/1 PASS**, final hedef koşusu **4/4 PASS**. |
+| Switch fiziksel SD, dış dosya yöneticisiyle replace, power-loss, gerçek Joy-Con | **NOT RUN / UNVERIFIED** | Kod artık canonical NRO'ya dokunmuyor; kullanıcının harici değişim adımı ve eski marker recovery donanımda sınanmadı. |
+
+**Karar: INCOMPLETE — BLOCKERS REMAIN.** G4 yeni updater self-install kesinti penceresini uygulama kodundan kaldırdı; external manual replace için rollback/power-loss iddiası yok. G5 scanner/index/parser kökenli tasarım, G6 kapak ölçüm matrisi, G7 11 özellik full-regression, Ponytail final audit, tüm native test seti/sanitizer ve fiziksel Switch senaryoları açık. Tam doğrulama zinciri baştan çalıştırılmadı; release, tag, PR, merge veya GitHub Actions çalıştırılmadı.

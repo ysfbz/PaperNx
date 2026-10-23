@@ -173,3 +173,22 @@ The earlier shared cache/curl distinction remains important. `src/page_cache.cpp
 Behavioral coverage for the G3 extension is in `tests/reader_input_tests.cpp`, `tests/reader_spread_tests.cpp`, `tests/comic_app_tests.cpp`, and the normal/fallback `tests/page_curl_tests.cpp` targets. Those tests establish behavior, not copyright origin. No fork-v0.17.3–v0.17.5 module was copied into the G3 commit.
 
 **Correct current wording:** “At feature HEAD `37d978f0f34ba86f0f1bda95088d061cae946723`, none of the five extant paths among the six originally listed is byte-identical to the pinned fork commit, and `include/papernx/interface_theme.hpp` is deleted. The original all-six byte-identity statement is true only for historical feature HEAD `a35aa7b0f51aee58f44d524616a2aa55477d670c`. The scanner/index/theme and updater/parser implementations retain their documented fork-derived/adapted lineage and Refael Bar / Refael Avramashvili AGPL-3.0 attribution. The page cache and page curl were shared v0.9.1 code already in the main comparison base; G3's small PageCurl API extension does not make the underlying algorithm independent or alter its provenance.”
+
+## Current provenance snapshot — G4 code commit `81a3b8c389e7b79ee018343223719cba67992675`
+
+G4 removes the PaperNX self-install transaction from the updater, but it does not erase the updater's fork-derived history or make the remaining parser/network code a clean-room implementation. The current blobs are:
+
+| Path | G4 feature blob | Pinned fork blob | Current classification |
+|---|---|---|---|
+| `src/self_update.cpp` | `066ae641bdaf66c36cb23b6e2a65d4c9ea03cf22` | `e7e5c52c1b4b2137d92d1c6902a011d1d3b71b6c` | Different after PaperNX trust/staging/recovery work and G4 deletion of risky self-install. Remaining updater lineage is adapted/fork-derived; keep Refael Avramashvili and AGPL-3.0 credit. |
+| `src/update_json.hpp` | `677a6931a6fbbf583ba8388fff217dcaef5b091b` | `d4e3bb96dcb2d363e23d40a83775c02768fc5394` | Unchanged from prior snapshot, still fork-derived parser; not independently authored. Keep Refael Avramashvili / AGPL-3.0 credit. |
+| `src/library_scan.inc` | `7e45b42f84fa84d3e20f2a4c209b0cc91d34b52b` | `c8087dc4defa88af950bed947e6d50962bc7799f` | Unchanged in G4; fork-derived scanner integration, not clean-room. Keep Refael Bar / AGPL-3.0 credit. |
+| `src/library_index.cpp` | `e991d669da322528accce694923c226b753bb06f` | `e4b3e83e2ddadaa55913b56f7a0a0e31b3f5dd1a` | Unchanged in G4; PaperNX extensions do not erase fork lineage. Keep Refael Bar / AGPL-3.0 credit. |
+| `include/papernx/library_index.hpp` | `bfbc9980a93d5f95e93f89e9a117f62e85d4b860` | `8a0ac82707cf5b402d0cbcebd790d751758b0003` | Unchanged in G4; fork-derived API. Keep Refael Bar / AGPL-3.0 credit. |
+| `include/papernx/interface_theme.hpp` | Deleted | `be58dc293354a4e38e31eb9faa08284367845c53` | Palette integration remains in PaperNX theme code; deletion is not removal of source credit. Keep Refael Bar / AGPL-3.0 credit. |
+
+`src/page_cache.cpp` remains the prior shared v0.9.1 blob `10b7df91eb4f9762b69a08573c25a7a5f74d9e3a`; `include/papernx/page_curl.hpp` remains the prior shared v0.9.1 code with G3 extension blob `abd656bb92e594e59588531a996d526184749234`. Neither is a G4 import or independently authored claim.
+
+G4 updater behavior is tested in `tests/self_update_tests.cpp` and `tests/self_update_integration.py`; tests establish verified-manual staging and canonical/user-data preservation, not provenance. `tests/reader_input_tests.cpp` separately verifies touch and controller `+` share the existing menu state. Attribution and AGPL notices remain present; no old release history was edited.
+
+**Correct current wording:** “At feature HEAD `81a3b8c389e7b79ee018343223719cba67992675`, the updater has been redesigned to stage a verified NRO for external manual replacement and no longer performs an in-app canonical-NRO swap. Its parser and remaining network/update lineage remain derived/adapted from the cited AGPL-3.0 fork contribution; Refael Avramashvili attribution remains appropriate. The scanner/index/theme remain fork-derived and attributed to Refael Bar. Historical byte identity remains true only at `a35aa7b`; changed blobs and deleted paths do not prove independent authorship. Page cache and curl remain shared v0.9.1 code, with G3's small curl API extension preserving that provenance.”

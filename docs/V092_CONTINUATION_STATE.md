@@ -1,7 +1,8 @@
 # PaperNX v0.9.2 hardening continuation state
 
-**Updated:** 2026-10-23
+**Updated:** 2026-10-24
 **Branch:** `feature/v0.9.2-complete-reader-enhancements`
+**Latest source commit:** `81a3b8c389e7b79ee018343223719cba67992675` (G4 updater manual-staging checkpoint).
 **Last source commit before the current hardening changes:** `bb9d8579db9ccf0d10b5843e1929c2e696565c59`
 **Hardening source commits:** `913fb8f` and `1cb06a1`.
 **Audit documentation:** committed on this feature branch; use `git log` for the final report commit SHA.
@@ -95,3 +96,16 @@ The verified/pushed branch HEAD at the start of this note was `ed9e3b69c184de1b4
 - **Pixel evidence:** `verification/v092/ui/comic-folio/comic-paired-{0,20,40,60,80,100}.bmp`; tests assert footer pixels are identical through the animation. No before/after frame-time, texture-RAM or Switch FPS baseline was measured, so no speedup claim is made.
 - **Not run / unverified:** complete native CTest, Switch cross-build at G3, ASan/UBSan, physical Switch render/controller, and performance matrix. Full task remains `INCOMPLETE — BLOCKERS REMAIN`.
 - **Next gate:** G4 updater install/recovery safety. Do not infer full power-loss rollback from host tests; canonical-NRO-missing recovery and real FAT behavior remain open. Keep the untracked execution plan and generated 43,484,977-byte RAR fixture outside commits.
+
+## 2026-10-24 G4 verified-manual updater checkpoint
+
+- **Current source commit:** `81a3b8c389e7b79ee018343223719cba67992675` (`fix(updater): stage verified releases for manual install`), pushed to the existing feature branch. The touch/controller `+` shared-state regression test is in pushed commit `bff2662d57412f255bc486fdc88e43a3e66ea2b6`.
+- **G4 strategy:** app self-install was removed. After HTTPS, SHA-256, NRO structure, NACP identity and version validation, the release is staged as adjacent `PaperNX.nro.new` plus `.ready`; UI gives a TR/EN external replacement instruction and folder path. The user should keep a backup. The app does not claim an atomic or automatic rollback for the external file-manager operation.
+- Switch SD rename/commit declarations do not establish target FAT power-loss semantics; no hardware experiment proved strategy A. No tested immutable launcher/chainload protocol exists for B. Chose C (verified manual staging) and retained only legacy `.boot/.old/.swap` recovery code for transactions from earlier self-installing builds. New downloads cannot create the canonical-missing rename state.
+- `check()` cleans orphan `.part` and `.ready.tmp`; invalid/orphan `.new/.ready` are removed with error handling; a verified newer ready package resumes across app launch. It checks free space for the staged package plus reserve and never writes progress/books/settings/catalog/Reading Journal.
+- **Host verification PASS, 4/4:** `papernx_self_update_tests`, `papernx_self_update_network_tests`, `papernx_reader_input_tests`, `papernx_localization_tests`. The TLS matrix covers malformed/HTTP/untrusted TLS, wrong hash/app/version, truncation/cancel/write failure, stale partial and orphan files, valid pending resume, tamper/missing-ready cleanup, canonical NRO preservation, user-data sentinels and legacy marker rollback. Touch `+` and controller `START/+` cross-toggle one existing `quickMenu_`.
+- **Desktop build command:** `docker compose run --rm desktop bash -lc 'cmake --build build-desktop --target PaperNX papernx_self_update_tests papernx_reader_input_tests papernx_localization_tests --parallel 4 && ctest --test-dir build-desktop --output-on-failure -R "^papernx_self_update_tests$|^papernx_self_update_network_tests$|^papernx_reader_input_tests$|^papernx_localization_tests$"'`.
+- **Switch build PASS:** `docker compose run --build --rm switch bash -lc 'export MUPDF_PREFIX=/work/prefix-mupdf-switch; make all -j4'`. AArch64 ELF/NRO linked; `curl_easy_init`, `curl_easy_perform` and `curl_easy_cleanup` are in the ELF. NRO SHA-256 `9f2e05997fc1d1336ad68c6ddd6af251c7739786a495f76732c5de6f4bcca1b6`, 49,580,479 bytes. Its RomFS contains the exact source CA file (118 certificates / 200,116 bytes). Test build keeps the branch's current 0.9.1 NACP version; no release/package was created. Existing ignored `verification/artifacts.json` was not overwritten.
+- A first localization test caught a missing Turkish-to-English reverse mapping; the map/assertion were fixed and the final 4/4 target run passed. `git diff --check` emits false trailing-whitespace flags for the added CRLF lines in `src/main.cpp`; byte inspection confirmed the file uses consistent CRLF. All other changed files pass whitespace checks.
+- **Not run / unverified:** physical Switch Joy-Con, SD/FAT external replace, interruption during manual replacement, legacy boot recovery on device, full CTest, ASan/UBSan and full cover matrix. These are not hardware PASS.
+- **Next gate:** G5 scanner/index/parser architecture and contract-test review. Do not rewrite the page cache/curl merely to alter hashes; retain fork/AGPL attribution. Keep the untracked execution plan and 43,484,977-byte CBR fixture out of commits. Overall status remains `INCOMPLETE — BLOCKERS REMAIN`.
