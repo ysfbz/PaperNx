@@ -237,3 +237,25 @@ Bu bölüm, ana v0.9.2 hardening görevinin devamıdır; release hazırlığı v
 - **Kalan kritik işler:** Scanner/index/parser için istenen bağımsız PaperNX mimarisi tamamlanmadı. İki rename arasındaki kesintide canonical NRO kaybolabilir; uygulama bu durumda kendi recovery kodunu çalıştıramaz ve `.old` harici dosya yöneticisi/bilgisayarla geri yüklenmelidir. Bu durum updater'ı power-loss-proof yapmaz.
 
 **Karar: INCOMPLETE — BLOCKERS REMAIN.** Bu checkpoint'in kod değişiklikleri `e791394` ve `b9a22bc`; provenance/continuation dokümantasyon commit'i `933eb2e`'dir. Bu FinalDevelopmentResult güncellemesi ayrı rapor commit'i olarak kaydedilecektir. Release/tag/PR/merge veya GitHub Actions çalıştırılmadı.
+
+## I. 2026-10-24 — Birleştirilmiş Asenkron Tarama Regresyonu
+
+- **Branch:** `feature/v0.9.2-complete-reader-enhancements`.
+- **Güncel kod-bearing HEAD:** `b9a22bcf023165ab0338c6e9cbf9a92253290e7f`. **Güncel branch HEAD:** `8c38513` (`test(library): cover coalesced async rescans`); bu commit yalnızca `tests/modern_library_tests.cpp` dosyasını değiştirdi.
+- `LibraryScanner` çalışırken yeni tarama isteği geldiğinde ilk iş iptal edilip join ediliyor, kısmi sonuç UI'ye uygulanmıyor ve birleştirilmiş yeni tarama başlatılıyor. Yeni test iki isteği art arda verip bir tamamlanmış yayın ve altıncı kitabın görünmesini doğruluyor.
+- **Hedefli doğrulama:** `papernx_modern_library_tests` yeniden derlendi ve CTest **1/1 PASS**. İlk koşuda yeni scan sırasından sonra eski `books_.size()==5` beklentisi kaldığı için test FAIL oldu; beklenti 6 olarak düzeltilip aynı hedef yeniden çalıştırıldı ve geçti.
+- Kaynak provenance tablosu güncel branch HEAD `8c38513` için tekrar doğrulandı; altı dosyanın blob'ları `b9a22bc` ile aynı, çünkü `8c38513` yalnızca test dosyasına dokunuyor. Fork kökeni ve Refael Bar / Refael Avramashvili atıfları korunuyor.
+- Bu test checkpoint'inden sonra full native CTest çalıştırılmadı. Physical Switch, Joy-Con, backlight, TLS ve gerçek güç kesintisi davranışları halen **UNVERIFIED**; performance matrix de **PARTIAL / NOT RUN**.
+
+**Karar: INCOMPLETE — BLOCKERS REMAIN.** Ayrı test commit'i `8c38513`; provenance/continuation güncellemesi ve bu rapor kaydı henüz commit/push edilmedi. Bağımsız modül yeniden tasarımı, canonical NRO'suz güç-kesintisi kurtarması ve gerçek cihaz/performance kanıtı açık kalıyor.
+
+## J. 2026-10-24 — İptal Edilen Taramanın Envanter Yazmasını Durdurma
+
+- **Branch:** `feature/v0.9.2-complete-reader-enhancements`; güncel kod-bearing HEAD `faecf30eb4fb12fd143d3c1666d91f0b690b484c`.
+- `src/library_index.cpp`, envanter kayıtlarını `ProgressStore` içine hazırlarken iptali her kayıt öncesi kontrol ediyor; iptal görülürse atomik `save()` çağrılmıyor. Böylece var olan cache korunuyor. Atomic save başlamışsa mevcut tümden-yazım davranışı korunuyor.
+- **Native doğrulama:** `papernx_library_index_tests` ve `papernx_modern_library_tests` yeniden derlendi; hedefli CTest **2/2 PASS**.
+- **Switch doğrulama:** `docker compose run --rm switch bash -lc 'make -j4 && python3 scripts/verify_artifacts.py --version 0.9.1'` **PASS**. AArch64 ELF/NRO; libcurl linki; 118 CA sertifikası / 200,116 bayt RomFS kaynağı. NRO SHA-256: `30c29d0ca291c5dacdc39040627e0a094f25d300259607f22aeb4b3a0e782a95`. Hardware `UNVERIFIED`.
+- **Full suite:** bu son değişikliklerden sonra full native CTest **NOT RUN**. Cache cold/warm ölçek ölçümleri, fiziksel Switch TLS/backlight/Joy-Con ve gerçek güç kesintisi testleri halen **NOT RUN / UNVERIFIED**.
+- **Provenance:** current module blobs are refreshed in `V092_SOURCE_PROVENANCE_AUDIT.md`; changed source still retains fork-derived classification and author/license notices. Independent scanner/index redesign remains open.
+
+**Karar: INCOMPLETE — BLOCKERS REMAIN.** Kod commit'i `faecf30`, queued scan test commit'i `8c38513`, provenance/continuation dokümantasyon commit'i `4335ec1`'dir. Bu rapor kaydı ayrı commit olarak eklenecektir. Release/tag/PR/merge/Actions yok.
