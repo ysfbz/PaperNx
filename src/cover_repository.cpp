@@ -145,7 +145,9 @@ void CoverRepository::initialize() {
     fs::directory_iterator it(root_, ec), end;
     while (!ec && it != end) {
         auto p = it->path(); auto name = p.filename().string();
-        if (name.size() >= 36 && safeKey(name.substr(0, 32)) && regular(p)) {
+        // Only leftover .tmp/.bak files need inspection; the (many) .pnxc entries are skipped here
+        // without a per-file stat and counted once in the next pass.
+        if (name.size() >= 36 && safeKey(name.substr(0, 32)) && name.substr(32) != ".pnxc" && regular(p)) {
             const auto key = name.substr(0, 32), suffix = name.substr(32);
             const auto final = root_ / (key + ".pnxc");
             if (suffix == ".tmp") removeOwned(p);
@@ -160,7 +162,10 @@ void CoverRepository::initialize() {
     ec.clear();
     for (fs::directory_iterator scan(root_, ec); !ec && scan != end; scan.increment(ec)) {
         auto p = scan->path(); auto name = p.filename().string();
-        if (name.size() != 37 || name.substr(32) != ".pnxc" || !safeKey(name.substr(0, 32)) || !regular(p)) continue;
+        if (name.size() != 37 || name.substr(32) != ".pnxc" || !safeKey(name.substr(0, 32))) continue;
+        // directory_entry reuses the type reported by the directory read (no extra SD stat on libnx).
+        std::error_code entryError;
+        if (!fs::is_regular_file(scan->symlink_status(entryError)) || entryError) continue;
         auto bytes = fs::file_size(p, ec); if (ec) break;
         if (bytes > headerSize + maxWidth * maxHeight * 3) { removeOwned(p); continue; }
         entries_[name.substr(0, 32)] = {bytes, ++clock_};
