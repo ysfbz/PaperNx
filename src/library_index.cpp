@@ -17,7 +17,16 @@ constexpr const char *inventorySchemaId="libraryindex0001";
 constexpr const char *inventorySchema="PAPERNX-LIBRARY-1";
 }
 std::optional<std::uintmax_t> regularBookFileSize(const fs::path &path) {
-#if !defined(_WIN32) && defined(O_NOFOLLOW)
+#if defined(__SWITCH__)
+    // shortcut: libnx SD filesystems lack openat and FAT has no symlinks/FIFOs; revisit if that changes.
+    const int file=::open(path.c_str(),O_RDONLY);
+    if(file<0)return std::nullopt;
+    struct stat info{};
+    const int status=::fstat(file,&info);
+    ::close(file);
+    if(status!=0 || !S_ISREG(info.st_mode) || info.st_size<0)return std::nullopt;
+    return static_cast<std::uintmax_t>(info.st_size);
+#elif !defined(_WIN32) && defined(O_NOFOLLOW)
     int flags=O_RDONLY|O_NONBLOCK|O_NOFOLLOW;
 #ifdef O_CLOEXEC
     flags|=O_CLOEXEC;
@@ -38,7 +47,7 @@ std::optional<std::uintmax_t> regularBookFileSize(const fs::path &path) {
 #endif
 }
 std::optional<std::uintmax_t> regularBookFileSize(const fs::path &root,const fs::path &path) {
-#if !defined(_WIN32) && defined(O_NOFOLLOW) && defined(O_DIRECTORY)
+#if !defined(__SWITCH__) && !defined(_WIN32) && defined(O_NOFOLLOW) && defined(O_DIRECTORY)
     const auto relative=path.lexically_relative(root);
     if(relative.empty() || relative.is_absolute())return std::nullopt;
     int flags=O_RDONLY|O_DIRECTORY|O_NOFOLLOW;
