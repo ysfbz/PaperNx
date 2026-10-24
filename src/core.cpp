@@ -548,7 +548,7 @@ void AppSettingsStore::put(AppPreferences preferences) {
     preferences.softwareBrightness = std::clamp(preferences.softwareBrightness, 50, 100);
     preferences.systemBrightness = std::clamp(preferences.systemBrightness, 10, 100);
     preferences.interfaceStyle = std::clamp(preferences.interfaceStyle, 0, 2);
-    preferences.interfaceAccent = std::clamp(preferences.interfaceAccent, 0, 6);
+    preferences.interfaceAccent = std::clamp(preferences.interfaceAccent, 0, 7);
     std::vector<std::string> folders;
     for(const auto &folder:preferences.libraryFolders) {
         if(folder.empty())continue;
@@ -574,6 +574,14 @@ bool AppSettingsStore::load() {
     if(store_.all().count("APP_UI_THEME_016")) {
         const auto theme=store_.get("APP_UI_THEME_016");
         preferences.interfaceStyle=theme.fontFamily;preferences.interfaceAccent=theme.fontSize-12;
+        // v0.9.2 serialized its implicit Dark/Purple defaults identically to
+        // a user choice. Migrate only that exact legacy default combination;
+        // other explicit variants and accents are left untouched. New writes
+        // carry a marker so an explicit Dark/Purple choice remains persistent.
+        if(!theme.favorite && theme.fontFamily==0 && theme.fontSize==12) {
+            preferences.interfaceStyle=2;
+            preferences.interfaceAccent=7;
+        }
         preferences.scanOnLaunch=theme.scrollInertia!=0;
     }
     for(int index=0;index<32;++index) {
@@ -641,6 +649,7 @@ bool AppSettingsStore::save() const {
     Progress theme;
     theme.fontFamily=preferences_.interfaceStyle;theme.fontSize=12+preferences_.interfaceAccent;
     theme.scrollInertia=preferences_.scanOnLaunch?1:0;
+    theme.favorite=true; // Distinguish explicit new settings from implicit v0.9.2 defaults.
     store_.put("APP_UI_THEME_016",std::move(theme));
     Progress updater;
     updater.favorite=preferences_.automaticUpdateCheck;
