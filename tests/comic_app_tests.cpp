@@ -173,6 +173,16 @@ struct AppTest {
         assert(app.catalog_.apply(cbz).title=="The Signal — Issue 7");
         assert(app.catalog_.get(cbz.id).sourceSeries=="PaperNX Test Comics");
         assert(app.tocEntries_.size()==2 && app.tocEntries_[0].page==1);
+        {
+            const auto before=app.appSettings_.get();auto spread=before;
+            spread.displayOrientation=0;spread.comicLandscapeSpreads=true;app.appSettings_.put(spread);
+            app.currentPage_=0;assert(app.comicSpreadPages(0).second==2);
+            app.configureComicPages();
+            app.comicPages_.setSuspended(true);app.failComicPage(0,"synthetic spread failure");app.render();
+            assert(!app.pageRenderError_.empty()); // A healthy facing page must not clear its failed partner's message.
+            app.comicPages_.clear();app.comicPages_.setSuspended(false);app.closeBook();app.appSettings_.put(before);
+            app.openBook(cbz);assert(app.comic());
+        }
         // Reader themes surround the artwork without changing its colors.
         app.currentTheme_=5;app.extraStyle_.backgroundColor=0;app.pageCache_.clear();
         assert(app.getOrRenderPageTexture(0));snapshot(app,"original-night");

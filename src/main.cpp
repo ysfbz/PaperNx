@@ -2249,15 +2249,18 @@ private:
         SDL_RenderSetClipRect(renderer_,&viewport);
         if(comic()) {
             bool pending=false;
+            int failedPage=-1;
             int page=currentPage_;float y=72-scrollY_;
             while(page<pageCount_ && y<h-72+512) {
                 const float height=segmentHeight(page);
                 if(auto texture=comicZoomTexture(page)) {
                     SDL_Rect destination{viewport.x,int(std::round(y)),viewport.w,std::max(1,int(std::ceil(height)))};
                     SDL_RenderCopy(renderer_,texture,nullptr,&destination);
-                } else if(!comicBaseRetry_.count(page))pending=true;
+                } else if(comicBaseRetry_.count(page))failedPage=page;
+                else pending=true;
                 y+=height;++page;
             }
+            if(failedPage>=0)pageRenderError_=catLabel("Sayfa açılamadı: ","Could not render page: ")+std::to_string(failedPage+1);
             SDL_RenderSetClipRect(renderer_,nullptr);
             return pending;
         }
@@ -2291,10 +2294,10 @@ private:
         const auto identity=comicTextureIdentity();
         if(pdfZoom_>1.01f) {
             auto detail=comicDetails_.find(page);
-            if(detail!=comicDetails_.end() && detail->second.identity==identity){pageRenderError_.clear();return detail->second.texture.get();}
+            if(detail!=comicDetails_.end() && detail->second.identity==identity)return detail->second.texture.get();
         }
         const auto key=comicTextureKey(page);
-        if(auto texture=pageCache_.get(key)){pageRenderError_.clear();return texture;}
+        if(auto texture=pageCache_.get(key))return texture;
         configureComicPages();
         auto retry=comicBaseRetry_.find(page);
         if(retry!=comicBaseRetry_.end()) {
@@ -2306,7 +2309,6 @@ private:
             }
             comicBaseRetry_.erase(retry);
         }
-        pageRenderError_.clear();
         comicPages_.request(page,ComicPages::Priority::Visible);
         return nullptr;
     }
@@ -3799,10 +3801,16 @@ private:
         }
         if(comic() && !continuous()) {
             const auto visible=comicSpreadPages(currentPage_);
+            bool failed=false;
             for(int side=0;side<visible.second;++side) {
                 const int page=visible.second==2?readerSidePage(visible.first,side):visible.first;
-                if(!pageCache_.get(comicTextureKey(page)) && !comicBaseRetry_.count(page))comicSurfacePending=true;
+                if(pageCache_.get(comicTextureKey(page)))continue;
+                if(comicBaseRetry_.count(page)) {
+                    if(!failed)pageRenderError_=catLabel("Sayfa açılamadı: ","Could not render page: ")+std::to_string(page+1);
+                    failed=true;
+                } else comicSurfacePending=true;
             }
+            if(!failed)pageRenderError_.clear();
         }
         if(comic() && (comicPendingTurn_.active || pageTurnTouch_.waitingForTexture || comicSurfacePending)) {
             const SDL_Rect loading{w/2-104,h/2-22,208,44};
