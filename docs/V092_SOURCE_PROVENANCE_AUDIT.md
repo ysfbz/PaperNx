@@ -474,3 +474,18 @@ Updater unit and local HTTPS tests passed **2/2** in desktop and **2/2** under A
 | `include/papernx/interface_theme.hpp` | Deleted | `be58dc293354a4e38e31eb9faa08284367845c53` | Palette is integrated with PaperNX theme tokens; deletion does not erase Refael Bar / AGPL-3.0 provenance. |
 
 `tests/library_index_tests.cpp` covers scanner history replaced by a symlink; `tests/modern_library_tests.cpp` covers progress-path discovery with launch scanning disabled and asserts that progress remains present. Both targeted tests passed in desktop and ASan/UBSan; current-source Switch build/artifact verification passed. These establish the safety behavior, not independent authorship. The code remains fork-derived/adapted pending any genuinely separate implementation with its own provenance review.
+
+## Current code provenance snapshot — POSIX no-follow open `426d0fbaba540129b6066d5f71519b99306f8577`
+
+The library-index file gained a PaperNX-specific single-open validation path: POSIX builds use `open(O_NOFOLLOW | O_NONBLOCK)` followed by `fstat()`, while Windows retains the prior filesystem-metadata fallback. The change closes a metadata-check race and rejects special files without blocking. It is a targeted adaptation in the fork-derived module, not an independent implementation; Refael Bar / AGPL-3.0 attribution remains appropriate.
+
+| Path | Feature blob at `426d0fb` | Pinned fork blob | Current classification |
+|---|---|---|---|
+| `src/library_scan.inc` | `af2a8cd74c69a777071bb2f275f24ae5e574e6d8` | `c8087dc4defa88af950bed947e6d50962bc7799f` | Fork-derived/adapted PaperNX SDL integration; Refael Bar / AGPL-3.0 attribution remains. |
+| `src/library_index.cpp` | `cd7bee0b76249c849fe04fd41fa8509e69415f78` | `e4b3e83e2ddadaa55913b56f7a0a0e31b3f5dd1a` | Fork-derived/adapted worker and inventory with PaperNX schema, symlink history and single-open file validation; not clean-room. Preserve Refael Bar / AGPL-3.0 attribution. |
+| `include/papernx/library_index.hpp` | `348cabf5cc9dcdd4befcd4cc7cd305b03d8dbc01` | `8a0ac82707cf5b402d0cbcebd790d751758b0003` | Fork-derived/adapted scanner contract; Refael Bar / AGPL-3.0 attribution remains. |
+| `src/self_update.cpp` | `ec3f5b922e15029b291e85877cd54374b2dbade1` | `e7e5c52c1b4b2137d92d1c6902a011d1d3b71b6c` | Fork-derived/adapted verified-manual updater; Refael Avramashvili / AGPL-3.0 attribution remains. |
+| `src/update_json.hpp` | `95ab577f9c0a705ea2de2a20fbb61fe690af3040` | `d4e3bb96dcb2d363e23d40a83775c02768fc5394` | Fork-derived/adapted bounded parser; Refael Avramashvili / AGPL-3.0 attribution remains. |
+| `include/papernx/interface_theme.hpp` | Deleted | `be58dc293354a4e38e31eb9faa08284367845c53` | Palette was integrated into PaperNX theme tokens; deletion does not remove Refael Bar attribution. |
+
+The POSIX FIFO regression and existing inventory/scanner symlink cases passed in desktop CTest (**2/2**) and targeted ASan/UBSan (**2/2**); the Switch AArch64 ELF/NRO and RomFS artifact verifier passed at this source revision. These tests establish behavior, not independent authorship. The historical six-path byte identity remains limited to `a35aa7b0f51aee58f44d524616a2aa55477d670c`; attribution remains tied to code lineage, not current blob equality.

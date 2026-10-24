@@ -5,7 +5,7 @@
 
 **Baseline:** `main@8db85384a1b6c277c74766601ef46e9a672328df` (2026-10-23 audit)  
 **Feature branch:** `feature/v0.9.2-complete-reader-enhancements`  
-**Latest source-bearing HEAD:** `aa400968fffe8524f0179280b2747be419a7636e` (reject symlinked progress-history paths; full native CTest at the preceding test checkpoint, focused current-source evidence below).
+**Latest source-bearing HEAD:** `426d0fbaba540129b6066d5f71519b99306f8577` (single-open regular-file validation; full native CTest at the preceding test checkpoint, focused current-source evidence below).
 **Fork reference:** `rtk19/PaperNx@d2b4bcfd10b1a66043c5b8cd36da08340cffec6d`  
 **Version remains:** v0.9.1; do not tag, release or merge to main.
 
@@ -431,3 +431,11 @@ The two focused tests passed after those adjustments. The full native suite then
 `PaperNX`, `papernx_library_index_tests` and `papernx_modern_library_tests` built; targeted CTest passed **2/2**. The same tests passed under ASan/UBSan **2/2**. The Switch command `docker compose run --rm switch bash -lc 'export MUPDF_PREFIX=/work/prefix-mupdf-switch; make all -j4 && python3 scripts/verify_artifacts.py --version 0.9.1'` passed at `aa400968fffe8524f0179280b2747be419a7636e`: AArch64 ELF/NRO, CA bundle 118 certs / 200,116 bytes, NRO 49,588,671 bytes, SHA-256 `334ebdfdd21d94d63a1c0d99bbca1741bfbf63c37f7c522753b8ca7a6dd9a946`. Physical Switch remains **UNVERIFIED**.
 
 The full **31/31** native CTest result is from `6fe94ec`; it was not rerun after this focused library change. Full independent scanner/index/updater/parser design, whole-app sanitizer, SD startup-cost measurement, actual cover-scroll performance and physical device checks remain open. Overall status remains **INCOMPLETE — BLOCKERS REMAIN**.
+
+## Single-open regular-file validation — `426d0fb`
+
+POSIX `regularBookFileSize()` now opens the path with `O_NOFOLLOW | O_NONBLOCK` and uses `fstat()` for the regular-file check and byte count. This prevents the earlier `symlink_status()`/`file_size()` pair from following a symlink swapped between calls and prevents a FIFO open from blocking. The Windows fallback still uses `std::filesystem` metadata calls.
+
+`PaperNX` and focused library/application tests built; desktop CTest passed **2/2**, and the same two tests passed under ASan/UBSan **2/2**. Switch AArch64 ELF/NRO linking passed using the committed source contents; post-commit artifact verification reports `426d0fb`, implementation SHA-256 `7ae2121bb177d89487a890f11082aa54dddeb3559c3c40d29062d970fb6ea4f5`, RomFS CA 118 certs / 200,116 bytes and NRO SHA-256 `aa677160cc8368ccbb443ed4b218f0cda82fa7634e94b56577c2401a3285d4a5`. Physical Switch remains **UNVERIFIED**.
+
+The `library_index.cpp` change remains fork-derived/adapted and keeps Refael Bar / AGPL-3.0 attribution. This does not resolve the independent scanner/index redesign. Full native CTest after `426d0fb`, whole-app sanitizer, Windows race behavior, Switch SD cost and physical device checks remain open. Overall status **INCOMPLETE — BLOCKERS REMAIN**.

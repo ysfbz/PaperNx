@@ -2,8 +2,8 @@
 
 **Updated:** 2026-10-24
 **Branch:** `feature/v0.9.2-complete-reader-enhancements`
-**Latest source commit:** `aa400968fffe8524f0179280b2747be419a7636e` (reject symlinked progress-history paths).
-**Latest separate test-only commit:** `6fe94ecbc821556abdd0eb958a06875d556c7dcd` (async comic test conditions; latest source+test commit is `aa40096`).
+**Latest source commit:** `426d0fbaba540129b6066d5f71519b99306f8577` (single-open regular-file validation; includes the FIFO regression test).
+**Latest separate test-only commit:** `6fe94ecbc821556abdd0eb958a06875d556c7dcd` (async comic test conditions; subsequent source commits include their focused regressions).
 **Last source commit before the current hardening changes:** `bb9d8579db9ccf0d10b5843e1929c2e696565c59`
 **Hardening source commits:** `913fb8f` and `1cb06a1`.
 **Audit documentation:** committed on this feature branch; use `git log` for the final report commit SHA.
@@ -411,3 +411,11 @@ The verified/pushed branch HEAD at the start of this note was `ed9e3b69c184de1b4
 - **Switch:** current commit cross-build and artifact verification passed. AArch64 ELF/NRO; NRO SHA-256 `334ebdfdd21d94d63a1c0d99bbca1741bfbf63c37f7c522753b8ca7a6dd9a946`; RomFS CA bundle 118 certificates / 200,116 bytes. Hardware **UNVERIFIED**.
 - **Provenance:** the scanner/index files remain fork-derived/adapted; the new shared validation does not change that finding or Refael Bar / AGPL-3.0 attribution. Current blobs are recorded in [`V092_SOURCE_PROVENANCE_AUDIT.md`](V092_SOURCE_PROVENANCE_AUDIT.md).
 - **Limits / next:** full 31/31 native CTest passed at earlier test commit `6fe94ec`; it was not rerun on `aa40096`. The added lstat-style check's Switch SD startup cost is not measured. Continue substantive scanner/index redesign and the remaining updater/parser/Ponytail audit; physical Switch remains unverified. Overall decision **INCOMPLETE — BLOCKERS REMAIN**.
+
+## 2026-10-24 — POSIX direct-file validation follow-up
+
+- **Current source:** `426d0fbaba540129b6066d5f71519b99306f8577`. `regularBookFileSize()` uses `open(O_NOFOLLOW | O_NONBLOCK)` plus `fstat()` on POSIX; Windows retains the `std::filesystem` fallback. FIFO regression added to `tests/library_index_tests.cpp`.
+- **Desktop:** `PaperNX`, `papernx_library_index_tests`, `papernx_modern_library_tests` built; focused CTest **2/2 PASS** (12.61 sec).
+- **ASan/UBSan:** the same two targets built; CTest **2/2 PASS** (16.77 sec).
+- **Switch:** AArch64 ELF/NRO link passed with the exact committed source contents; post-commit artifact verification identifies HEAD `426d0fb`, implementation SHA-256 `7ae2121bb177d89487a890f11082aa54dddeb3559c3c40d29062d970fb6ea4f5`, 118 CA certificates / 200,116 bytes, NRO SHA-256 `aa677160cc8368ccbb443ed4b218f0cda82fa7634e94b56577c2401a3285d4a5`. Physical device **UNVERIFIED**.
+- This is a targeted safety adaptation in fork-derived library code; Refael Bar / AGPL-3.0 attribution remains. Full native CTest, broad clean-room scanner/index redesign, Windows race semantics, Switch SD timing and physical hardware remain open. Overall **INCOMPLETE — BLOCKERS REMAIN**.
