@@ -5,7 +5,7 @@
 
 **Baseline:** `main@8db85384a1b6c277c74766601ef46e9a672328df` (2026-10-23 audit)  
 **Feature branch:** `feature/v0.9.2-complete-reader-enhancements`  
-**Latest source-bearing HEAD:** `99839eb8e336a76649f433a11e7804263221661a` (versioned disposable library inventory).
+**Latest source-bearing HEAD:** `96d0d799eb834b9b13f860d23cd3d746df433b96` (visible-cover upload priority; current Switch artifact check).
 **Fork reference:** `rtk19/PaperNx@d2b4bcfd10b1a66043c5b8cd36da08340cffec6d`  
 **Version remains:** v0.9.1; do not tag, release or merge to main.
 
@@ -26,7 +26,7 @@
 | 06 | Chapter/page reader chrome | HISTORICAL IMPLEMENTATION; current full acceptance pending | `src/reader_book_chrome.inc` provides chapter/page captions, scrubber, bookmarks and folios. Prior focused tests exist; the full current-source chapter/progress/bookmark matrix was not rerun in G1. |
 | 07 | Modern menus, app theme and accent colors | HISTORICAL STATUS WITHDRAWN; palette integrated in shared tokens | `include/papernx/interface_theme.hpp` is deleted; palette resolution now lives in `include/papernx/theme.hpp`. Its fork-derived lineage and Refael Bar attribution remain documented. Current acceptance still requires the dated tests/device matrix below. |
 | 08 | Secure native self-update | HISTORICAL STATUS WITHDRAWN; G4 verified-manual path | Current code verifies and stages the release beside `PaperNX.nro`, but does not mutate the canonical NRO. See dated G4 evidence below. Switch file-manager replacement and legacy boot recovery remain unverified on hardware. |
-| 09 | Persistent cover cache optimization and safe clearing | HISTORICAL STATUS WITHDRAWN; TARGETED CACHE TESTS PASS; REAL-DOCUMENT PERFORMANCE UNVERIFIED | Existing worker cache and safe-clear path remain; disk hit/miss and size stats are now visible in settings. Synthetic 100/500/1000 repository I/O is documented in [`V092_COVER_BENCHMARK.md`](V092_COVER_BENCHMARK.md); it does not measure document decode or Switch performance. |
+| 09 | Persistent cover cache optimization and safe clearing | TARGETED CACHE TESTS PASS; FIXTURE WORKLOAD PARTIAL; UI/SWITCH PERFORMANCE UNVERIFIED | Existing worker cache and safe-clear path remain; disk hit/miss/size stats are visible in settings. Synthetic repository-only and fixture-backed 100/500/1,000 workloads are documented in [`V092_COVER_BENCHMARK.md`](V092_COVER_BENCHMARK.md). Four repeated fixture contents are not a diverse library; actual UI scroll latency, frame time and Switch SD remain unmeasured. A focused regression now prevents stale completed surfaces from consuming visible-cover uploads. |
 | 10 | Natural paper reading (Soft E-Ink) | TARGETED DESKTOP EVIDENCE; full visual matrix pending | Preset 9 `Soft E-Ink` and bilingual names remain in `src/v04_choices.inc`; prior persistence/localization tests are recorded in dated checkpoints. Current full theme/book/PDF/curl screenshot matrix was not rerun in G1. |
 | 11 | Brightness | TARGETED DESKTOP EVIDENCE; physical backlight UNVERIFIED | `include/papernx/app_settings.hpp`, `src/core.cpp`, `src/main.cpp`; saved ranges, slider and software fallback have focused earlier host tests. Physical Switch backlight restoration and HOME/suspend/docked behavior remain unverified. |
 
@@ -126,7 +126,7 @@ Five runs of `papernx_cover_performance_tests` measured repository-only I/O for 
 | Safe clearing, cache budget, rebuild | TARGETED PASS | `papernx_cover_tests` exercises safe removal, user-file preservation, budget limits, corruption handling, and regeneration. |
 | 100/500/1000 real-document cold/warm, decode/reopen, UI/FPS/RAM, Switch SD | NOT RUN / UNVERIFIED | The five-run scale test uses placeholder `.epub` files and fixed RGB buffers. No real document decode or renderer is involved. |
 
-**Decision remains INCOMPLETE — BLOCKERS REMAIN.** Continue with G7 reader/UI/brightness regression and Ponytail audit, then close feasible native and Switch gates. Keep real-document cover performance and physical Switch measurements explicitly open.
+**Decision remains INCOMPLETE — BLOCKERS REMAIN.** Continue with G7 reader/UI/brightness regression and Ponytail audit, then close feasible native and Switch gates. Keep interactive cover performance and physical Switch measurements explicitly open.
 
 ## Q. 2026-10-24 — G7 host regression and cover-worker fairness
 
@@ -333,3 +333,7 @@ Command `docker compose run --rm switch bash -lc 'export MUPDF_PREFIX=/work/pref
 `tests/cover_document_benchmark.cpp` builds 100/500/1,000 path-distinct entries from real EPUB, PDF, CBZ and RAR4 CBR fixtures, runs a cold open/metadata-on-same-handle/thumbnail/cache-write pass, then reloads the disk cache and repeats a sequential warm pass with miss decode/write. The CMake target built and ran three times; its CTest registration passed **1/1** in **19.85 seconds**.
 
 Median/p95 warm full-pass times: 100 copies **94/96 ms** with 100 hits; 500 copies **1,659/1,946 ms** with 145–156 hits and 344–355 misses; 1,000 copies **4,411/5,010 ms** with 0 hits and 1,000 misses in every run. Cache retained 393 entries / 33,502,728 bytes at 500/1,000, within the current 32 MiB budget. This sequential fixture workload exposes cache thrash when the working set exceeds the disk budget; it is not the viewport-driven app queue or a speedup comparison. Four source contents repeat, and SDL, Switch SD, memory high-water, and catalog reopen were not measured. `COVER-01` remains **NOT PASSED**; see [`V092_COVER_BENCHMARK.md`](V092_COVER_BENCHMARK.md).
+
+## G6 visible-cover queue checkpoint — `96d0d79`
+
+`processCompletedThumbnails()` now discards off-screen completed surfaces before renderer uploads, releases their queued IDs and resets stale `Loading` state. `placeholderCover()` reads worker-updated status under `queueMutex_`. The focused `papernx_modern_library_tests` build and CTest passed **1/1** (10.65 sec). A current-source Switch build/artifact check also passed: AArch64 ELF/NRO, 118 embedded CA certificates, NRO SHA-256 `25aa1766e11540629e06c9d3d734534cc53ba65bbc8f8d3aa7fe21cd40479a8c`. This is behavioral/build evidence only; interactive scroll latency, FPS, RAM, Switch SD and speedup remain unmeasured. Overall decision remains **INCOMPLETE — BLOCKERS REMAIN**.
