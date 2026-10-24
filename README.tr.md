@@ -19,6 +19,9 @@
 
 ---
 
+> [!IMPORTANT]
+> **Henüz yayımlanmamış kaynak kodda**, v0.9.2 tema davranışı ve çizgi roman sayfa geçişine yönelik düzeltmeler bulunmaktadır. Bu değişiklikler indirilebilir v0.9.2 NRO paketinde **yoktur** ve Switch derlemesi, testler ve yayın doğrulamasından henüz geçmemiştir. Doğrulanmış yeni sürüm çıkana kadar v0.9.2 yayın dosyalarını kullanın.
+
 ## Genel Bakış
 
 **PaperNX**, Nintendo Switch için modern C++17, C11, SDL2 ve MuPDF kullanılarak geliştirilmiş, **yerel ve tamamen çevrimdışı bir doküman ve çizgi roman okuyucusudur**. Joy-Con kumandaları konsoldan ayrılmış durumdayken bile tek elle ya da masaüstü modunda rahatça kitap ve çizgi roman okuyabilmeniz amacıyla dokunmatik öncelikli olarak tasarlanmıştır.
@@ -43,7 +46,7 @@ Tüm kitaplarınız, çizgi roman arşivleriniz, kapak önbelleğiniz, okuma ge�
 - **Hızlı Menü ve Ekran Ayarları:** Dokunmatik `+` menüsü Joy-Con Plus tuşuyla aynıdır. Natural Paper ve Soft E-Ink görünümleri, yazılımsal karartma ve desteklenen elde kullanım parlaklık ayarı sunulur.
 - **Asenkron Kitaplık Tarama:** Kök dizinler arka planda taranır; iptal veya eksik tarama son başarılı kitaplık envanterini değiştirmez.
 - **Güçlü PDF Motoru:** MuPDF 1.23.11 tabanlı; genişliğe/sayfaya sığdırma, serbest analog ve dokunmatik kaydırma, yakınlaştırma ve belge renk filtreleri (Orijinal, Koyu, Sepya, Ters).
-- **Bütünleşik Kâğıt Görünümü:** Dokuz doğal kâğıt teması (Beyaz, Kitap Kâğıdı, Klasik Sepya, Krem, Koyu Kömür, Gece vb.). Kitaplık, araç çubukları, çizgi roman dış kenarları ve okuma pencereleri ortak renk paletini paylaşır.
+- **Bütünleşik Kâğıt Görünümü:** On kâğıt teması (Saf Kâğıt, Yumuşak Fildişi, Sıcak Krem, Doğal Kâğıt, Nostaljik Sepya, Keten, Serin Kâğıt, Kömür Gecesi, OLED Siyah, Yumuşak E-Mürekkep). Kitaplık, menüler ve okuma arayüzü varsayılan olarak genel okuma paletini takip eder; isteğe bağlı koyu/açık arayüz ve vurgu renkleri korunur.
 - **Çift Dilli Arayüz:** Doğal Türkçe ve İngilizce dil desteği. Kitap içerikleri ve içindekiler orijinal dilinde korunur (İbranice/BiDi metin dizimi proje tasarımı gereği hariç tutulmuştur).
 - **Disk Üzerinde Kapak Önbelleği:** 150×210 RGB24 kapaklar için 48 MiB / 512 kayıt sınırı, dosya bilgisi ve CRC denetimi; ayrıca bellekteki küçük resim texture cache'i 32 MiB ile sınırlıdır. Kapak yüklenene kadar vektörel yer tutucu görünür.
 - **Okuma Günlüğü ve Çevrimdışı İstatistikler:** Okuma süresi, oturumlar, tamamlama oranları ve günlük hedefleri tamamen yerel olarak takip eder.
