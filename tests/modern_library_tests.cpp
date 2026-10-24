@@ -121,7 +121,7 @@ struct AppTest {
         app.rebuildLibraryLookup();app.sort_=Sort::Title;app.updateVisibleBooks();app.viewMode_=ViewMode::List;app.listScroll_=1120;
         const auto newlyVisible=app.books_.front().id;
         assert(app.visibleBooks_.front().id==newlyVisible);
-        {std::lock_guard<std::mutex> lock(app.completedMutex_);app.completedMetadata_.push_back({newlyVisible,"Book 12","","",""});app.completedThumbs_.push_back({newlyVisible,1,1,3,{7,8,9},CoverState::Loaded});}
+        {std::lock_guard<std::mutex> lock(app.completedMutex_);app.completedMetadata_.push_back({newlyVisible,"Book 12","","","",PaperNxApp::bookMetadataFingerprint(app.books_.front())});app.completedThumbs_.push_back({newlyVisible,1,1,3,{7,8,9},CoverState::Loaded});}
         app.processCompletedThumbnails();
         const auto moved=std::find_if(app.visibleBooks_.begin(),app.visibleBooks_.end(),[&](const Book &book){return book.id==newlyVisible;});
         assert(moved!=app.visibleBooks_.end() && moved-app.visibleBooks_.begin()>=10);
@@ -132,7 +132,7 @@ struct AppTest {
         PaperNxApp app(root);assert(initReady(app));
         Book book;book.id="eeeeeeeeeeeeeeee";book.path=(root/"books"/"missing.epub").u8string();book.title="Retry";book.format=Format::Epub;book.bytes=123;book.modified=1;
         app.books_.push_back(book);app.rebuildLibraryLookup();
-        const auto fingerprint=std::to_string(book.bytes)+":"+std::to_string(book.modified)+":series-v1";
+        const auto fingerprint=PaperNxApp::bookMetadataFingerprint(book);
         const auto key=book.id+":"+fingerprint;
         app.scheduleMetadataIndex();
         const auto deadline=SDL_GetTicks()+10000;
@@ -153,6 +153,19 @@ struct AppTest {
             SDL_Delay(2);
         }
         assert(app.catalog_.get(book.id).metadataFingerprint==fingerprint);
+        app.books_.front().modified=2;
+        const auto updatedFingerprint=PaperNxApp::bookMetadataFingerprint(app.books_.front());
+        {std::lock_guard<std::mutex> lock(app.completedMutex_);app.completedMetadata_.push_back({book.id,"Stale title","","","",fingerprint});}
+        app.processCompletedThumbnails();
+        assert(app.catalog_.get(book.id).metadataFingerprint==fingerprint && app.catalog_.get(book.id).sourceTitle!="Stale title");
+        app.scheduleMetadataIndex();
+        const auto refreshDeadline=SDL_GetTicks()+10000;
+        while(SDL_GetTicks()<refreshDeadline) {
+            app.processCompletedThumbnails();
+            if(app.catalog_.get(book.id).metadataFingerprint==updatedFingerprint)break;
+            SDL_Delay(2);
+        }
+        assert(app.catalog_.get(book.id).metadataFingerprint==updatedFingerprint);
     }
 };
 }

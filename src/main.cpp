@@ -118,6 +118,7 @@ struct LoadedThumb {
 };
 struct LoadedMetadata {
     std::string id,title,author,series,seriesIndex;
+    std::string fingerprint;
 };
 
 class PaperNxApp {
@@ -675,10 +676,13 @@ private:
         failedThumbIds_[id] = std::chrono::steady_clock::now() + std::chrono::seconds(30);
     }
 
+    static std::string bookMetadataFingerprint(const Book &book) {
+        return std::to_string(book.bytes)+":"+std::to_string(book.modified)+":series-v1";
+    }
     void scheduleMetadataIndex() {
         std::lock_guard<std::mutex> lock(queueMutex_);
         for(const auto &book:books_) {
-            const auto fingerprint=std::to_string(book.bytes)+":"+std::to_string(book.modified)+":series-v1";
+            const auto fingerprint=bookMetadataFingerprint(book);
             if(catalog_.get(book.id).metadataFingerprint!=fingerprint && metadataIndexedIds_.insert(book.id+":"+fingerprint).second)
                 metadataQueue_.push_back(book);
         }
@@ -693,7 +697,7 @@ private:
         px_document_metadata(document,"info:Author",author,sizeof author);
         px_document_metadata(document,"info:Series",series,sizeof series);
         px_document_metadata(document,"info:SeriesIndex",index,sizeof index);
-        {std::lock_guard<std::mutex> lock(completedMutex_);completedMetadata_.push_back({book.id,title,author,series,index});}
+        {std::lock_guard<std::mutex> lock(completedMutex_);completedMetadata_.push_back({book.id,title,author,series,index,bookMetadataFingerprint(book)});}
         if(owned)px_document_close(document);
         return true;
     }
@@ -752,9 +756,8 @@ private:
             }
             if(metadataOnly) {
                 if(!collectBookMetadata(b)) {
-                    const auto fingerprint=std::to_string(b.bytes)+":"+std::to_string(b.modified)+":series-v1";
                     std::lock_guard<std::mutex> lock(queueMutex_);
-                    metadataIndexedIds_.erase(b.id+":"+fingerprint);
+                    metadataIndexedIds_.erase(b.id+":"+bookMetadataFingerprint(b));
                 }
                 continue;
             }
@@ -831,8 +834,9 @@ private:
         for(const auto &md:metadata) {
             const auto found=libraryLookup_.find(md.id);if(found==libraryLookup_.end())continue;
             const auto *book=&books_[found->second];
+            const auto fingerprint=bookMetadataFingerprint(*book);
+            if(md.fingerprint!=fingerprint)continue;
             auto entry=catalog_.get(md.id);
-            const std::string fingerprint=std::to_string(book->bytes)+":"+std::to_string(book->modified)+":series-v1";
             if(entry.sourceTitle==md.title && entry.sourceAuthor==md.author &&
                entry.sourceSeries==md.series && entry.sourceSeriesIndex==md.seriesIndex &&
                entry.metadataFingerprint==fingerprint)continue;
