@@ -444,3 +444,18 @@ The original byte-identity statement remains historical at `a35aa7b0f51aee58f44d
 | `include/papernx/interface_theme.hpp` | Deleted | `be58dc293354a4e38e31eb9faa08284367845c53` | Palette tokens are integrated into `include/papernx/theme.hpp`; deletion does not erase Refael Bar / AGPL-3.0 provenance. |
 
 The focused `papernx_library_index_tests` and `papernx_modern_library_tests` passed **2/2**; the targeted library-index ASan/UBSan test passed **1/1**. They exercise cache path validation, scanner behavior and app integration. These tests establish behavior, not independent authorship. `src/library_scan.inc`, the worker/inventory in `src/library_index.cpp`, and the public scan contract remain fork-derived/adapted; the historical attribution is still appropriate.
+
+## Current code provenance snapshot — updater JSON type checks `0e0b2e060b1b9c857fe6cfa278b72c60245c288a`
+
+`src/update_json.hpp` changed after the `89cb2b7` snapshot to reject non-string types for release/asset text fields, non-array `assets` values, and negative/fractional/non-numeric asset sizes. It still accepts documented null optional values. The parser's bounded release-specific design retains its fork lineage; this targeted schema hardening is not an independent reimplementation. Preserve Refael Avramashvili / AGPL-3.0 attribution.
+
+| Path | Feature blob at `0e0b2e0` | Pinned fork blob | Current classification |
+|---|---|---|---|
+| `src/library_scan.inc` | `c6c950712c7b0d34431c8f3994bc4f960e136950` | `c8087dc4defa88af950bed947e6d50962bc7799f` | Fork-derived/adapted PaperNX scanner integration; Refael Bar / AGPL-3.0 attribution remains. |
+| `src/library_index.cpp` | `a9abd543d9e67cb6d5a4a151613b132628c38365` | `e4b3e83e2ddadaa55913b56f7a0a0e31b3f5dd1a` | Fork-derived/adapted worker and inventory with PaperNX safety boundaries; Refael Bar / AGPL-3.0 attribution remains. |
+| `include/papernx/library_index.hpp` | `7ddb5b8a91fcc5d2306c9e4d766d74288e06b580` | `8a0ac82707cf5b402d0cbcebd790d751758b0003` | Fork-derived/adapted scan contract; Refael Bar / AGPL-3.0 attribution remains. |
+| `src/self_update.cpp` | `ec3f5b922e15029b291e85877cd54374b2dbade1` | `e7e5c52c1b4b2137d92d1c6902a011d1d3b71b6c` | Fork-derived updater with PaperNX manual-staging and security changes; Refael Avramashvili / AGPL-3.0 attribution remains. |
+| `src/update_json.hpp` | `95ab577f9c0a705ea2de2a20fbb61fe690af3040` | `d4e3bb96dcb2d363e23d40a83775c02768fc5394` | Changed parser blob with stricter field types; Git/code lineage remains fork-derived/adapted, not clean-room. Preserve Refael Avramashvili / AGPL-3.0 attribution. |
+| `include/papernx/interface_theme.hpp` | Deleted | `be58dc293354a4e38e31eb9faa08284367845c53` | Palette is integrated into `include/papernx/theme.hpp`; deletion does not erase Refael Bar / AGPL-3.0 provenance. |
+
+Updater unit and local HTTPS tests passed **2/2** in desktop and **2/2** under ASan/UBSan. These confirm parser behavior, not authorship. The original six-file byte identity remains true only at historical feature HEAD `a35aa7b0f51aee58f44d524616a2aa55477d670c`; no extant path currently matches its fork blob.

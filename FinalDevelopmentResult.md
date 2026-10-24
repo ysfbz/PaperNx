@@ -701,3 +701,11 @@ Bu tek koşu yazılım renderer’ı host ölçümüdür; hızlanma iddiası de�
 - **ASan/UBSan:** `docker compose run --rm desktop bash -lc 'cmake --build build-sanitize --target papernx_library_index_tests --parallel 4 && ctest --test-dir build-sanitize --output-on-failure -R "^papernx_library_index_tests$"'` — build **PASS**, CTest **1/1 PASS** (6,36 sn).
 - **Switch:** `docker compose run --rm switch bash -lc 'export MUPDF_PREFIX=/work/prefix-mupdf-switch; make all -j4 && python3 scripts/verify_artifacts.py --version 0.9.1'` — `89cb2b7` kaynak kimliğiyle AArch64 ELF/NRO ve RomFS doğrulaması **PASS**. NRO 49.588.671 bayt; SHA-256 `f35feab3d5138c2b4e08a7030cf9e0ebb033471ca924dc64136e3a36fc8d716a`; CA 118 sertifika / 200.116 bayt. Donanım **UNVERIFIED**.
 - **Sınır / karar:** açılışta cache kayıtları başına dosya metadata I/O maliyeti ve gerçek Switch SD başlangıç süresi ölçülmedi. Tam native CTest, fiziksel cihaz ve tüm uygulama sanitizers çalıştırılmadı. Genel karar **INCOMPLETE — BLOCKERS REMAIN**.
+
+## 2026-10-24 — Updater release JSON alan tipi doğrulaması
+
+- **Branch / commit:** `feature/v0.9.2-complete-reader-enhancements` / `0e0b2e060b1b9c857fe6cfa278b72c60245c288a` (`fix(updater): reject malformed release field types`). Release `name/body` ve asset metin alanları artık yalnızca string veya `null`; `assets` yalnızca dizi veya `null`; `size` yalnızca işaretsiz tamsayı veya `null` kabul ediyor. Negatif, kesirli ve yanlış tipli alanlar reddediliyor.
+- **Desktop:** `PaperNX` ve updater testleri build **PASS**; updater unit + local HTTPS CTest **2/2 PASS** (3,47 sn).
+- **ASan/UBSan:** updater unit + local HTTPS CTest **2/2 PASS** (5,50 sn).
+- **Switch:** `docker compose run --rm switch bash -lc 'export MUPDF_PREFIX=/work/prefix-mupdf-switch; make all -j4 && python3 scripts/verify_artifacts.py --version 0.9.1'` — AArch64 ELF/NRO ve RomFS doğrulaması **PASS**. NRO 49.588.671 bayt; SHA-256 `d7b5a38f13e6b0c49af824105e188057125f6903b1a057e03636d4e44e50af96`; CA 118 sertifika / 200.116 bayt.
+- **Köken / sınır:** `src/update_json.hpp` blob'u `95ab577f9c0a705ea2de2a20fbb61fe690af3040`; değişiklik fork-derived parser içinde uyarlamadır. Refael Avramashvili / AGPL-3.0 atfı korunuyor; bu değişiklik bağımsız implementasyon değildir. Cihaz TLS, tam native CTest ve release doğrulaması yapılmadı; genel karar **INCOMPLETE — BLOCKERS REMAIN**.

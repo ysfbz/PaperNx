@@ -383,3 +383,10 @@ The verified/pushed branch HEAD at the start of this note was `ed9e3b69c184de1b4
 - Targeted ASan/UBSan library-index CTest passed **1/1**.
 - Switch `make all -j4` and `verify_artifacts.py --version 0.9.1` passed at source `89cb2b75dad9dcbf98532264910cb7ea566ce9ae`; AArch64 ELF/NRO and RomFS verified. NRO SHA-256 `f35feab3d5138c2b4e08a7030cf9e0ebb033471ca924dc64136e3a36fc8d716a`; CA bundle 118 certs / 200,116 bytes. Hardware **UNVERIFIED**.
 - Cache-load metadata I/O cost on Switch SD, full native CTest, whole-app sanitizer and broad independent scanner/index redesign remain open. Overall status stays **INCOMPLETE — BLOCKERS REMAIN**.
+
+## 2026-10-24 — Strict updater release field types (`0e0b2e0`)
+
+- Optional release/asset strings accept string or `null`; `assets` accepts array or `null`; asset `size` accepts an unsigned integer or `null`. Wrong JSON types, negative sizes and fractional sizes fail parsing. Asset URL/origin, TLS, checksum and NRO checks are unchanged.
+- Desktop `PaperNX` + updater tests built; updater unit and local HTTPS CTest passed **2/2**. Targeted ASan/UBSan updater unit and local HTTPS CTest passed **2/2**.
+- Current-source Switch AArch64 ELF/NRO and RomFS verification passed. NRO SHA-256 `d7b5a38f13e6b0c49af824105e188057125f6903b1a057e03636d4e44e50af96`; CA bundle 118 certs / 200,116 bytes. Physical TLS remains **UNVERIFIED**.
+- `src/update_json.hpp` blob is `95ab577f9c0a705ea2de2a20fbb61fe690af3040`; its fork-derived/adapted origin and Refael Avramashvili / AGPL-3.0 attribution remain. Full native CTest and independent parser redesign remain open; overall status **INCOMPLETE — BLOCKERS REMAIN**.
