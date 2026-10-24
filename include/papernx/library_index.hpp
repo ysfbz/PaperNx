@@ -15,7 +15,7 @@ public:
     bool start(std::vector<fs::path> roots,std::vector<Book> known,fs::path inventory);
     bool pending() const {return worker_.joinable();}
     bool ready() const {return ready_.load();}
-    void cancel() {cancel_.store(true);}
+    void cancel() {if(!ready_.load())cancel_.store(true);}
     std::optional<LibraryScanResult> take();
     void stop();
 private:

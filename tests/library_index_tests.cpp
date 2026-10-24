@@ -98,6 +98,12 @@ int main() {
     assert(inventoryBytes()==savedInventory);
     assert(scanner.start({root/"books"},second.books,inventory));
     auto restarted=wait(scanner);assert(!restarted.cancelled && restarted.books.size()==299);
+    assert(scanner.start({root/"books"},second.books,inventory));
+    const auto completedDeadline=std::chrono::steady_clock::now()+std::chrono::seconds(10);
+    while(!scanner.ready() && std::chrono::steady_clock::now()<completedDeadline)std::this_thread::yield();
+    assert(scanner.ready());scanner.cancel();
+    auto completedThenCancelled=scanner.take();
+    assert(completedThenCancelled && completedThenCancelled->complete && !completedThenCancelled->cancelled);
     assert(scanner.start({root/"books"},{},inventory));scanner.stop();assert(!scanner.ready() && !scanner.pending());
     assert(loadLibraryInventory(inventory).size()==299);
     const auto broken=root/"data"/"broken-inventory.txt";std::ofstream(broken)<<"damaged inventory";
