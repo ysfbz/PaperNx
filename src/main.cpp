@@ -1823,6 +1823,9 @@ private:
         if(!comic())return px_document_page_size(doc_,page,width,height);
         if(px_document_known_comic_size(doc_,page,width,height))return true;
         if(page>=0 && page<pageCount_) {
+            // Honour the normal failed-page retry gate for broken archives.
+            auto retry=comicBaseRetry_.find(page);
+            if(retry!=comicBaseRetry_.end() && Sint32(SDL_GetTicks()-retry->second)<0)return false;
             configureComicPages();
             comicPages_.request(page,page==currentPage_?ComicPages::Priority::Visible:
                                 ComicPages::Priority::SpeculativeForward);
