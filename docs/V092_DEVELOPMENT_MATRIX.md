@@ -5,7 +5,7 @@
 
 **Baseline:** `main@8db85384a1b6c277c74766601ef46e9a672328df` (2026-10-23 audit)  
 **Feature branch:** `feature/v0.9.2-complete-reader-enhancements`  
-**Latest source-bearing HEAD:** `1daedb63246384a73afb979978230f75716c2165` (G10 scan depth/cancellation completion).
+**Latest source-bearing HEAD:** `d3265ddda21fd2ba5a1ba6fca0d72d95d8420e6b` (G1 comic spread error visibility follow-up).
 **Fork reference:** `rtk19/PaperNx@d2b4bcfd10b1a66043c5b8cd36da08340cffec6d`  
 **Version remains:** v0.9.1; do not tag, release or merge to main.
 
@@ -18,17 +18,17 @@
 
 | # | Workstream | Actual status | Evidence and remaining acceptance |
 |---|---|---|---|
-| 01 | Comic page cache, independent worker, solid RAR streams | CODE COMPLETE / TESTED | `include/papernx/comic_pages.hpp` implements dual base (2 MP, 6 slots, <=48 MiB) and detail (6 MP, 2 slots) budgets, generation counter, back-pressure and thread safety (priority `0x3b`). `src/comic_document.c` integrates solid RAR persistent stream cursor (`cursor`, `cursor_ordinal`) to eliminate re-decompression. `tests/comic_performance_tests.cpp` and `tests/generate_comic_performance_fixtures.py` provide validation. |
-| 02 | Real EPUB/PDF landscape spreads | CODE COMPLETE / TESTED | `include/papernx/reader_layout.hpp` models landscape spreads, leaf dimensions, content margins and folios. `src/reader_sheets.inc` modularizes spread rendering. Verified with `tests/reader_spread_tests.cpp` and `tests/fixtures/spread_doc.pdf`. Single-page and continuous modes fully preserved. |
-| 03 | Smart comic spreads | CODE COMPLETE / TESTED | `src/comic_document.c` detects `ComicInfo.xml` DoublePage tags and wide-scan aspect ratios (`px_comic_page_is_spread`, `px_comic_remember_size`). `src/comic_spreads.inc` pairs facing pages dynamically with single-page fallback for vertical/non-matching sheets. Tested via `tests/fixtures/comics/smart-spreads.cbz`. |
-| 04 | True-leaf spread curl | CODE COMPLETE / TESTED | `include/papernx/page_curl.hpp` implements `PageCurlRenderer::renderSpread` with `TextureState` RAII modulation restore, underlying page reveal, opposite page projection, and `inkOnly` support. Integrated into `tickPageTurn()`. Tested via `tests/page_curl_tests.cpp` and fallback paths. |
+| 01 | Comic page cache, bounded worker, solid RAR streams | TARGETED DESKTOP + SWITCH BUILD PASS; full/device performance unverified | `include/papernx/comic_pages.hpp`, `src/comic_document.c`, `src/main.cpp`: cold visible comic pages, including continuous-scroll pages, are requested from the bounded worker; SDL texture creation/upload remains on the UI thread. Worker and archive-entry counters are covered by `tests/comic_performance_tests.cpp`. G1 evidence below is current; no codec CPU-time or Switch FPS claim. |
+| 02 | Real EPUB/PDF landscape spreads | TARGETED DESKTOP PASS; full/device acceptance pending | `include/papernx/reader_layout.hpp`, `src/reader_sheets.inc`; current `tests/reader_spread_tests.cpp` covers EPUB/PDF/CBZ/CBR layouts, directions, folios, curl endpoints and rotation. Full native/device matrix remains open. |
+| 03 | Smart comic spreads | TARGETED DESKTOP PASS; full/device acceptance pending | `src/comic_document.c`, `src/comic_spreads.inc`; current reader spread, comic app and comic document tests cover smart spread fixtures and page access. Switch device behavior remains unverified. |
+| 04 | True-leaf spread curl | TARGETED DESKTOP PASS; Switch GPU/input unverified | `include/papernx/page_curl.hpp`, `src/main.cpp`; current spread test covers curl faces, exact endpoints, blank final leaf and rotation cancellation. Dedicated fallback/GPU and device matrix remain open. |
 | 05 | Multiple sources and asynchronous scanning | TARGETED DESKTOP PASS; full acceptance pending | `scanRoots()` remains the single walker. `LibraryScanner` reports incomplete traversal and does not replace the visible list or inventory on missing/inaccessible roots. UTF-8 paths round-trip through the inventory. Focused evidence: `tests/library_index_tests.cpp` and `tests/modern_library_tests.cpp`; the 100/500/1000/10000 stress, Switch SD permission and full CTest matrices remain open. |
-| 06 | Chapter/page reader chrome | CODE COMPLETE / TESTED | `src/reader_book_chrome.inc` provides chapter titles, page range captions (`bookChapterCaption`, `readerFooterCaption`), scrubber, bookmark indicators, and low-distraction folio. Verified with `tests/book_chrome_tests.cpp`. |
+| 06 | Chapter/page reader chrome | HISTORICAL IMPLEMENTATION; current full acceptance pending | `src/reader_book_chrome.inc` provides chapter/page captions, scrubber, bookmarks and folios. Prior focused tests exist; the full current-source chapter/progress/bookmark matrix was not rerun in G1. |
 | 07 | Modern menus, app theme and accent colors | HISTORICAL STATUS WITHDRAWN; palette integrated in shared tokens | `include/papernx/interface_theme.hpp` is deleted; palette resolution now lives in `include/papernx/theme.hpp`. Its fork-derived lineage and Refael Bar attribution remain documented. Current acceptance still requires the dated tests/device matrix below. |
 | 08 | Secure native self-update | HISTORICAL STATUS WITHDRAWN; G4 verified-manual path | Current code verifies and stages the release beside `PaperNX.nro`, but does not mutate the canonical NRO. See dated G4 evidence below. Switch file-manager replacement and legacy boot recovery remain unverified on hardware. |
 | 09 | Persistent cover cache optimization and safe clearing | HISTORICAL STATUS WITHDRAWN; TARGETED CACHE TESTS PASS; REAL-DOCUMENT PERFORMANCE UNVERIFIED | Existing worker cache and safe-clear path remain; disk hit/miss and size stats are now visible in settings. Synthetic 100/500/1000 repository I/O is documented in [`V092_COVER_BENCHMARK.md`](V092_COVER_BENCHMARK.md); it does not measure document decode or Switch performance. |
-| 10 | Natural paper reading (Soft E-Ink) | CODE COMPLETE / TESTED | Preset 9 `Soft E-Ink` (`#242424` text / `#EAE7DF` background) added to `src/v04_choices.inc` as a neutral 10th preset. Available in reading and global themes with Turkish and English localization (`paperPresetLabel`). Verified via `tests/check_utf8_integrity.py`. |
-| 11 | Brightness | CODE COMPLETE / HARDWARE UNVERIFIED | Full-frame software dimming pass (10–100% brightness) after portrait composition in `src/main.cpp`. Added Nintendo Switch hardware backlight hook (`updateSwitchBacklight` via `lblSetCurrentBrightnessSetting`) under `#ifdef __SWITCH__`. Interactive slider and reset button in Appearance tab. Note: Physical Switch backlight verification is marked HARDWARE UNVERIFIED. |
+| 10 | Natural paper reading (Soft E-Ink) | TARGETED DESKTOP EVIDENCE; full visual matrix pending | Preset 9 `Soft E-Ink` and bilingual names remain in `src/v04_choices.inc`; prior persistence/localization tests are recorded in dated checkpoints. Current full theme/book/PDF/curl screenshot matrix was not rerun in G1. |
+| 11 | Brightness | TARGETED DESKTOP EVIDENCE; physical backlight UNVERIFIED | `include/papernx/app_settings.hpp`, `src/core.cpp`, `src/main.cpp`; saved ranges, slider and software fallback have focused earlier host tests. Physical Switch backlight restoration and HOME/suspend/docked behavior remain unverified. |
 
 ## Invariants and release gate
 
@@ -92,7 +92,7 @@
 
 | # | Area | Current result | Source and executed evidence |
 |---|---|---|---|
-| 01 | Comic cache/worker | DESKTOP PASS; device timing unverified | `include/papernx/comic_pages.hpp`, `src/comic_document.c`, `src/page_cache.cpp`; `tests/comic_performance_tests.cpp`, `tests/comic_app_tests.cpp`. Bounded cache/worker and stale cancellation assertions passed. |
+| 01 | Comic cache/worker | TARGETED DESKTOP + SWITCH BUILD PASS; device timing unverified | `include/papernx/comic_pages.hpp`, `src/comic_document.c`, `src/main.cpp`; current G1 tests verify cold paginated/continuous loads, stale-safe turns, UI-thread rasterization count, archive payload counters, idle/suspend lifecycle and solid RAR5. Full-suite/device timing remains open. |
 | 02 | EPUB/PDF spreads | DESKTOP PASS | `include/papernx/reader_layout.hpp`, `src/reader_sheets.inc`; `tests/reader_spread_tests.cpp`, `tests/page_navigation_tests.cpp`. |
 | 03 | Smart comic spreads | DESKTOP PASS | `src/comic_spreads.inc`, `src/comic_document.c`; smart spread, bookmark navigation and comic app tests passed. |
 | 04 | Spread page curl | DESKTOP PASS; Switch GPU/input unverified | `include/papernx/page_curl.hpp`, `src/main.cpp`; curl geometry, fallback and app tests passed. |
@@ -250,3 +250,38 @@ The Joy-Con physical `+` maps to SDL `START` and calls the existing `toggleQuick
 | Switch, full CTest, ASan/UBSan, physical Switch and cover benchmark | **NOT RUN / UNVERIFIED** | G5 did not rerun these checks. G4 Switch evidence does not cover G5 sources. |
 
 **Decision remains INCOMPLETE — BLOCKERS REMAIN.** Scanner/index adaptations are safer but are not represented as independent/clean-room source. Parser redesign, full current-HEAD verification, G6 cover measurement and physical-device acceptance remain open. No release, tag, PR, merge or GitHub Actions run was created.
+
+## 2026-10-24 — G1 cold comic pages and archive-read evidence
+
+**Source commit:** `a6e01b3b937a8d350346d0d14accc971e60af594` (`fix(comics): render cold pages on worker`). A cold miss from `comicZoomTexture()` now enqueues a visible worker request; continuous comic scrolling uses the same bounded page cache/worker. The worker owns MuPDF decode and returns RGB buffers; SDL texture creation and upload stay on the UI thread. Failed visible requests use a retry delay instead of reopening a bad archive on every frame. Zoom-detail work is skipped when renderer limits make it the same size as the base texture.
+
+`PxComicMetrics` and `ComicPages::Metrics` expose page-entry loads, archive cursor opens/reopens and skipped entries. The counters establish archive/page-entry behavior and cursor replay, not codec-internal decompression CPU time.
+
+| Check | Result | Evidence |
+|---|---|---|
+| Current desktop build | **PASS** | `cmake --build build-desktop --target PaperNX papernx_comic_document_tests papernx_comic_performance_tests papernx_comic_app_tests papernx_reader_spread_tests papernx_reader_input_tests --parallel 4`. |
+| Focused CTest | **PASS, 7/7** | `papernx_comic_performance_tests`, generated fixture setup, `papernx_comic_rar_performance_tests`, `papernx_reader_input_tests`, `papernx_reader_spread_tests`, `papernx_comic_app_tests`, `papernx_comic_document_tests`; 129.42 seconds total. |
+| 8-page CBZ / 37-page RAR5 stored fixture | **PASS** | Software renderer; 0 UI rasterizations in measured curl/pan/idle loops. RAR5 worker reported 3 page-entry loads, 3 cursor opens, 0 reopens, 4 skipped entries; 30-second idle stayed at 2 document opens / 1 close, then suspend/resume/stop ended 3/3. |
+| RAR5 solid fixture | **PASS, direct test** | `SDL_VIDEODRIVER=dummy build-desktop/papernx_comic_performance_tests tests/fixtures/comics/sample-rar5-solid.cbr`; 3 pages, 3 page-entry loads, cursor opens/reopens 3/0, 2 skipped entries, 0 UI rasterizations, final document counts 3/3. Requesting the same page again did not increase payload-load count. |
+| Switch build | **PASS** | `docker compose run --rm switch bash -lc 'export MUPDF_PREFIX=/work/prefix-mupdf-switch; make all -j4'`; linked `PaperNX.elf`, produced `PaperNX.nro`, and RomFS checks found 118 CA certificates / 200,116 bytes plus fonts. Physical Switch remains unverified. |
+| Performance limits | **UNVERIFIED** | No before/after baseline, codec CPU timing, median/p95, Switch FPS/RAM, large solid-RAR fixture or total-process memory measurement. Existing cache caps were not increased. |
+
+Full CTest and sanitizers were not run at this source commit. Overall decision remains **INCOMPLETE — BLOCKERS REMAIN**.
+
+## G1 sonrası G2/G3 regresyon kapısı — `d3265dd`
+
+At the current source HEAD `d3265ddda21fd2ba5a1ba6fca0d72d95d8420e6b`, the focused desktop build for comic cold turns, reader input, spreads, comic app errors and page-curl geometry/application tests passed. CTest passed **7/7** in **233.14 seconds**. This revalidates earlier G2/G3 implementation after the G1 worker and visible-error changes; it does not repeat or replace the full native suite.
+
+The reader-input test uses real SDL `SDL_CONTROLLERBUTTONDOWN` events with `SDL_CONTROLLER_BUTTON_START`, verifies controller/touch toggles share `quickMenu_`, and activates both fixed quick-menu shortcuts through focus navigation. Physical Joy-Con `+`, reconnect, Switch rendering and controller behavior remain **UNVERIFIED**. Full CTest, sanitizers and a Switch build at this source HEAD were not run. Overall decision remains **INCOMPLETE — BLOCKERS REMAIN**.
+
+## 2026-10-24 — G1 follow-up: preserve errors on partial spreads
+
+**Source commit:** `d3265ddda21fd2ba5a1ba6fca0d72d95d8420e6b` (`fix(comics): preserve errors on partial spreads`). A successful facing page no longer clears a failed visible page's shared error state. Paginated and continuous comic rendering recompute the visible failure after drawing, so message visibility no longer depends on left/right draw order.
+
+| Check | Result | Evidence |
+|---|---|---|
+| `papernx_comic_performance_tests` | **PASS, 1/1** | Current production source; cold worker, lifecycle and archive metrics. |
+| `papernx_reader_spread_tests` | **PASS, 1/1** | Current production source; spread, curl, reader and rotation behavior. |
+| `papernx_comic_app_tests` | **PASS, 1/1** | Added a partial-spread error test: first page fails while its facing page is still cold. The first grouped run exposed a test setup issue (worker identity was not configured before injecting the synthetic failure); after fixing the setup, the focused app CTest passed. |
+| Switch build | **PASS** | Re-ran `make all -j4` at `d3265dd`; ELF linked, NRO produced, RomFS CA/font validation passed. |
+| Full CTest, sanitizers, physical Switch | **NOT RUN / UNVERIFIED** | Not part of this focused follow-up. Overall decision remains **INCOMPLETE — BLOCKERS REMAIN**. |
