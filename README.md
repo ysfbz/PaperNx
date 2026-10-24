@@ -20,7 +20,7 @@
 ---
 
 > [!IMPORTANT]
-> The v0.9.3 theme and comic paging changes pass the host C++/CTest suite (32/32). The Switch AArch64 build and NRO metadata checks are still pending; physical Switch behavior remains unverified.
+> The v0.9.3 source passes the host C++/CTest suite (32/32) and Switch AArch64/NRO metadata validation. Physical Switch behavior remains unverified.
 
 ## Overview
 

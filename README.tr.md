@@ -20,7 +20,7 @@
 ---
 
 > [!IMPORTANT]
-> v0.9.3 tema ve çizgi roman sayfalama değişiklikleri ana makinedeki C++/CTest paketini geçti (32/32). Switch AArch64 derlemesi ve NRO metadata kontrolleri beklemede; fiziksel Switch davranışı doğrulanmadı.
+> v0.9.3 kaynak kodu ana makinedeki C++/CTest paketini geçti (32/32); Switch AArch64 derlemesi ve NRO metadata doğrulaması da başarılı. Fiziksel Switch davranışı doğrulanmadı.
 
 ## Genel Bakış
 

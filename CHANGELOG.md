@@ -5,7 +5,7 @@ All notable changes to **PaperNX** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.9.3] - 2026-10-25 (release verification in progress)
+## [0.9.3] - 2026-10-25
 
 ### Reader and theme recovery
 - Restored a unified default application palette that follows the global reading theme while keeping optional Dark/Light interface overrides and seven custom accent colors.
@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Verification status
 - Host C++ build and full CTest: **PASS — 32/32** (Docker, SDL software renderer, pinned MuPDF 1.23.11).
-- Switch AArch64 build, NRO/NACP checks, release ZIPs and hashes: pending.
+- Switch AArch64 NRO build and NRO/NACP metadata, icon, font and CA-bundle checks: **PASS**.
 - Physical Switch acceptance: **UNVERIFIED**.
 
 ## [0.9.2] - 2026-10-24
