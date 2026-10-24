@@ -307,3 +307,7 @@ Desktop `PaperNX` and `papernx_self_update_tests` built. The updater unit and lo
 ## Current Switch source/link and RomFS check — `4ba0aa0`
 
 Command `docker compose run --rm switch bash -lc 'export MUPDF_PREFIX=/work/prefix-mupdf-switch; make all -j4 && python3 scripts/verify_artifacts.py --version 0.9.1'` completed successfully at source revision `4ba0aa039ac415dd8f736664d3766509039e5e12` (documentation-only commit over `cb5eb7a` source). It linked the AArch64 ELF and produced the NRO; successful linking includes the updater’s libcurl references. RomFS verification found the exact 118-certificate, 200,116-byte CA file. NRO size: 49,588,671 bytes; SHA-256 `fe0ab1c12c9959527072673f96d96836fb004d2ed22daf2a4fc56943f9fecdb7`. This is not release packaging or hardware evidence. Physical Switch and full native/sanitizer gates remain open.
+
+## Updater cancellation after transfer — `ebf6555`
+
+`SelfUpdater::cancel()` now participates in the same mutex-protected terminal transition as Ready/Error. A cancellation observed after body receipt or NRO/hash validation removes the temporary/staged files; a cancel after Ready is a no-op. The local HTTPS integration suite streams a 16 MiB candidate and requests cancellation at 100% reported progress. Desktop build passed and updater unit/network CTest passed **2/2** in **2.72 seconds**. Switch SD cancellation, full suite and sanitizers were not run at this source commit.

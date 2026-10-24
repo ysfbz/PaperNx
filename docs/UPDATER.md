@@ -8,6 +8,8 @@ For each release, the parser retains at most the exact `PaperNX.nro` and `PaperN
 
 Automatic launch checks default to off and are stored in app settings. A manual check remains available. When enabled, the launch check starts only after the first rendered frame and performs network work on the updater worker. Release notes and the NRO are shown before download; the user must choose Update. Once verified, the UI shows the staged file path and manual replacement steps. There is no in-app restart/install action. Download cancellation removes the partial `.part` file. The updater stages only files adjacent to `PaperNX.nro`; progress, catalog, settings, books and Reading Journal are not written by the update flow.
 
+Cancellation stays active through transfer, NRO/hash validation and staging. If it arrives after the response body, the updater removes `.part` or any just-created `.new`/`.ready` files before publishing `Cancelled`. The terminal `Ready` transition and `cancel()` are serialized by the status mutex, so a cancel after `Ready` does not retroactively undo a completed package.
+
 ## CA trust bundle
 
 `romfs/cacert.pem` is curl's PEM conversion of Mozilla's public root store, downloaded from [curl.se/ca/cacert.pem](https://curl.se/ca/cacert.pem). The source documents that the converted bundle retains Mozilla's **MPL-2.0** license: [CA extract and license details](https://curl.se/docs/caextract.html). The bundled revision was updated by Mozilla on **2026-10-20** and contains **118 certificates**; its SHA-256 is `796f1389bfea13c0ed78f663b765baaff54a508e5483786bd6ece73c5e3e3cbe` and its size is **200,116 bytes**. `scripts/license-notices/curl-ca-bundle.md` preserves this attribution in generated license archives.
@@ -25,3 +27,5 @@ This selects the verified-manual strategy because PaperNX has not established de
 Local HTTPS integration tests exercise valid and invalid certificates, source/asset restrictions, cancellation, truncated bodies, wrong hashes, wrong app identity/version, staging cleanup, tampered pending files, unchanged canonical NRO and legacy startup recovery. These tests run on the desktop host. A real Switch TLS request, file-manager replacement, SD-card interruption and legacy boot recovery have not been exercised on hardware.
 
 At source revision `cb5eb7a` (built with report-only commit `4ba0aa0`), the Switch cross-build and `scripts/verify_artifacts.py --version 0.9.1` passed: libcurl-linked AArch64 ELF, NRO output, and embedded CA equality (118 certs / 200,116 bytes). This verifies compile/link and packaging inputs, not a real Switch HTTPS request or external file-manager recovery.
+
+At source commit `ebf6555`, updater unit and local HTTPS integration tests pass **2/2**. The integration suite includes a 16 MiB transfer cancelled at 100% reported progress, then checks that no partial or staged package remains. This is host evidence; Switch cancellation timing and SD-card interruption remain unverified.

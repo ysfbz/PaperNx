@@ -343,3 +343,11 @@ Each initial feature blob below matches the corresponding path at the cited fork
 | `include/papernx/interface_theme.hpp` | `be58dc293354a4e38e31eb9faa08284367845c53` | Deleted | `be58dc293354a4e38e31eb9faa08284367845c53` | Palette tokens were folded into PaperNX theme infrastructure in `913fb8f`; deletion does not remove the contribution's provenance. Retain Refael Bar / AGPL-3.0 attribution. |
 
 **Correct statement:** “The six files were byte-identical to `rtk19/PaperNx@d2b4bcfd10b1a66043c5b8cd36da08340cffec6d` at historical feature HEAD `a35aa7b0f51aee58f44d524616a2aa55477d670c`. At current source HEAD `cb5eb7ac51d6681eab43928f6a7687140656d6cf`, five of the six paths exist with different blobs and `include/papernx/interface_theme.hpp` is deleted. Their Git history and implementation structure remain fork-derived/adapted, so preserve Refael Bar's scanner/index/theme credit and Refael Avramashvili's updater/parser credit alongside PaperNX authorship and AGPL-3.0 notices. Do not describe them as independent implementations based on hash changes, refactoring or tests.”
+
+## Current updater lineage after cancellation hardening — `ebf655526e44b44ee0c3f3f731ae8f8beef7d43d`
+
+| Path | Current feature blob | Pinned fork blob | Finding |
+|---|---|---|---|
+| `src/self_update.cpp` | `26990ab0ebd4cb5ea48d85085f4cb03126249893` | `e7e5c52c1b4b2137d92d1c6902a011d1d3b71b6c` | Cancellation is observed through verification/staging and terminal publication is synchronized. This is a PaperNX-specific safety adaptation in historically fork-derived updater code; it is not independent. Preserve Refael Avramashvili / AGPL-3.0 provenance. |
+
+At `ebf6555`, the other five paths retain the blobs in the preceding six-file snapshot: `src/library_scan.inc` `c740ad3397b3b3909312e20f0b97ae5d29dc36cd`, `src/library_index.cpp` `00b940e6ee65a0733c79d958d06a02bb66029e7b`, `include/papernx/library_index.hpp` `d70a7c58985ec8f77e53e54c495d332401124a60`, `src/update_json.hpp` `dc81698b3684b21b1ce0c48d1791780b9b632163`, and deleted `include/papernx/interface_theme.hpp`. No extant path is byte-identical to the pinned fork; all six historical import matches and all contributor notices remain as documented above.

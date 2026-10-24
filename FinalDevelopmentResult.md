@@ -560,3 +560,12 @@ Bu tek koşu yazılım renderer’ı host ölçümüdür; hızlanma iddiası de�
 - **Kaynak:** artifact raporundaki revision `4ba0aa039ac415dd8f736664d3766509039e5e12` (doc-only provenance commit; derlenen uygulama kaynak kodu `cb5eb7a` ile aynı). ELF AArch64. CA RomFS kontrolü 118 sertifika / 200.116 bayt buldu; embedded dosya `romfs/cacert.pem` ile aynı. RomFS toplamı 1.962.916 bayt.
 - **Artifact:** NRO 49.588.671 bayt; SHA-256 `fe0ab1c12c9959527072673f96d96836fb004d2ed22daf2a4fc56943f9fecdb7`. Bu yerel build doğrulamasıdır; release, tag veya dağıtım paketi değildir. Metadata sürümü release talimatı gereği yükseltilmedi.
 - **Açık:** Fiziksel Switch, gerçek TLS/NIFM, Joy-Con/backlight, SD kesintisi, full native CTest ve sanitizer **UNVERIFIED / NOT RUN**. Genel karar **INCOMPLETE — BLOCKERS REMAIN**.
+
+## 2026-10-24 — Updater cancellation through verified staging
+
+- **Branch/source commit:** `feature/v0.9.2-complete-reader-enhancements` / `ebf655526e44b44ee0c3f3f731ae8f8beef7d43d` (`fix(updater): honor cancellation through staging`).
+- `cancel()` now affects only active checks/downloads and shares a mutex-serialized terminal transition with `Ready`. Cancellation after fetch, NRO/hash verification or file staging prevents `.new`/`.ready` publication and removes updater-owned partial files. The status mutex ensures a later non-operation network error is still reported as Error.
+- **Callers:** `src/self_update_ui.inc` busy/cancel controls; shutdown still uses `stop()`. Test path: `tests/self_update_tests.cpp` + `tests/self_update_integration.py`, including a 16 MiB valid NRO cancelled at 100% progress and assertions for cleanup and later error reporting.
+- **Verification:** `docker compose run --rm desktop bash -lc 'cmake --build build-desktop --target PaperNX papernx_self_update_tests --parallel 4 && ctest --test-dir build-desktop --output-on-failure -R "^papernx_self_update_tests$|^papernx_self_update_network_tests$"'` — build **PASS**, CTest **2/2 PASS** in **2.72 sec**. `git diff --check` passed before commit.
+- **Provenance:** `src/self_update.cpp` blob `26990ab0ebd4cb5ea48d85085f4cb03126249893` remains fork-derived/adapted; Refael Avramashvili / AGPL-3.0 notice is retained. Six-file audit updated in [`docs/V092_SOURCE_PROVENANCE_AUDIT.md`](docs/V092_SOURCE_PROVENANCE_AUDIT.md).
+- **Not verified:** Switch build after this source change, physical cancellation, SD power-loss/interruption, full native suite and ASan/UBSan. Manual verified update remains the only enabled replacement path; overall **INCOMPLETE — BLOCKERS REMAIN**.
