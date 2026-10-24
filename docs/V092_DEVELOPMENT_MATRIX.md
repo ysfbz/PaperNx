@@ -56,6 +56,12 @@
 - `papernx_library_index_tests` creates 10,000 actual filesystem entries and confirms the exact cap is complete. Adding entry 10,001 leaves the output bounded at 10,000 and sets `complete=false`.
 - **Result:** CTest `papernx_library_index_tests` **1/1 PASS** in 2.37 seconds. This is a scan-cap host stress check, not a Switch SD performance measurement. Full CTest and physical device checks remain open.
 
+## 2026-10-24 — G11 comic worker idle/lifecycle run
+
+- **Command:** `docker compose run --rm desktop bash -lc 'cmake --build build-desktop --target papernx_comic_performance_tests --parallel 4 && ctest --test-dir build-desktop --output-on-failure -R "^papernx_comic_performance_tests$"'` — build PASS; CTest **1/1 PASS**, 32.91 seconds.
+- `LastTest.log` records stable worker counts over 30 seconds idle (`opens=2, closes=1`), close on suspend, reopen on resume, and balanced stop (`3/3`). UI texture rasterization remained zero in four idle/toolbar cycles, 30 curl frames and 30 spread-pan frames.
+- Host software-renderer timings were 54 ms, 499 ms and 199 ms respectively. These are not before/after comparisons and do not establish Switch performance gains. Full CTest, RAR5-specific run, sanitizers and hardware remain open.
+
 ---
 
 ## G. 2026-10-23 final hardening audit — current source of truth

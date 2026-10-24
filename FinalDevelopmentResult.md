@@ -443,3 +443,17 @@ G10 değişikliği önceden var olan PaperNX `core.cpp/core.hpp` koduna aittir; 
 - `tests/library_index_tests.cpp` 10.000 gerçek filesystem girişi oluşturuyor: tam sınırda `complete=true`, 10.001’inci giriş eklendiğinde 10.000 kitaplık sonuç ve `complete=false` bekleniyor.
 - **Gerçek doğrulama:** `docker compose run --rm desktop bash -lc 'cmake --build build-desktop --target papernx_library_index_tests --parallel 4 && ctest --test-dir build-desktop --output-on-failure -R "^papernx_library_index_tests$"'` — CTest **1/1 PASS**, 2,37 saniye.
 - Bu yalnız host filesystem cap stress testidir; Switch SD performansı, full native CTest ve fiziksel Switch doğrulaması değildir. Genel karar **INCOMPLETE — BLOCKERS REMAIN**.
+
+## V. 2026-10-24 — G11: Comic worker idle ve yaşam döngüsü doğrulaması
+
+- **Kaynak HEAD:** `1daedb63246384a73afb979978230f75716c2165`; bu test koşusu kaynak değiştirmedi.
+- **Komut:** `docker compose run --rm desktop bash -lc 'cmake --build build-desktop --target papernx_comic_performance_tests --parallel 4 && ctest --test-dir build-desktop --output-on-failure -R "^papernx_comic_performance_tests$"'` — build PASS; CTest **1/1 PASS**, 32,91 saniye.
+- Kanıt: `build-desktop/Testing/Temporary/LastTest.log`. Worker open/close sayıları idle 1/3/10/30 saniyede `2/1` kaldı. Suspend sonrası `2/2`, resume sonrası üçüncü açılış ve son stop’ta `3/3` dengeli kapanış gerçekleşti.
+- Dört idle/toolbar çevrimi 54 ms ve 0 UI rasterizasyonu; 30 curl frame 499 ms ve 0 UI rasterizasyonu; 30 spread-pan frame 199 ms ve 0 UI rasterizasyonu. Bunlar host software-renderer fixture ölçümleri, önce/sonra kıyası veya Switch performans kanıtı değildir.
+
+| Kontrol | Sonuç | Kanıt |
+|---|---|---|
+| `papernx_comic_performance_tests` | **PASS, 1/1** | Gerçek worker idle/suspend/resume/stop sayaçları ve 0 hot-path UI rasterization; CTest günlüğü yukarıdaki yolda. |
+| 37 sayfalı gerçek RAR5 fixture, full native CTest, ASan/UBSan, Switch FPS/RAM, fiziksel cihaz | **NOT RUN / UNVERIFIED** | Ayrı test/gate olarak açık. Bu host ölçümünden performans kazanımı iddiası çıkarılmıyor. |
+
+Bu checkpoint `ComicPages` worker lifecycle ve test edilebilirlik kapsamını güçlendiriyor; 11 özelliğin tamamı için final kabul anlamına gelmiyor. Genel karar **INCOMPLETE — BLOCKERS REMAIN**.

@@ -173,3 +173,10 @@ The verified/pushed branch HEAD at the start of this note was `ed9e3b69c184de1b4
 - `papernx_library_index_tests` creates 10,000 real filesystem book entries and verifies an exact-limit complete result, then adds item 10,001 and verifies `complete=false` while the result stays bounded at 10,000.
 - **Desktop CTest:** `papernx_library_index_tests` **1/1 PASS**, 2.37 seconds. This closes the previously listed 10,001-entry core scan stress gap; async preservation at depth limit and existing multi-root tests remain separately covered.
 - Full native suite, sanitizers, physical Switch and end-to-end performance remain open. Overall status remains `INCOMPLETE — BLOCKERS REMAIN`.
+
+## 2026-10-24 G11 comic worker idle/lifecycle verification
+
+- **Source unchanged:** G10 production source `1daedb63246384a73afb979978230f75716c2165`; test-only scan boundary commit `70ac670873af6e254185808ed397ee05b9c46ccc` remains current.
+- **Command:** `docker compose run --rm desktop bash -lc 'cmake --build build-desktop --target papernx_comic_performance_tests --parallel 4 && ctest --test-dir build-desktop --output-on-failure -R "^papernx_comic_performance_tests$"'` — build PASS; CTest **1/1 PASS**, 32.91 seconds.
+- `build-desktop/Testing/Temporary/LastTest.log` records idle 1/3/10/30 seconds with open/close counts `2/1`; suspend closes the document, resume opens one replacement, and stop ends at `3/3`. Four idle/toolbar render cycles: 54 ms and 0 UI rasterizations; 30 curl frames: 499 ms and 0 UI rasterizations; 30 spread-pan frames: 199 ms and 0 UI rasterizations.
+- This is a desktop software-renderer fixture, with no baseline comparison and no Switch FPS/RAM measurement. The 37-page RAR5 test, full native suite, sanitizers and physical Switch remain separate gates.
