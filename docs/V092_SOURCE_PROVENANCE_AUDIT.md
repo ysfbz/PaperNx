@@ -459,3 +459,18 @@ The focused `papernx_library_index_tests` and `papernx_modern_library_tests` pas
 | `include/papernx/interface_theme.hpp` | Deleted | `be58dc293354a4e38e31eb9faa08284367845c53` | Palette is integrated into `include/papernx/theme.hpp`; deletion does not erase Refael Bar / AGPL-3.0 provenance. |
 
 Updater unit and local HTTPS tests passed **2/2** in desktop and **2/2** under ASan/UBSan. These confirm parser behavior, not authorship. The original six-file byte identity remains true only at historical feature HEAD `a35aa7b0f51aee58f44d524616a2aa55477d670c`; no extant path currently matches its fork blob.
+
+## Current code provenance snapshot — symlink history-path validation `aa400968fffe8524f0179280b2747be419a7636e`
+
+`regularBookFileSize()` was added to centralize direct-regular-file validation across inventory restore, retained scanner history and progress-only startup recovery. This is a PaperNX-specific safety addition inside files with existing fork ancestry. It does not change the provenance classification of any module or remove the existing Refael Bar / AGPL-3.0 attribution. The original six-path byte identity remains a historical statement about feature HEAD `a35aa7b0f51aee58f44d524616a2aa55477d670c`; none of the five current files exists byte-identically to its pinned fork blob, and `include/papernx/interface_theme.hpp` remains deleted.
+
+| Path | Feature blob at `aa40096` | Pinned fork blob | Current classification |
+|---|---|---|---|
+| `src/library_scan.inc` | `af2a8cd74c69a777071bb2f275f24ae5e574e6d8` | `c8087dc4defa88af950bed947e6d50962bc7799f` | PaperNX SDL scan integration with fork-derived structure; the shared safe-file check is a targeted adaptation, not independent code. Preserve Refael Bar / AGPL-3.0 attribution. |
+| `src/library_index.cpp` | `0eab4780c400bc264aaa8acd3f9abbb4e6d15cd3` | `e4b3e83e2ddadaa55913b56f7a0a0e31b3f5dd1a` | Fork-derived/adapted worker and inventory, with PaperNX schema, cache safety and symlink-history validation. Preserve Refael Bar / AGPL-3.0 attribution. |
+| `include/papernx/library_index.hpp` | `348cabf5cc9dcdd4befcd4cc7cd305b03d8dbc01` | `8a0ac82707cf5b402d0cbcebd790d751758b0003` | Fork-derived/adapted scanner contract plus the PaperNX-specific file-size helper declaration. Preserve Refael Bar / AGPL-3.0 attribution. |
+| `src/self_update.cpp` | `ec3f5b922e15029b291e85877cd54374b2dbade1` | `e7e5c52c1b4b2137d92d1c6902a011d1d3b71b6c` | Adapted verified-manual updater with fork lineage; preserve Refael Avramashvili / AGPL-3.0 attribution. |
+| `src/update_json.hpp` | `95ab577f9c0a705ea2de2a20fbb61fe690af3040` | `d4e3bb96dcb2d363e23d40a83775c02768fc5394` | Fork-derived/adapted bounded release parser; preserve Refael Avramashvili / AGPL-3.0 attribution. |
+| `include/papernx/interface_theme.hpp` | Deleted | `be58dc293354a4e38e31eb9faa08284367845c53` | Palette is integrated with PaperNX theme tokens; deletion does not erase Refael Bar / AGPL-3.0 provenance. |
+
+`tests/library_index_tests.cpp` covers scanner history replaced by a symlink; `tests/modern_library_tests.cpp` covers progress-path discovery with launch scanning disabled and asserts that progress remains present. Both targeted tests passed in desktop and ASan/UBSan; current-source Switch build/artifact verification passed. These establish the safety behavior, not independent authorship. The code remains fork-derived/adapted pending any genuinely separate implementation with its own provenance review.

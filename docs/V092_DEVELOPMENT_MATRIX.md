@@ -5,7 +5,7 @@
 
 **Baseline:** `main@8db85384a1b6c277c74766601ef46e9a672328df` (2026-10-23 audit)  
 **Feature branch:** `feature/v0.9.2-complete-reader-enhancements`  
-**Latest source-bearing HEAD:** `0e0b2e060b1b9c857fe6cfa278b72c60245c288a` (strict updater release field validation; native CTest evidence is recorded below).
+**Latest source-bearing HEAD:** `aa400968fffe8524f0179280b2747be419a7636e` (reject symlinked progress-history paths; full native CTest at the preceding test checkpoint, focused current-source evidence below).
 **Fork reference:** `rtk19/PaperNx@d2b4bcfd10b1a66043c5b8cd36da08340cffec6d`  
 **Version remains:** v0.9.1; do not tag, release or merge to main.
 
@@ -423,3 +423,11 @@ This verifies UI and host settings persistence. The Switch-only `lbl*` service, 
 `tests/comic_app_tests.cpp` now filters to `sample.cbz` before expecting its thumbnail texture, so the book is actually visible under the library's cover-upload policy. `tests/page_navigation_tests.cpp` waits for the async comic worker to report the damaged-page error and for the next healthy page texture before checking recovery. Production code did not change.
 
 The two focused tests passed after those adjustments. The full native suite then passed **31/31** at test commit `6fe94ecbc821556abdd0eb958a06875d556c7dcd`; command: `docker compose run --rm desktop bash -lc 'ctest --test-dir build-native --output-on-failure'` (450.70 sec). This closes the current native CTest gate only. Full sanitizer coverage, substantial independent scanner/index/updater/parser redesign, actual cover-scroll performance, Switch SD behavior and physical Joy-Con/backlight/TLS remain open or unverified. Overall status remains **INCOMPLETE — BLOCKERS REMAIN**.
+
+## Reject symlinked progress-history paths — `aa40096`
+
+`regularBookFileSize()` is now the shared file check for inventory loading, retained previously opened books and `restoreLibraryLabels()` when launch scanning is disabled. It requires a direct regular file and avoids following a symlink. Saved progress records are retained; only the unusable path is omitted from the book list. This is a focused PaperNX safety adaptation in fork-derived library files, not an independent reimplementation; Refael Bar / AGPL-3.0 attribution remains.
+
+`PaperNX`, `papernx_library_index_tests` and `papernx_modern_library_tests` built; targeted CTest passed **2/2**. The same tests passed under ASan/UBSan **2/2**. The Switch command `docker compose run --rm switch bash -lc 'export MUPDF_PREFIX=/work/prefix-mupdf-switch; make all -j4 && python3 scripts/verify_artifacts.py --version 0.9.1'` passed at `aa400968fffe8524f0179280b2747be419a7636e`: AArch64 ELF/NRO, CA bundle 118 certs / 200,116 bytes, NRO 49,588,671 bytes, SHA-256 `334ebdfdd21d94d63a1c0d99bbca1741bfbf63c37f7c522753b8ca7a6dd9a946`. Physical Switch remains **UNVERIFIED**.
+
+The full **31/31** native CTest result is from `6fe94ec`; it was not rerun after this focused library change. Full independent scanner/index/updater/parser design, whole-app sanitizer, SD startup-cost measurement, actual cover-scroll performance and physical device checks remain open. Overall status remains **INCOMPLETE — BLOCKERS REMAIN**.

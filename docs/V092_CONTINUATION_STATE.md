@@ -2,8 +2,8 @@
 
 **Updated:** 2026-10-24
 **Branch:** `feature/v0.9.2-complete-reader-enhancements`
-**Latest source commit:** `0e0b2e060b1b9c857fe6cfa278b72c60245c288a` (strict updater JSON field types; later commits record tests/docs).
-**Latest separate test-only commit:** `6fe94ecbc821556abdd0eb958a06875d556c7dcd` (async comic test conditions; latest source+test commit is `6fe94ec`).
+**Latest source commit:** `aa400968fffe8524f0179280b2747be419a7636e` (reject symlinked progress-history paths).
+**Latest separate test-only commit:** `6fe94ecbc821556abdd0eb958a06875d556c7dcd` (async comic test conditions; latest source+test commit is `aa40096`).
 **Last source commit before the current hardening changes:** `bb9d8579db9ccf0d10b5843e1929c2e696565c59`
 **Hardening source commits:** `913fb8f` and `1cb06a1`.
 **Audit documentation:** committed on this feature branch; use `git log` for the final report commit SHA.
@@ -403,3 +403,11 @@ The verified/pushed branch HEAD at the start of this note was `ed9e3b69c184de1b4
 - Corrected two test preconditions: cover upload now exercises a searched, visible `sample.cbz`; damaged comic navigation waits for the worker's failure and healthy-page result. No production source changed.
 - The full native suite passed **31/31**: `docker compose run --rm desktop bash -lc 'ctest --test-dir build-native --output-on-failure'` (450.70 sec). This run includes library, updater/local HTTPS, comic worker/RAR performance, reader, Page Curl, UI, MuPDF and app tests.
 - **Next:** continue the G5 scanner/index architecture and source provenance/Ponytail audit. Broad clean-room redesign, whole-app sanitizer, actual cover-scroll timing, Switch SD and physical Switch TLS/Joy-Con/backlight remain open or **UNVERIFIED**. Keep overall status **INCOMPLETE — BLOCKERS REMAIN**. User-owned execution-plan and generated CBR files remain unmodified and unstaged.
+
+## 2026-10-24 — Symlink history-path validation
+
+- **Source commit:** `aa400968fffe8524f0179280b2747be419a7636e` (`fix(library): reject symlinked history paths`). A shared `regularBookFileSize()` check now protects the disposable inventory, scanner's retained history and progress-only startup recovery. Reading progress is preserved if its path has become a symlink.
+- **Regression evidence:** the new scanner retention and `scanOnLaunch=false` app regressions both failed before the change and passed afterward. `PaperNX` plus focused library-index/modern-library CTest: **2/2 PASS**. The same CTest pair rebuilt under ASan/UBSan: **2/2 PASS**.
+- **Switch:** current commit cross-build and artifact verification passed. AArch64 ELF/NRO; NRO SHA-256 `334ebdfdd21d94d63a1c0d99bbca1741bfbf63c37f7c522753b8ca7a6dd9a946`; RomFS CA bundle 118 certificates / 200,116 bytes. Hardware **UNVERIFIED**.
+- **Provenance:** the scanner/index files remain fork-derived/adapted; the new shared validation does not change that finding or Refael Bar / AGPL-3.0 attribution. Current blobs are recorded in [`V092_SOURCE_PROVENANCE_AUDIT.md`](V092_SOURCE_PROVENANCE_AUDIT.md).
+- **Limits / next:** full 31/31 native CTest passed at earlier test commit `6fe94ec`; it was not rerun on `aa40096`. The added lstat-style check's Switch SD startup cost is not measured. Continue substantive scanner/index redesign and the remaining updater/parser/Ponytail audit; physical Switch remains unverified. Overall decision **INCOMPLETE — BLOCKERS REMAIN**.
