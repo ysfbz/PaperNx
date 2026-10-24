@@ -19,6 +19,17 @@ int main() {
     fs::create_directories(unicodeRoot);std::ofstream(unicodeBook)<<"fixture";
     std::ofstream(root/"books"/"ignored.txt")<<"ignored";
     const auto inventory=root/"data"/"inventory.txt";LibraryScanner scanner;
+    const auto deepRoot=root/"deep";
+    auto withinLimit=deepRoot/"within-limit";
+    for(int i=0;i<15;++i){withinLimit/="nested";fs::create_directories(withinLimit);}
+    std::ofstream(withinLimit/"within.epub")<<"within depth limit";
+    auto beyondLimit=deepRoot/"beyond-limit";
+    for(int i=0;i<18;++i){beyondLimit/="nested";fs::create_directories(beyondLimit);}
+    std::ofstream(beyondLimit/"beyond.epub")<<"beyond depth limit";
+    bool legacyScanComplete=false;
+    assert(scan(deepRoot,100,{},&legacyScanComplete).size()==1&&!legacyScanComplete);
+    bool rootsScanComplete=true;
+    assert(scanRoots({deepRoot},100,{},&rootsScanComplete).size()==1&&!rootsScanComplete);
     assert(scanner.start({root/"books"/"nested",root/"books",root/"books"}, {}, inventory));
     assert(!scanner.start({}, {}, inventory));auto first=wait(scanner);assert(first.complete && first.cached && first.error.empty() && first.books.size()==300);
     assert(scanRoots({root/"books"/"nested",root/"books",root/"books"}).size()==300);
@@ -39,6 +50,12 @@ int main() {
            restoredUnicode.front().path==unicodeBook.u8string());
     assert(scanRoots({root/"books"},5).size()==5);
     auto cached=loadLibraryInventory(inventory);assert(cached.size()==300);
+    auto inventoryBytes=[&]{std::ifstream in(inventory,std::ios::binary);return std::string(std::istreambuf_iterator<char>(in),{});};
+    const auto inventoryBeforeDepthLimit=inventoryBytes();
+    assert(scanner.start({deepRoot},first.books,inventory));
+    auto depthLimited=wait(scanner);
+    assert(!depthLimited.complete&&!depthLimited.error.empty());
+    assert(inventoryBytes()==inventoryBeforeDepthLimit&&loadLibraryInventory(inventory).size()==300);
     auto known=first.books;known.front().title="Custom title";known.front().author="Author";
     const auto changed=known.back();std::ofstream(changed.path,std::ios::app)<<"new bytes";
     fs::remove(known[1].path);
@@ -48,7 +65,6 @@ int main() {
     assert(custom && replaced);
     // Removing a scan root retains already-opened, existing files, without touching progress.
     assert(scanner.start({},second.books,inventory));assert(wait(scanner).books.size()==299);
-    auto inventoryBytes=[&] {std::ifstream in(inventory,std::ios::binary);return std::string(std::istreambuf_iterator<char>(in),{});};
     const auto savedInventory=inventoryBytes();
     const auto inventoryBeforeCancel=loadLibraryInventory(inventory);
     assert(scanner.start({root/"books",root/"missing-sd-library"},second.books,inventory));
@@ -72,11 +88,14 @@ int main() {
     assert(scanner.start({root/"books"},second.books,broken));auto recovered=wait(scanner);
     assert(recovered.cached && recovered.books.size()==299 && loadLibraryInventory(broken).size()==299);
     ProgressStore restoredReading(root/"data"/"reading-progress.txt");assert(restoredReading.load() && restoredReading.get(changed.id).page==7);
-    assert(scan(root/"books",5).size()==5);assert(scan(root/"books",100,[]{return true;}).empty());
+    assert(scan(root/"books",5).size()==5);
+    bool cancelledScanComplete=true;
+    assert(scan(root/"books",100,[]{return true;},&cancelledScanComplete).empty()&&!cancelledScanComplete);
     std::size_t checks=0;const auto interrupted=scan(root/"books",300,[&]{return ++checks==12;});
     assert(checks==12 && interrupted.size()<300);
-    checks=0;const auto multiRootInterrupted=scanRoots({root/"books",root/"books"/"nested"},300,[&]{return ++checks==12;});
-    assert(checks==12 && multiRootInterrupted.size()<300);
+    checks=0;bool interruptedRootsComplete=true;
+    const auto multiRootInterrupted=scanRoots({root/"books",root/"books"/"nested"},300,[&]{return ++checks==12;},&interruptedRootsComplete);
+    assert(checks==12 && multiRootInterrupted.size()<300&&!interruptedRootsComplete);
     AppSettingsStore settings(root/"settings.txt");auto prefs=settings.get();assert(prefs.scanOnLaunch && prefs.interfaceStyle==0 && prefs.interfaceAccent==0);
     prefs.libraryFolders={"/books/a","/books/a","/books/b"};prefs.interfaceStyle=1;prefs.interfaceAccent=5;prefs.scanOnLaunch=false;settings.put(prefs);assert(settings.save());
     AppSettingsStore restored(root/"settings.txt");assert(restored.load());assert(restored.get().libraryFolders.size()==2 && !restored.get().scanOnLaunch && restored.get().interfaceStyle==1 && restored.get().interfaceAccent==5);

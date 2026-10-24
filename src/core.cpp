@@ -288,8 +288,9 @@ void scanInto(const fs::path &root, std::size_t maxBooks, const std::function<bo
     fs::recursive_directory_iterator it(root, fs::directory_options::none, ec), end;
     if (ec) { fail(); return; }
     while (it != end && books.size() < maxBooks) {
-        if (cancelled && cancelled()) break;
+        if (cancelled && cancelled()) { fail(); break; }
         if (it.depth() > 16) {
+            fail();
             it.disable_recursion_pending();
         } else {
             const bool symlink = it->is_symlink(ec);
@@ -343,9 +344,11 @@ bool containsPath(const fs::path &parent, const fs::path &child) {
 }
 
 std::vector<Book> scan(const fs::path &root, std::size_t maxBooks,
-                       const std::function<bool()> &cancelled) {
+                       const std::function<bool()> &cancelled, bool *complete) {
     std::vector<Book> books;
-    scanInto(root, maxBooks, cancelled, books);
+    bool scanComplete = true;
+    scanInto(root, maxBooks, cancelled, books, &scanComplete);
+    if (complete) *complete = scanComplete;
     std::sort(books.begin(), books.end(), [](const Book &a, const Book &b) {
         const int order = compareNatural(a.title, b.title);
         return order ? order < 0 : a.id < b.id;
@@ -381,7 +384,10 @@ std::vector<Book> scanRoots(const std::vector<fs::path> &roots, std::size_t maxB
 
     std::vector<Book> books;
     for (std::size_t i = 0; i < uniqueRoots.size(); ++i) {
-        if (cancelled && cancelled()) break;
+        if (cancelled && cancelled()) {
+            if (complete) *complete = false;
+            break;
+        }
         if (books.size() >= maxBooks) {
             if (complete) *complete = false;
             break;

@@ -83,9 +83,10 @@ struct Progress : ReaderPreferences {
 Format detectFormat(const fs::path &path);
 std::string documentId(const std::string &path, std::uintmax_t size);
 std::string defaultTitle(const fs::path &path);
+// `complete` is false when traversal is cancelled, fails, or is truncated by a safety limit.
 std::vector<Book> scan(const fs::path &root, std::size_t maxBooks = 10000,
-                       const std::function<bool()> &cancelled = {});
-// `complete` is false when a root fails or the limit truncates any configured root.
+                       const std::function<bool()> &cancelled = {}, bool *complete = nullptr);
+// `complete` is false when a root fails, traversal is cancelled, or a safety limit truncates it.
 std::vector<Book> scanRoots(const std::vector<fs::path> &roots, std::size_t maxBooks = 10000,
                             const std::function<bool()> &cancelled = {}, bool *complete = nullptr);
 
