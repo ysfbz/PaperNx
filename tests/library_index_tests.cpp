@@ -5,6 +5,9 @@
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#ifndef _WIN32
+#include <sys/stat.h>
+#endif
 using namespace papernx;
 static LibraryScanResult wait(LibraryScanner &scanner) {
     const auto until=std::chrono::steady_clock::now()+std::chrono::seconds(10);
@@ -79,6 +82,10 @@ int main() {
     std::ofstream(changedFile,std::ios::trunc)<<"changed size";fs::remove(missingFile);
     std::error_code symlinkError;fs::create_symlink(outsideFile,missingFile,symlinkError);
     assert(!symlinkError);
+#ifndef _WIN32
+    const auto fifo=validationRoot/"not-a-book.cbz";
+    assert(::mkfifo(fifo.c_str(),0600)==0 && !regularBookFileSize(fifo));
+#endif
     const auto validatedInventory=loadLibraryInventory(validationInventory);
     assert(validatedInventory.size()==1 && validatedInventory.front().path==keepFile.u8string());
     Book symlinkHistory;symlinkHistory.path=missingFile.u8string();symlinkHistory.bytes=fs::file_size(outsideFile);

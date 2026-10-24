@@ -4,6 +4,11 @@
 #include <chrono>
 #include <unordered_map>
 #include <unordered_set>
+#ifndef _WIN32
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
 
 namespace papernx {
 namespace {
@@ -11,11 +16,25 @@ constexpr const char *inventorySchemaId="libraryindex0001";
 constexpr const char *inventorySchema="PAPERNX-LIBRARY-1";
 }
 std::optional<std::uintmax_t> regularBookFileSize(const fs::path &path) {
+#if !defined(_WIN32) && defined(O_NOFOLLOW)
+    int flags=O_RDONLY|O_NONBLOCK|O_NOFOLLOW;
+#ifdef O_CLOEXEC
+    flags|=O_CLOEXEC;
+#endif
+    const int file=::open(path.c_str(),flags);
+    if(file<0)return std::nullopt;
+    struct stat info{};
+    const int status=::fstat(file,&info);
+    ::close(file);
+    if(status!=0 || !S_ISREG(info.st_mode) || info.st_size<0)return std::nullopt;
+    return static_cast<std::uintmax_t>(info.st_size);
+#else
     std::error_code ec;const auto status=fs::symlink_status(path,ec);
     if(ec || fs::is_symlink(status) || !fs::is_regular_file(status))return std::nullopt;
     const auto size=fs::file_size(path,ec);
     if(ec)return std::nullopt;
     return size;
+#endif
 }
 std::vector<Book> loadLibraryInventory(const fs::path &path) {
     ProgressStore store(path);std::vector<Book> books;
