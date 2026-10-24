@@ -87,12 +87,15 @@ struct AppTest {
         auto book=[&](const char *filename) {return *std::find_if(app.books_.begin(),app.books_.end(),[&](const Book &b){return fs::path(b.path).filename()==filename;});};
         const Book cbz=book("sample.cbz"),rar=book("sample.cbr"),manga=book("manga.cbz"),broken=book("broken.cbz");
         assert(cbz.format==Format::Cbz && rar.format==Format::Cbr);
+        app.searchQuery_="sample.cbz";app.updateVisibleBooks();
+        assert(std::any_of(app.visibleBooks_.begin(),app.visibleBooks_.end(),[&](const Book &candidate){return candidate.id==cbz.id;}));
         app.getOrRenderThumbnail(cbz);const Uint32 coverDeadline=SDL_GetTicks()+3000;
         while(!app.thumbCache_.get("thumb_"+cbz.id) && SDL_GetTicks()<coverDeadline) {SDL_Delay(10);app.processCompletedThumbnails();}
         assert(app.thumbCache_.get("thumb_"+cbz.id));
         const auto cachedCover=app.coverRepository_.read(cbz);assert(cachedCover);
         const auto *pixel=cachedCover->rgb.data()+(cachedCover->height/4)*cachedCover->stride+(cachedCover->width/4)*3;
         assert(std::abs(int(pixel[1])-185)<8); // ComicInfo FrontCover, not the first page.
+        app.searchQuery_.clear();app.updateVisibleBooks();
         // A real, compressed RAR5 scan exceeds the old 16 MiB thumbnail budget.
         const Book large=book("large.cbr");app.getOrRenderThumbnail(large);
         const Uint32 largeDeadline=SDL_GetTicks()+5000;

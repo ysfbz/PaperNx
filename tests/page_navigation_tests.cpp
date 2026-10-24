@@ -104,8 +104,13 @@ struct AppTest {
         app.closeBook();app.openBook(book("broken.cbz"));app.openContents(1);app.preparePagePreviews();
         const auto failed=app.previewKey(1,0);const auto deadline=SDL_GetTicks()+5000;
         while(SDL_GetTicks()<deadline && !app.failedPreviews_.count(failed)){app.render();app.processPagePreviews();SDL_Delay(5);}
-        assert(app.failedPreviews_.count(failed));snapshot(app,"damaged-preview");app.activateContentsItem(1);app.render();assert(!app.pageRenderError_.empty());
-        app.navigationJump(2);app.render();if(!app.pageRenderError_.empty())std::cerr<<"Recovery: "<<app.currentPage_<<" / "<<app.pageCount_<<" zoom="<<app.pdfZoom_<<" continuous="<<app.continuous()<<" "<<app.pageRenderError_<<"\n";assert(app.pageRenderError_.empty());
+        assert(app.failedPreviews_.count(failed));snapshot(app,"damaged-preview");app.activateContentsItem(1);app.render();
+        const auto damagedPageDeadline=SDL_GetTicks()+5000;
+        while(app.pageRenderError_.empty() && SDL_GetTicks()<damagedPageDeadline){app.processComicPages();app.render();SDL_Delay(5);}
+        assert(!app.pageRenderError_.empty());
+        app.navigationJump(2);const auto recoveredPageDeadline=SDL_GetTicks()+5000;
+        while(!app.pageCache_.get(app.comicTextureKey(2)) && SDL_GetTicks()<recoveredPageDeadline){app.processComicPages();app.render();SDL_Delay(5);}
+        app.render();assert(app.pageCache_.get(app.comicTextureKey(2)) && app.pageRenderError_.empty());
         app.closeBook();
         std::cout<<"PASS: transactional scrubbing and preview cache, touch/mouse/controllers, both rotations, RTL, grid scroll/selection, chapter/bookmark jumps, comic chapters, continuous anchors, CBR/PDF/single-page and stale decode isolation\n";
     }
