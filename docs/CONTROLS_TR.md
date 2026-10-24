@@ -1,4 +1,4 @@
-# PaperNX v0.9.2 — Türkçe Kontrol ve Kullanım Rehberi
+# PaperNX v0.9.3 — Türkçe Kontrol ve Kullanım Rehberi
 
 Güncel dokunmatik ve oyun kumandası (Joy-Con / Pro Controller) kontrolleri aşağıda özetlenmiştir.
 

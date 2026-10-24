@@ -4,7 +4,7 @@ PaperNX is maintained by Yusuf Buzrul and licensed under [AGPL-3.0](../LICENSE).
 
 ## PaperNX and rtk19/PaperNx
 
-The [rtk19/PaperNx fork](https://github.com/rtk19/PaperNx) credits **Refael Bar (@rtk19)**. PaperNX v0.9.2 retains fork-derived/adapted work in comic archive/document handling, ComicInfo and series grouping, page-curl and page previews, controller integration, scanner/index behavior, theme and page-cache adaptations. The current scanner/index code includes PaperNX-specific safety and inventory changes.
+The [rtk19/PaperNx fork](https://github.com/rtk19/PaperNx) credits **Refael Bar (@rtk19)**. PaperNX v0.9.3 retains fork-derived/adapted work in comic archive/document handling, ComicInfo and series grouping, page-curl and page previews, controller integration, scanner/index behavior, theme and page-cache adaptations. The current scanner/index code includes PaperNX-specific safety and inventory changes.
 
 The fork also credits **Refael Avramashvili** for updater and release JSON parser contributions. PaperNX retains that lineage in the bounded release parser and updater while using verified, two-slot manual staging. The updater does not replace the running NRO.
 
@@ -12,7 +12,7 @@ At feature import revision `a35aa7b0f51aee58f44d524616a2aa55477d670c`, six track
 
 ## Third-party components
 
-The exact license texts and notices are included in `PaperNX-licenses-v0.9.2.zip` and retained in the repository:
+The exact license texts and notices are included in `PaperNX-licenses-v0.9.3.zip` and retained in the repository:
 
 - **MuPDF 1.23.11:** AGPL/COPYING and upstream third-party notices under `third-party-licenses/MuPDF-1.23.11/`.
 - **unarr RAR decoder:** source, local changes, authors and COPYING files under `third_party/unarr/` and `third-party-licenses/unarr/`; its components include LGPL/GPL, LZMA SDK and 7-Zip terms.
@@ -20,4 +20,4 @@ The exact license texts and notices are included in `PaperNX-licenses-v0.9.2.zip
 - **Noto fonts:** OFL notice in `fonts/OFL.txt`, also embedded in RomFS and the Switch package.
 - **Mozilla CA bundle:** provenance and license details in `scripts/license-notices/curl-ca-bundle.md`.
 
-The separate release license archive contains `LICENSE`, this source attribution, `docs/LICENSES.md`, and the collected dependency notices. The corresponding application source and build/install instructions are published in the v0.9.2 source tag. These summaries do not replace the terms in the supplied license texts.
+The separate release license archive contains `LICENSE`, this source attribution, `docs/LICENSES.md`, and the collected dependency notices. The corresponding application source and build/install instructions are published in the v0.9.3 source tag. These summaries do not replace the terms in the supplied license texts.

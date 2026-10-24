@@ -1,6 +1,6 @@
-# PaperNX v0.9.2 — Physical Switch acceptance checklist
+# PaperNX v0.9.3 — Physical Switch acceptance checklist
 
-Target the **v0.9.2 NRO release binary**. Record Switch model, firmware, Homebrew Menu launch mode (Applet vs Title Override), installed NRO SHA-256 from the release sidecar, language, and sample books. All **44** checks below remain **UNVERIFIED** until performed and recorded on a physical console. Desktop tests and cross-compilation do not constitute hardware pass evidence.
+Target the **v0.9.3 NRO release binary**. Record Switch model, firmware, Homebrew Menu launch mode (Applet vs Title Override), installed NRO SHA-256 from the release sidecar, language, and sample books. All **44** checks below remain **UNVERIFIED** until performed and recorded on a physical console. Desktop tests and cross-compilation do not constitute hardware pass evidence.
 
 | # | Check | Result |
 |---|---|---|
@@ -49,7 +49,7 @@ Target the **v0.9.2 NRO release binary**. Record Switch model, firmware, Homebre
 | 43 | Natural Paper / Soft E-Ink, software brightness and supported system brightness lifecycle | UNVERIFIED |
 | 44 | Stage verified update, preserve old NRO, manually replace and confirm books/data/progress/journal remain intact | UNVERIFIED |
 
-Never use a valuable original for deletion testing. First back up `books/` and `data/`; copy a disposable EPUB/PDF/CBZ/CBR into the allowed books root. Test cancel first, then explicit confirmation. Shelf deletion must leave book files intact. v0.9.2 is a stable software release, but **real-device acceptance has not been demonstrated**; do not describe it as hardware-validated.
+Never use a valuable original for deletion testing. First back up `books/` and `data/`; copy a disposable EPUB/PDF/CBZ/CBR into the allowed books root. Test cancel first, then explicit confirmation. Shelf deletion must leave book files intact. v0.9.3 is a stable software release, but **real-device acceptance has not been demonstrated**; do not describe it as hardware-validated.
 
 ## Evidence for a physical PASS
 

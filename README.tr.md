@@ -2,7 +2,7 @@
   <img src="assets/branding/PaperNX-icon-512.png" alt="PaperNX Logo" width="160">
 </p>
 
-<h1 align="center">PaperNX v0.9.2 — Türkçe Dokümantasyon</h1>
+<h1 align="center">PaperNX v0.9.3 — Türkçe Dokümantasyon</h1>
 
 <p align="center">
   <strong>Nintendo Switch için yerel, çevrimdışı EPUB, PDF, CBZ ve CBR okuyucu.</strong>
@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/Lisans-AGPL_3.0-blue.svg" alt="AGPL-3.0 Lisansı"></a>
-  <a href="https://github.com/ysfbz/PaperNx/releases/tag/v0.9.2"><img src="https://img.shields.io/badge/S%C3%BCr%C3%BCm-v0.9.2-brightgreen.svg" alt="Sürüm v0.9.2"></a>
+  <a href="https://github.com/ysfbz/PaperNx/releases/tag/v0.9.3"><img src="https://img.shields.io/badge/S%C3%BCr%C3%BCm-v0.9.3-brightgreen.svg" alt="Sürüm v0.9.3"></a>
   <img src="https://img.shields.io/badge/Platform-Nintendo_Switch-e60012.svg" alt="Platform Nintendo Switch">
   <img src="https://img.shields.io/badge/Dil-C%2B%2B17%20%2F%20C11-00599C.svg" alt="Dil C++17 / C11">
   <img src="https://img.shields.io/badge/Grafik-SDL2-black.svg" alt="Grafik SDL2">
@@ -20,7 +20,7 @@
 ---
 
 > [!IMPORTANT]
-> **Henüz yayımlanmamış kaynak kodda**, v0.9.2 tema davranışı ve çizgi roman sayfa geçişine yönelik düzeltmeler bulunmaktadır. Bu değişiklikler indirilebilir v0.9.2 NRO paketinde **yoktur** ve Switch derlemesi, testler ve yayın doğrulamasından henüz geçmemiştir. Doğrulanmış yeni sürüm çıkana kadar v0.9.2 yayın dosyalarını kullanın.
+> v0.9.3 tema ve çizgi roman sayfalama değişiklikleri ana makinedeki C++/CTest paketini geçti (32/32). Switch AArch64 derlemesi ve NRO metadata kontrolleri beklemede; fiziksel Switch davranışı doğrulanmadı.
 
 ## Genel Bakış
 
@@ -59,18 +59,18 @@ Tüm kitaplarınız, çizgi roman arşivleriniz, kapak önbelleğiniz, okuma ge�
 
 ### Temiz Kurulum
 
-1. Güncel sürüm arşivini [`PaperNX-switch-v0.9.2.zip`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.2/PaperNX-switch-v0.9.2.zip) indirin.
+1. Güncel sürüm arşivini [`PaperNX-switch-v0.9.3.zip`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.3/PaperNX-switch-v0.9.3.zip) indirin.
 2. Arşivi Switch microSD kartınızın ana dizinine (`sdmc:/`) çıkartın.
 3. `.epub`, `.pdf`, `.cbz` ve `.cbr` dosyalarınızı `sdmc:/switch/PaperNX/books/` dizinine kopyalayın.
 4. Homebrew Menu üzerinden **PaperNX** uygulamasını başlatın.
 
-#### SHA-256 Sağlama Toplamları (v0.9.2)
+#### SHA-256 Sağlama Toplamları (v0.9.3)
 
 | Dosya | SHA256 sidecar |
 |---|---|
-| [`PaperNX.nro`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.2/PaperNX.nro) | [`PaperNX.nro.sha256`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.2/PaperNX.nro.sha256) |
-| [`PaperNX-switch-v0.9.2.zip`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.2/PaperNX-switch-v0.9.2.zip) | [`PaperNX-switch-v0.9.2.zip.sha256`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.2/PaperNX-switch-v0.9.2.zip.sha256) |
-| [`PaperNX-licenses-v0.9.2.zip`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.2/PaperNX-licenses-v0.9.2.zip) | [`PaperNX-licenses-v0.9.2.zip.sha256`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.2/PaperNX-licenses-v0.9.2.zip.sha256) |
+| [`PaperNX.nro`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.3/PaperNX.nro) | [`PaperNX.nro.sha256`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.3/PaperNX.nro.sha256) |
+| [`PaperNX-switch-v0.9.3.zip`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.3/PaperNX-switch-v0.9.3.zip) | [`PaperNX-switch-v0.9.3.zip.sha256`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.3/PaperNX-switch-v0.9.3.zip.sha256) |
+| [`PaperNX-licenses-v0.9.3.zip`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.3/PaperNX-licenses-v0.9.3.zip) | [`PaperNX-licenses-v0.9.3.zip.sha256`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.3/PaperNX-licenses-v0.9.3.zip.sha256) |
 
 ```text
 sdmc:/switch/PaperNX/
@@ -81,7 +81,7 @@ sdmc:/switch/PaperNX/
 
 ### Önceki Sürümden Güncelleme
 
-Önce `books/` ve `data/` klasörlerinizi yedekleyip PaperNX'i kapatın. Doğrulanmış v0.9.2 Switch ZIP'ini microSD kartın ana dizinine (`sdmc:/`) açın ve içindeki NRO'yu `sdmc:/switch/PaperNX/PaperNX.nro` ile değiştirin. Yeni sürüm başarıyla açılana kadar eski NRO'nun bir kopyasını saklayın. Uygulama içi güncelleme de doğrulanmış adayı staging alanına alır; dosyayı uygulama kendisi kurmaz veya yeniden başlatmaz.
+Önce `books/` ve `data/` klasörlerinizi yedekleyip PaperNX'i kapatın. Doğrulanmış v0.9.3 Switch ZIP'ini microSD kartın ana dizinine (`sdmc:/`) açın ve içindeki NRO'yu `sdmc:/switch/PaperNX/PaperNX.nro` ile değiştirin. Yeni sürüm başarıyla açılana kadar eski NRO'nun bir kopyasını saklayın. Uygulama içi güncelleme de doğrulanmış adayı staging alanına alır; dosyayı uygulama kendisi kurmaz veya yeniden başlatmaz.
 
 > [!IMPORTANT]
 > Dağıtım paketi uygulamayı, fontları ve boş bir `books/` yer tutucusunu içerir; kitaplarınızı, `data/` klasörünü, ayarları, ilerlemeyi, yer imlerini, Okuma Günlüğünü veya logları içermez ve üzerine yazmaz. Yine de güncellemeden önce `books/` ve `data/` klasörlerinizi yedekleyin.
@@ -117,7 +117,7 @@ git clone https://github.com/ysfbz/PaperNx.git
 cd PaperNx
 
 # Nintendo Switch NRO ve paket derlemesi
-docker compose run --rm -e PAPERNX_RELEASE_VERSION=v0.9.2 switch bash -lc 'scripts/verify-switch.sh'
+docker compose run --rm -e PAPERNX_RELEASE_VERSION=v0.9.3 switch bash -lc 'scripts/verify-switch.sh'
 
 # Masaüstü testleri ve sanitizer doğrulamaları
 docker compose run --rm desktop bash scripts/verify-desktop.sh

@@ -8,7 +8,7 @@ export PATH="${DEVKITPRO}/portlibs/switch/bin:${PATH}"
 BUILD_DIR="${PAPERNX_MUPDF_BUILD_ROOT:-build-mupdf-switch}" \
   bash scripts/build-mupdf-switch.sh "${PAPERNX_MUPDF_PREFIX:-/work/prefix-mupdf-switch}"
 export MUPDF_PREFIX="${PAPERNX_MUPDF_PREFIX:-/work/prefix-mupdf-switch}"
-version="${PAPERNX_RELEASE_VERSION:-v0.9.2}"
+version="${PAPERNX_RELEASE_VERSION:-v0.9.3}"
 release_dir="${PAPERNX_RELEASE_DIST:-dist/${version}}"
 licenses_root="${PAPERNX_LICENSES_ROOT:-third-party-licenses}"
 receipt="$verify_root/switch-build-receipt.json"

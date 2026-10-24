@@ -23,4 +23,4 @@ Legacy `.boot`, `.boot.started`, `.boot.ok` and `.swap` markers block a new down
 
 The updater fails closed on TLS, JSON schema, URL origin, SHA-256, NRO/NACP identity and version failures. It does not disable certificate verification. Unit and local HTTPS tests exercise cancellation, interrupted transfers, invalid payloads, disk-full and staging faults; these host tests do not establish real Switch SD behavior.
 
-Automatic launcher/chainload installation is not part of v0.9.2. HBL `envSetNextLoad()` argument/RomFS/reboot recovery behavior and FAT power-loss replacement guarantees have not been proven on hardware. Updates therefore remain verified downloads followed by manual NRO replacement. Back up `books/` and `data/` before upgrading.
+Automatic launcher/chainload installation is not part of v0.9.3. HBL `envSetNextLoad()` argument/RomFS/reboot recovery behavior and FAT power-loss replacement guarantees have not been proven on hardware. Updates therefore remain verified downloads followed by manual NRO replacement. Back up `books/` and `data/` before upgrading.

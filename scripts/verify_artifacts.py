@@ -8,7 +8,7 @@ from artifact_validation import validate_assets, read_romfs, validate_elf, sourc
 from package_release import validate_nro
 
 parser = argparse.ArgumentParser(description="Validate the real Switch ELF/NRO and embedded assets")
-parser.add_argument("--version", default="0.9.2")
+parser.add_argument("--version", default="0.9.3")
 parser.add_argument("--elf", type=Path, default=Path("PaperNX.elf"))
 parser.add_argument("--nro", type=Path, default=Path("PaperNX.nro"))
 parser.add_argument("--output", type=Path, default=Path("verification/artifacts.json"))

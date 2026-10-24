@@ -5,18 +5,20 @@ All notable changes to **PaperNX** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] — post-v0.9.2 fixes (not yet built, tested or published)
+## [0.9.3] - 2026-10-25 (release verification in progress)
 
 ### Reader and theme recovery
 - Restored a unified default application palette that follows the global reading theme while keeping optional Dark/Light interface overrides and seven custom accent colors.
-- Aligned the Turkish paper-preset labels with the actual ten preset identities, and restored v0.9.1-style controller selection/focus behaviour.
-- Added a nonblocking comic-geometry lookup fed by independent background decoding; unknown dimensions are conservatively paired only after discovery.
-- Primed the restored comic page and immediate neighbour on open, expanded direction-aware prefetching with a bounded ZIP-only reverse neighbour, and removed the routine centre-screen “Preparing page” overlay.
-- Retained the existing bounded texture cache, page-curl path, document-scoped controls, and archived format support in source. Physical Switch behaviour has **not** been validated.
+- Aligned the Turkish paper-preset labels with the actual ten preset identities, and restored controller selection/focus behaviour.
+- Kept comic geometry lookup off the interface thread; unknown dimensions are conservatively paired only after background discovery.
+- Restored the current comic page and immediate neighbour on open, bounded direction-aware prefetching, and removed the routine centre-screen “Preparing page” overlay while preserving visible broken-page errors.
+- Preserved the bounded texture cache, page curl, continuous comic, RTL manga, zoom/pan, and supported CBZ/CBR RAR4/RAR5/solid archive paths.
+- Migrated ambiguous v0.9.2 Dark/Purple defaults toward Follow Reading Theme / Theme accent. The old stored format cannot distinguish an untouched default from an explicit matching choice; physical Switch behavior remains unverified.
 
-### Pending before v0.9.3 release
-- Focused regressions, RAR4/RAR5/solid RAR and CBZ performance measurements, memory and controller acceptance checks, native Switch build/NRO validation, version consistency, source identity, packaging hashes and publication.
-- The current shipping binary and download links remain **v0.9.2** until a new tested release is published.
+### Verification status
+- Host C++ build and full CTest: **PASS — 32/32** (Docker, SDL software renderer, pinned MuPDF 1.23.11).
+- Switch AArch64 build, NRO/NACP checks, release ZIPs and hashes: pending.
+- Physical Switch acceptance: **UNVERIFIED**.
 
 ## [0.9.2] - 2026-10-24
 

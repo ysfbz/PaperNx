@@ -13,8 +13,8 @@ if not __debug__:
     raise RuntimeError("Artifact checks require enabled assertions")
 
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument("--dist", type=Path, default=Path("dist/v0.9.2"))
-parser.add_argument("--version", default="v0.9.2")
+parser.add_argument("--dist", type=Path, default=Path("dist/v0.9.3"))
+parser.add_argument("--version", default="v0.9.3")
 parser.add_argument("--licenses-root", type=Path, default=Path("third-party-licenses"))
 parser.add_argument("--nro", type=Path, default=Path("PaperNX.nro"))
 parser.add_argument("--elf", type=Path, default=Path("PaperNX.elf"))

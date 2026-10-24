@@ -185,8 +185,8 @@ def package(nro_path: Path, destination: Path, version: str, repo_root: Path = N
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Package PaperNX release ZIP for Nintendo Switch")
     parser.add_argument("nro", type=Path, help="Path to compiled PaperNX.nro")
-    parser.add_argument("--destination", "--dist", type=Path, default=Path("dist/v0.9.2"), help="Output directory")
-    parser.add_argument("--version", default="v0.9.2", help="Release version tag")
+    parser.add_argument("--destination", "--dist", type=Path, default=Path("dist/v0.9.3"), help="Output directory")
+    parser.add_argument("--version", default="v0.9.3", help="Release version tag")
     parser.add_argument("--build-receipt", type=Path, help="Validate pre/post-build source and NRO hash against this receipt")
     parser.add_argument("--repo-root", type=Path, default=Path("."), help="Path to repository root")
     parser.add_argument("--licenses-root", type=Path, help="Staged third-party notices directory")

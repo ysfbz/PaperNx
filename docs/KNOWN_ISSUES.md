@@ -1,10 +1,10 @@
-# PaperNX v0.9.2 — Known limitations
+# PaperNX v0.9.3 — Known limitations
 
 These are known scope or platform limits, not claims of failures observed in the release.
 
 ## Switch hardware and installation
 
-- Broad v0.9.2 acceptance on a physical Nintendo Switch has not been completed. Touch feel, Joy-Con reconnect, sleep/resume, portrait mapping, system brightness, SD durability, real GPU frame time and device memory remain **UNVERIFIED**. See the [physical test plan](DEVICE_TEST_PLAN.md).
+- Broad v0.9.3 acceptance on a physical Nintendo Switch has not been completed. Touch feel, Joy-Con reconnect, sleep/resume, portrait mapping, system brightness, SD durability, real GPU frame time and device memory remain **UNVERIFIED**. See the [physical test plan](DEVICE_TEST_PLAN.md).
 - Updates are downloaded, verified and staged; the user manually replaces the NRO. No automatic launcher/chainload install or power-loss-safe replacement is provided. Keep a known-good NRO and back up `books/` and `data/` before updating. See [updater behavior](UPDATER.md).
 - First startup and cover-cache behavior for very large libraries varies with the document mix, console and SD card. Desktop software-renderer measurements are not Switch performance guarantees.
 - Sudden power loss or SD-card failure can still lose unsaved data despite temporary writes and recovery copies.
