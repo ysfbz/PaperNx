@@ -18,9 +18,21 @@ struct Release {
     bool draft{}, prerelease{};
 };
 
-class Parser {
+// Layering (syntax -> schema -> policy), all bounded and exception-free:
+//  * JsonCursor: RFC 8259 tokens only (UTF-8, escapes/surrogates, duplicate keys, depth/node caps).
+//  * ReleaseDecoder<Policy>: GitHub release schema (types, null rules, integer sizes).
+//  * PaperNxAssetPolicy: which assets matter and how duplicates are treated (trust decisions).
+// Origin/SemVer/installability decisions stay in selectUpdateRelease (self_update.cpp).
+struct Limits {
+    static constexpr std::size_t maxInput = 4 * 1024 * 1024, maxNodes = 150000;
+    static constexpr int maxDepth = 24;
+};
+
+class JsonCursor {
+protected:
     const std::string &input_;
     std::size_t pos_{}, nodes_{};
+    explicit JsonCursor(const std::string &input) : input_(input) {}
 
     static bool validUtf8(const std::string &text) {
         for (std::size_t i = 0; i < text.size();) {
@@ -59,7 +71,7 @@ class Parser {
         ++pos_;
         return true;
     }
-    bool account(int depth) { space(); return depth <= 24 && ++nodes_ <= 150000 && pos_ < input_.size(); }
+    bool account(int depth) { space(); return depth <= Limits::maxDepth && ++nodes_ <= Limits::maxNodes && pos_ < input_.size(); }
     static void appendUtf8(std::string &out, unsigned value) {
         if (value < 0x80) out.push_back(char(value));
         else if (value < 0x800) { out.push_back(char(0xc0 | (value >> 6))); out.push_back(char(0x80 | (value & 63))); }
@@ -171,6 +183,20 @@ class Parser {
         if (literal("false")) { out = false; return true; }
         return false;
     }
+};
+
+// Only the exact installer and checksum assets are retained; a repeated name is kept once and
+// its URL cleared so selectUpdateRelease rejects the ambiguous release (fail closed).
+struct PaperNxAssetPolicy {
+    static void accept(std::vector<Asset> &assets, Asset asset) {
+        if (asset.name != "PaperNX.nro" && asset.name != "PaperNX.nro.sha256") return;
+        for (auto &existing : assets) if (existing.name == asset.name) { existing.url.clear(); return; }
+        assets.push_back(std::move(asset));
+    }
+};
+
+template <class Policy>
+class ReleaseDecoder : JsonCursor {
     bool assetArray(std::vector<Asset> &assets, int depth) {
         if (!account(depth)) return false;
         if (input_[pos_] != '[') return literal("null");
@@ -182,13 +208,7 @@ class Parser {
             if (input_[pos_] == '{') {
                 Asset asset;
                 if (!assetObject(asset, depth + 1)) return false;
-                if (asset.name == "PaperNX.nro" || asset.name == "PaperNX.nro.sha256") {
-                    auto existing = assets.end();
-                    for (auto it = assets.begin(); it != assets.end(); ++it)
-                        if (it->name == asset.name) { existing = it; break; }
-                    if (existing == assets.end()) assets.push_back(std::move(asset));
-                    else existing->url.clear();
-                }
+                Policy::accept(assets, std::move(asset));
             } else if (!skipValue(depth + 1)) return false;
             if (take(']')) return true;
         } while (take(','));
@@ -245,10 +265,10 @@ class Parser {
     }
 
 public:
-    explicit Parser(const std::string &input) : input_(input) {}
+    explicit ReleaseDecoder(const std::string &input) : JsonCursor(input) {}
     bool parse(std::vector<Release> &releases) {
         releases.clear();
-        if (input_.size() > 4 * 1024 * 1024 || !validUtf8(input_) || !account(0) || !take('[')) return false;
+        if (input_.size() > Limits::maxInput || !validUtf8(input_) || !account(0) || !take('[')) return false;
         if (!take(']')) {
             do {
                 Release release;
@@ -263,4 +283,5 @@ public:
         return pos_ == input_.size();
     }
 };
+using Parser = ReleaseDecoder<PaperNxAssetPolicy>;
 } // namespace papernx::update_json
