@@ -85,6 +85,7 @@ std::string documentId(const std::string &path, std::uintmax_t size);
 std::string defaultTitle(const fs::path &path);
 std::vector<Book> scan(const fs::path &root, std::size_t maxBooks = 10000,
                        const std::function<bool()> &cancelled = {});
+// `complete` is false when a root fails or the limit truncates any configured root.
 std::vector<Book> scanRoots(const std::vector<fs::path> &roots, std::size_t maxBooks = 10000,
                             const std::function<bool()> &cancelled = {}, bool *complete = nullptr);
 

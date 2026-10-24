@@ -80,6 +80,8 @@ int main() {
     // Bidirectional / error messages
     assert(localizeUiText("Settings could not be saved",0)=="Ayarlar kaydedilemedi");
     assert(localizeUiText("Library folder unavailable",0)=="Kitap klasörüne erişilemiyor");
+    assert(localizeUiText("Library scan incomplete",0)=="Kitaplık taraması tamamlanamadı");
+    assert(localizeUiText("Kitaplık taraması tamamlanamadı",1)=="Library scan incomplete");
     assert(localizeUiText("Kitap klasörüne erişilemiyor",1)=="Library folder unavailable");
     assert(localizeUiText("Settings could not be saved",1)=="Settings could not be saved");
     assert(localizeUiText("Ayarlar kaydedilemedi",1)=="Settings could not be saved");

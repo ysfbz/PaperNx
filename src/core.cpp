@@ -323,6 +323,7 @@ void scanInto(const fs::path &root, std::size_t maxBooks, const std::function<bo
         it.increment(ec);
         if (ec) { fail(); break; }
     }
+    if (complete && it != end && books.size() >= maxBooks) *complete = false;
 }
 
 std::size_t pathDepth(const fs::path &path) {
@@ -379,8 +380,13 @@ std::vector<Book> scanRoots(const std::vector<fs::path> &roots, std::size_t maxB
     }
 
     std::vector<Book> books;
-    for (const auto &root : uniqueRoots) {
-        if ((cancelled && cancelled()) || books.size() >= maxBooks) break;
+    for (std::size_t i = 0; i < uniqueRoots.size(); ++i) {
+        if (cancelled && cancelled()) break;
+        if (books.size() >= maxBooks) {
+            if (complete) *complete = false;
+            break;
+        }
+        const auto &root = uniqueRoots[i];
         scanInto(root, maxBooks, cancelled, books, complete);
     }
     std::sort(books.begin(), books.end(), [](const Book &a, const Book &b) {

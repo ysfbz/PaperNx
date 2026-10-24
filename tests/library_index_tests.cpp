@@ -23,6 +23,9 @@ int main() {
     assert(!scanner.start({}, {}, inventory));auto first=wait(scanner);assert(first.complete && first.cached && first.error.empty() && first.books.size()==300);
     assert(scanRoots({root/"books"/"nested",root/"books",root/"books"}).size()==300);
     bool rootsComplete=true;assert(scanRoots({root/"books",root/"missing-root"},100,{},&rootsComplete).size()==100 && !rootsComplete);
+    bool limitComplete=true;assert(scanRoots({root/"books"},5,{},&limitComplete).size()==5 && !limitComplete);
+    bool exactLimitComplete=false;assert(scanRoots({root/"books"/"nested"},300,{},&exactLimitComplete).size()==300 && exactLimitComplete);
+    bool multiLimitComplete=true;assert(scanRoots({root/"books"/"nested",unicodeRoot},300,{},&multiLimitComplete).size()==300 && !multiLimitComplete);
     const auto unicodeBooks=scan(unicodeRoot);
     assert(unicodeBooks.size()==1 && unicodeBooks.front().path==unicodeBook.u8string() &&
            unicodeBooks.front().title==unicodeBook.stem().u8string());

@@ -40,7 +40,7 @@ bool LibraryScanner::start(std::vector<fs::path> roots,std::vector<Book> known,f
             bool scanComplete=true;
             for(auto &book:scanRoots(roots,10000,[this]{return cancel_.load();},&scanComplete))add(std::move(book));
             if(!scanComplete) {
-                result.error="Library folder unavailable";result.cancelled=cancel_.load();
+                result.error="Library scan incomplete";result.cancelled=cancel_.load();
                 result_=std::move(result);ready_.store(true);return;
             }
             // Independently opened files remain available. Missing source files
