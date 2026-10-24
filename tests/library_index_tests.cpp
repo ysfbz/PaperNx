@@ -69,6 +69,18 @@ int main() {
     const auto brokenMarkerInventory=root/"data"/"broken-marker-inventory.txt";ProgressStore brokenMarkerIndex(brokenMarkerInventory);
     brokenMarkerIndex.put("libraryindex0001",Progress{});brokenMarkerIndex.put(unicodeResult.books.front().id,legacyRecord);
     assert(brokenMarkerIndex.save() && loadLibraryInventory(brokenMarkerInventory).empty());
+    const auto validationRoot=root/"inventory-validation";fs::create_directories(validationRoot);
+    const auto keepFile=validationRoot/"keep.cbz",changedFile=validationRoot/"changed.cbz",missingFile=validationRoot/"missing.cbz";
+    const auto outsideFile=root/"outside.cbz";
+    std::ofstream(keepFile)<<"keep";std::ofstream(changedFile)<<"old";std::ofstream(missingFile)<<"gone";std::ofstream(outsideFile)<<"outside";
+    const auto validationInventory=root/"data"/"validated-inventory.txt";LibraryScanner validationScanner;
+    assert(validationScanner.start({validationRoot},{},validationInventory));
+    const auto validation=wait(validationScanner);assert(validation.complete && validation.cached && validation.books.size()==3);
+    std::ofstream(changedFile,std::ios::trunc)<<"changed size";fs::remove(missingFile);
+    std::error_code symlinkError;fs::create_symlink(outsideFile,missingFile,symlinkError);
+    assert(!symlinkError);
+    const auto validatedInventory=loadLibraryInventory(validationInventory);
+    assert(validatedInventory.size()==1 && validatedInventory.front().path==keepFile.u8string());
     assert(scanRoots({root/"books"},5).size()==5);
     auto cached=loadLibraryInventory(inventory);assert(cached.size()==300);
     auto inventoryBytes=[&]{std::ifstream in(inventory,std::ios::binary);return std::string(std::istreambuf_iterator<char>(in),{});};

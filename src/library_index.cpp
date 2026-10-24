@@ -22,8 +22,15 @@ std::vector<Book> loadLibraryInventory(const fs::path &path) {
         if(p.bookPath.empty() || p.bookAuthor.empty())continue;
         std::uintmax_t size=0;const auto parsed=std::from_chars(p.bookAuthor.data(),p.bookAuthor.data()+p.bookAuthor.size(),size);
         if(parsed.ec!=std::errc{} || parsed.ptr!=p.bookAuthor.data()+p.bookAuthor.size() || documentId(p.bookPath,size)!=id)continue;
-        const auto type=detectFormat(fs::u8path(p.bookPath));if(type==Format::Unsupported)continue;
+        const auto path=fs::u8path(p.bookPath);std::error_code ec;
+        const auto status=fs::symlink_status(path,ec);
+        if(ec || fs::is_symlink(status) || !fs::is_regular_file(status))continue;
+        const auto actualSize=fs::file_size(path,ec);
+        if(ec || actualSize!=size)continue;
+        const auto type=detectFormat(path);if(type==Format::Unsupported)continue;
         Book b;b.id=id;b.path=p.bookPath;b.bytes=size;b.title=p.bookTitle;b.modified=p.lastRead;b.format=type;
+        const auto stamp=fs::last_write_time(path,ec);
+        if(!ec)b.modified=std::chrono::duration_cast<std::chrono::seconds>(stamp.time_since_epoch()).count();
         books.push_back(std::move(b));if(books.size()==10000)break;
     }
     return books;
