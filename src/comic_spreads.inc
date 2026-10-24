@@ -31,6 +31,18 @@ std::pair<int,int> comicSpreadPages(int page) {
         comicWidePage(page) || comicWidePage(page+1)?1:2;
     comicGroups_[page]=count;return {page,count};
 }
+// Spread navigation may proceed only when both candidate headers are known.
+// Otherwise a cold neighbour could appear single, commit a turn, and later
+// merge into a pair after the asynchronous header decode completes.
+bool comicSpreadGeometryReady(int page) {
+    if(!comicSpreadActive())return true;
+    if(page<0 || page>=pageCount_)return false;
+    float w=0,h=0;
+    if(!readerPageSize(page,&w,&h))return false;
+    if(px_document_page_is_spread(doc_,page) || (h>0 && w/h>=1.2f) || page+1>=pageCount_)
+        return true;
+    return readerPageSize(page+1,&w,&h);
+}
 int comicTurnTarget(int page,int steps) {
     auto group=comicSpreadPages(page);int target=group.first;
     const int direction=steps>0?1:-1;
