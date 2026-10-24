@@ -703,6 +703,11 @@ SelfUpdater::BootRecovery SelfUpdater::prepareBoot(std::string &error) {
     const auto started = std::filesystem::path(executable_.string() + ".boot.started");
     const auto confirmed = std::filesystem::path(executable_.string() + ".boot.ok");
     if (pathExists(confirmed)) {
+        // Never drop the only known-good backup while the canonical NRO is absent.
+        if (!pathExists(executable_) && pathExists(executable_.string() + ".old")) {
+            error = "PaperNX.nro is missing; restore the retained .old backup manually";
+            return BootRecovery::Error;
+        }
         if (pathExists(executable_.string() + ".old") && std::remove((executable_.string() + ".old").c_str()) != 0) {
             error = "Update started, but the old NRO backup could not be cleaned up";
             return BootRecovery::Error;

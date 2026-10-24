@@ -121,7 +121,7 @@ void renderUpdateDialog(int w,int h,const ThemePalette &pal) {
         else if(s.state==UpdateState::Downloading)text=ui::label("Downloading update...")+" "+std::to_string(s.percent)+"%";
         else if(s.state==UpdateState::Current)text=ui::label("You are on the latest version")+"\n\n"+APP_VERSION_FULL;
         else if(s.state==UpdateState::Error)text=ui::label("Could not update PaperNX")+"\n\n"+ui::label(s.error);
-        else if(s.state==UpdateState::Ready)text=ui::label("Update verified and saved as PaperNX.nro.new.")+"\n\n"+
+        else if(s.state==UpdateState::Ready)text=ui::label("Update downloaded and verified as PaperNX.nro.new. Manual installation required; PaperNX has not been replaced.")+"\n\n"+
             ui::label("Close PaperNX, then use a file manager to replace PaperNX.nro with PaperNX.nro.new.")+"\n\n"+
             ui::label("Update folder")+": "+updater_->executable().parent_path().string();
         else if(s.state==UpdateState::Cancelled)text=ui::label("Update cancelled");
