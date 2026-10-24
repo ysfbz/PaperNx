@@ -288,3 +288,10 @@ The verified/pushed branch HEAD at the start of this note was `ed9e3b69c184de1b4
 - **Command/result:** `docker compose run --rm switch bash -lc 'export MUPDF_PREFIX=/work/prefix-mupdf-switch; make all -j4 && python3 scripts/verify_artifacts.py --version 0.9.1'` — **PASS**. AArch64 ELF linked, NRO built, artifact verifier passed; RomFS CA contains 118 certs / 200,116 bytes and required fonts/icon.
 - **NRO:** 49,588,671 bytes; SHA-256 `05e30b184819bc0825e7f737ddceb5366d97d6c2e6f20d3a6cac1be78857515f`. NACP remains 0.9.1. This is a local validation artifact, not a release.
 - **Remaining:** physical Switch TLS/Joy-Con/backlight/SD behavior; full native CTest and sanitizer; real cover benchmark; open G5 architecture/Ponytail audit. Continue from G5; do not run Actions or publish. Overall **INCOMPLETE — BLOCKERS REMAIN**.
+
+## 2026-10-24 — G6 fixture-backed cover cache workload
+
+- **Test commit:** `e5111fc` adds a CMake benchmark target that opens real EPUB/PDF/CBZ/RAR4 CBR fixture copies at 100/500/1,000 entries, renders covers, and measures a cold fill plus a warm sequential pass. Target build/direct benchmark ran three times; CTest **1/1 PASS** (19.85 sec).
+- **Observed:** 100 copies warm-hit 100/100; 500 copies retain 393 cache entries and warm-hit 145–156; 1,000 copies retain the same 393 entries but all three sequential warm passes miss/reopen all 1,000. Exact median/p95 values and test limits are in `docs/V092_COVER_BENCHMARK.md`.
+- **Interpretation:** Fixture contents repeat across paths, the test bypasses SDL/UI queue and does not represent Switch storage or a real diverse library. It reveals sequential scan cache thrash above the current 32 MiB working-set capacity, but is not a speedup or production scrolling result. Keep cache caps unchanged pending viewport/physical measurements; `COVER-01` not passed.
+- **Next:** continue G5 source architecture/Ponytail work and investigate cache admission/visible-queue behavior only with an app-level regression design. Full native CTest, sanitizer and physical hardware remain open; overall **INCOMPLETE — BLOCKERS REMAIN**.

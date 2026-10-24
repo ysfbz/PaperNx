@@ -327,3 +327,9 @@ The targeted desktop build of `papernx_library_index_tests` passed; CTest passed
 ## Switch source/link and CA artifact check — `96a10c2`
 
 Command `docker compose run --rm switch bash -lc 'export MUPDF_PREFIX=/work/prefix-mupdf-switch; make all -j4 && python3 scripts/verify_artifacts.py --version 0.9.1'` passed at HEAD `96a10c2e352370383808755badfbb54d15597f16`, with application source from `761f9b9`. It linked the AArch64 ELF, produced the NRO and verified RomFS CA/fonts/icon. The bundle contains 118 certs / 200,116 bytes. NRO: 49,588,671 bytes, SHA-256 `05e30b184819bc0825e7f737ddceb5366d97d6c2e6f20d3a6cac1be78857515f`. No package/release was created; physical device and full native/sanitizer tests remain unverified/not run.
+
+## G6 fixture-backed cover decode/cache benchmark — `e5111fc`
+
+`tests/cover_document_benchmark.cpp` builds 100/500/1,000 path-distinct entries from real EPUB, PDF, CBZ and RAR4 CBR fixtures, runs a cold open/metadata-on-same-handle/thumbnail/cache-write pass, then reloads the disk cache and repeats a sequential warm pass with miss decode/write. The CMake target built and ran three times; its CTest registration passed **1/1** in **19.85 seconds**.
+
+Median/p95 warm full-pass times: 100 copies **94/96 ms** with 100 hits; 500 copies **1,659/1,946 ms** with 145–156 hits and 344–355 misses; 1,000 copies **4,411/5,010 ms** with 0 hits and 1,000 misses in every run. Cache retained 393 entries / 33,502,728 bytes at 500/1,000, within the current 32 MiB budget. This sequential fixture workload exposes cache thrash when the working set exceeds the disk budget; it is not the viewport-driven app queue or a speedup comparison. Four source contents repeat, and SDL, Switch SD, memory high-water, and catalog reopen were not measured. `COVER-01` remains **NOT PASSED**; see [`V092_COVER_BENCHMARK.md`](V092_COVER_BENCHMARK.md).

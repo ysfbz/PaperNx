@@ -26,3 +26,21 @@ The 32 MiB byte budget is the active limit for these samples: one stored thumbna
 ## Still unverified
 
 This run does not satisfy the requested 100/500/1000 real-document workload. Actual cold/warm decode time, first visible cover, scroll-fill latency, archive opens, metadata reopens, repeated decode count, upload queue delay, texture/RAM use, UI frame time, baseline comparison, and physical Switch SD performance were not measured. `COVER-01` and any cover speedup claim remain **UNVERIFIED**.
+
+## Fixture-backed document decode workload — 2026-10-24
+
+**Status:** exploratory host measurement; `COVER-01` remains **NOT PASSED**.
+
+Added `tests/cover_document_benchmark.cpp`, registered as `papernx_cover_document_benchmark`. Each workload cycles through the real `sample_book.epub`, `sample_doc.pdf`, `comics/sample.cbz`, and `comics/sample-rar4.cbr` fixtures, copying those four documents to distinct paths until the set reaches 100, 500, or 1,000 entries. Each path gets its own cache identity. The cold pass opens each document, reads title/author from that same handle, renders a thumbnail and writes it through `CoverRepository`; the warm pass reloads the disk index and follows cache read → decode/write on misses, as the app does.
+
+The benchmark was executed three times in the desktop Docker environment; all three exited successfully. The CTest registration also passed **1/1** in **19.85 seconds**. Times below are median / nearest-rank p95 (the maximum for three runs):
+
+| Fixture copies | Cold first cover (ms) | Cold fill (ms) | Warm first cover (ms) | Warm full pass (ms) | Warm hits / misses per run | Retained cache |
+|---:|---:|---:|---:|---:|---|---:|
+| 100 | 25 / 25 | 521 / 640 | 2 / 2 | 94 / 96 | 100 / 0; 100 / 0; 100 / 0 | 100 / 8,526,350 bytes |
+| 500 | 7 / 10 | 2,264 / 2,511 | 14 / 15 | 1,659 / 1,946 | 147 / 353; 156 / 344; 145 / 355 | 393 / 33,502,728 bytes |
+| 1,000 | 11 / 15 | 4,761 / 5,831 | 12 / 13 | 4,411 / 5,010 | 0 / 1,000; 0 / 1,000; 0 / 1,000 | 393 / 33,502,728 bytes |
+
+The 32 MiB cap is active at 500 and 1,000 copies; the 512-entry cap is not. In this sequential full-library walk, cache misses evict later entries before the scan reaches them, resulting in repeated document opens at 1,000 items. This is useful evidence of the current budget's limit under this workload; it does not prove the same hit rate for PaperNX's viewport-driven SDL queue.
+
+**Limits:** These are four repeated fixture contents, not 1,000 distinct user books. The harness does not instantiate `PaperNxApp`, measure SDL queue wait/texture upload/frame time, or reproduce interactive scrolling. Cold title/author reads share the thumbnail document handle; the warm pass assumes metadata is already persisted and therefore does not measure catalog metadata-only reopen. It measures no Switch SD latency, memory high-water, solid-RAR decode cost, or before/after improvement. MuPDF emitted an `unknown epub version: 3.0` warning for EPUB fixture opens; the process and CTest still passed. Do not claim a speedup or mark `COVER-01` complete from these figures.
