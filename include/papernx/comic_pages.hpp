@@ -112,6 +112,17 @@ public:
         std::lock_guard<std::mutex> lock(mutex_);
         return active_ || !queue_.empty() || !results_.empty();
     }
+    // A fast direction change invalidates queued guesses, but never cancels
+    // a visible/turn target or tears down the worker's solid-RAR cursor.
+    void discardQueuedSpeculative() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        for(auto it=queue_.begin();it!=queue_.end();) {
+            if(it->priority==Priority::SpeculativeForward) {
+                requested_.erase({it->page,it->detail});
+                it=queue_.erase(it);
+            } else ++it;
+        }
+    }
     void clear() { configure({}); }
     void setSuspended(bool suspended) {
         std::lock_guard<std::mutex> lock(mutex_);
