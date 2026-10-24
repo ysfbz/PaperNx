@@ -180,3 +180,9 @@ The verified/pushed branch HEAD at the start of this note was `ed9e3b69c184de1b4
 - **Command:** `docker compose run --rm desktop bash -lc 'cmake --build build-desktop --target papernx_comic_performance_tests --parallel 4 && ctest --test-dir build-desktop --output-on-failure -R "^papernx_comic_performance_tests$"'` — build PASS; CTest **1/1 PASS**, 32.91 seconds.
 - `build-desktop/Testing/Temporary/LastTest.log` records idle 1/3/10/30 seconds with open/close counts `2/1`; suspend closes the document, resume opens one replacement, and stop ends at `3/3`. Four idle/toolbar render cycles: 54 ms and 0 UI rasterizations; 30 curl frames: 499 ms and 0 UI rasterizations; 30 spread-pan frames: 199 ms and 0 UI rasterizations.
 - This is a desktop software-renderer fixture, with no baseline comparison and no Switch FPS/RAM measurement. The 37-page RAR5 test, full native suite, sanitizers and physical Switch remain separate gates.
+
+## 2026-10-24 G12 large RAR5 and solid-format tests
+
+- The direct large-fixture run `docker compose run --rm desktop bash -lc 'SDL_VIDEODRIVER=dummy build-desktop/papernx_comic_performance_tests tests/fixtures/comics/performance-37.cbr'` **PASS**. The existing 43,484,977-byte, 37-page fixture is RAR5 stored method, not solid; its SHA-256 remained unchanged (`EB9EF2C91FEF3AED592F4A14EBF4524BAC13548E94D1BB9C717ED2B8E79B0E5A`). Timings and limits are in [`V092_COMIC_PERFORMANCE.md`](V092_COMIC_PERFORMANCE.md).
+- `docker compose run --rm desktop bash -lc 'cmake --build build-desktop --target papernx_comic_document_tests --parallel 4 && ctest --test-dir build-desktop --output-on-failure -R "^papernx_comic_document_tests$"'` — build PASS; CTest **1/1 PASS**, 1.25 seconds. Existing small RAR4/RAR5 solid and random-access cases pass.
+- No large solid archive performance/decode-count result, baseline, Switch timing/RAM or hardware result is claimed. Full native suite remains open.

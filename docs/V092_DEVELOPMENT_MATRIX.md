@@ -62,6 +62,12 @@
 - `LastTest.log` records stable worker counts over 30 seconds idle (`opens=2, closes=1`), close on suspend, reopen on resume, and balanced stop (`3/3`). UI texture rasterization remained zero in four idle/toolbar cycles, 30 curl frames and 30 spread-pan frames.
 - Host software-renderer timings were 54 ms, 499 ms and 199 ms respectively. These are not before/after comparisons and do not establish Switch performance gains. Full CTest, RAR5-specific run, sanitizers and hardware remain open.
 
+## 2026-10-24 — G12 large RAR5 and solid fixture coverage
+
+- Direct `papernx_comic_performance_tests tests/fixtures/comics/performance-37.cbr` run **PASS** on the 37-page, 43,484,977-byte RAR5 stored-method fixture. Four idle/toolbar cycles took 43 ms; 30 curl frames 347 ms; 30 spread-pan frames 154 ms; rasterizations were zero in all loops. Worker counts stayed `2/1` through 30 seconds idle and finished `3/3` after suspend/resume/stop.
+- `papernx_comic_document_tests` build and CTest **1/1 PASS** in 1.25 seconds, including the existing RAR4/RAR5 solid and random-access fixtures.
+- Fixture identity before/after was unchanged. Full run details, commands and limits are in [`V092_COMIC_PERFORMANCE.md`](V092_COMIC_PERFORMANCE.md). No before/after improvement or large solid-RAR speed claim is made; full CTest and physical Switch performance remain open.
+
 ---
 
 ## G. 2026-10-23 final hardening audit — current source of truth

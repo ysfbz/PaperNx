@@ -457,3 +457,18 @@ G10 değişikliği önceden var olan PaperNX `core.cpp/core.hpp` koduna aittir; 
 | 37 sayfalı gerçek RAR5 fixture, full native CTest, ASan/UBSan, Switch FPS/RAM, fiziksel cihaz | **NOT RUN / UNVERIFIED** | Ayrı test/gate olarak açık. Bu host ölçümünden performans kazanımı iddiası çıkarılmıyor. |
 
 Bu checkpoint `ComicPages` worker lifecycle ve test edilebilirlik kapsamını güçlendiriyor; 11 özelliğin tamamı için final kabul anlamına gelmiyor. Genel karar **INCOMPLETE — BLOCKERS REMAIN**.
+
+## W. 2026-10-24 — G12: Büyük RAR5 reader ve solid-format regresyonları
+
+- **Kaynak:** `1daedb63246384a73afb979978230f75716c2165`; bu testler yeni üretim kaynak kodu değiştirmedi. Ayrıntılı kayıt [`docs/V092_COMIC_PERFORMANCE.md`](docs/V092_COMIC_PERFORMANCE.md).
+- **Büyük fixture:** `tests/fixtures/comics/performance-37.cbr`, 43.484.977 bayt / 37 sayfa / RAR5 stored yöntemi. Bu solid RAR değildir. Dosyanın SHA-256 değeri test öncesi/sonrası aynı: `EB9EF2C91FEF3AED592F4A14EBF4524BAC13548E94D1BB9C717ED2B8E79B0E5A`.
+- Doğrudan `papernx_comic_performance_tests ...performance-37.cbr` koşusu **PASS**. Dört idle/toolbar döngüsü 43 ms; 30 curl frame 347 ms; 30 spread-pan frame 154 ms; her ölçümde UI rasterizasyonu 0. Worker 30 sn idle boyunca `2 açılış / 1 kapanış` kaldı; suspend/resume/stop sonunda `3/3`.
+- `papernx_comic_document_tests` yeniden derlendi ve CTest **1/1 PASS** (1,25 sn); küçük RAR4/RAR5 solid, random-access, bozuk/şifreli/split arşiv ve concurrency testleri içeriyor.
+
+| Kontrol | Sonuç | Kanıt |
+|---|---|---|
+| Büyük stored RAR5 reader/worker yolu | **PASS, doğrudan test** | Yukarıdaki komut; fixture hash’i korunmuş. |
+| Küçük RAR4/RAR5 solid ve random access | **PASS, 1/1** | `papernx_comic_document_tests`, CTest günlüğü. |
+| Büyük solid-RAR decode sayacı, önce/sonra baseline, median/p95, Switch FPS/RAM ve SD | **NOT RUN / UNVERIFIED** | Mevcut test bu ölçümleri üretmiyor. |
+
+Bu tek koşu yazılım renderer’ı host ölçümüdür; hızlanma iddiası değildir. Genel durum **INCOMPLETE — BLOCKERS REMAIN**.
