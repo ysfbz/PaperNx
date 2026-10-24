@@ -30,6 +30,13 @@ int main() {
     assert(scan(deepRoot,100,{},&legacyScanComplete).size()==1&&!legacyScanComplete);
     bool rootsScanComplete=true;
     assert(scanRoots({deepRoot},100,{},&rootsScanComplete).size()==1&&!rootsScanComplete);
+    const auto capRoot=root/"book-limit";fs::create_directories(capRoot);
+    for(int i=0;i<10000;++i){std::ofstream file(capRoot/("book-"+std::to_string(i)+".cbz"));}
+    bool exactBookCapComplete=false;
+    assert(scanRoots({capRoot},10000,{},&exactBookCapComplete).size()==10000&&exactBookCapComplete);
+    {std::ofstream extra(capRoot/"book-10000.cbz");}
+    bool exceededBookCapComplete=true;
+    assert(scanRoots({capRoot},10000,{},&exceededBookCapComplete).size()==10000&&!exceededBookCapComplete);
     assert(scanner.start({root/"books"/"nested",root/"books",root/"books"}, {}, inventory));
     assert(!scanner.start({}, {}, inventory));auto first=wait(scanner);assert(first.complete && first.cached && first.error.empty() && first.books.size()==300);
     assert(scanRoots({root/"books"/"nested",root/"books",root/"books"}).size()==300);
