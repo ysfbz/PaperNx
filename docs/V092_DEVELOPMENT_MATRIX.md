@@ -377,3 +377,9 @@ The current Switch command `docker compose run --rm switch bash -lc 'export MUPD
 The version parser now allows numeric identifiers with leading zeroes in `+build.metadata`, while still rejecting them in core and numeric prerelease identifiers. An assertion verifies `0.14.0+switch.001` is accepted as newer than `0.13.99`; existing invalid prerelease cases remain.
 
 Desktop updater unit/local HTTPS CTest passed **2/2** (2.50 sec); targeted ASan/UBSan updater unit/local HTTPS CTest passed **2/2** (4.17 sec). Current-source Switch AArch64 ELF/NRO and RomFS verifier passed: 118 CA certificates / 200,116 bytes, NRO 49,588,671 bytes, SHA-256 `8628c1b369400bb2939c3a6f23665165eb6bc228981ce4d72c5ffe5aabcd8215`. Hardware remains **UNVERIFIED**; full native tests remain open.
+
+## Comic worker and reader input regression checkpoint — `0d0f92b` source `0ecc2e3`
+
+The focused comic performance test rebuilt and passed **1/1** in **33.06 sec**. It verifies the worker retains its open document while idle, releases it on suspend, reopens after resume, and closes it on stop.
+
+The focused native set `papernx_library_index_tests`, `papernx_core_tests`, `papernx_reader_input_tests`, and `papernx_reader_spread_tests` rebuilt and passed **4/4** in **55.94 sec**. SDL `SDL_CONTROLLER_BUTTON_START` and touch `+` use the same quick menu state in library and reader; settings defaults/migration and spread behavior were covered by this selected set. This is not a full native CTest or physical Switch result. Hardware remains **UNVERIFIED** and the overall status remains **INCOMPLETE — BLOCKERS REMAIN**.

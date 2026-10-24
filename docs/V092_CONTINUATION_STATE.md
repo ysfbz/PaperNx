@@ -351,3 +351,10 @@ The verified/pushed branch HEAD at the start of this note was `ed9e3b69c184de1b4
 - **ASan/UBSan:** rebuilt updater test target; updater unit and local HTTPS CTest passed **2/2** (4.17 sec).
 - **Switch:** AArch64 ELF/NRO and artifact verifier passed at this commit. NRO 49,588,671 bytes; SHA-256 `8628c1b369400bb2939c3a6f23665165eb6bc228981ce4d72c5ffe5aabcd8215`; CA bundle 118 certs / 200,116 bytes. Hardware **UNVERIFIED**.
 - `src/self_update.cpp` current blob is `ec3f5b922e15029b291e85877cd54374b2dbade1`; it remains fork-derived/adapted and keeps Refael Avramashvili / AGPL-3.0 provenance. Full native CTest and device acceptance remain open; overall status stays **INCOMPLETE — BLOCKERS REMAIN**.
+
+## 2026-10-24 — Comic worker and reader input checkpoint
+
+- **Current docs HEAD before this record:** `0d0f92b94945c139a13e6e790026f6de4be90325`; code under test is unchanged from source commit `0ecc2e3732c9ced80e95c09cf373fb549efa27d3`.
+- **Comic worker:** targeted `papernx_comic_performance_tests` build passed; CTest **1/1** passed in **33.06 sec**. It covers idle document retention, suspend release, resume reopen, bounded priority requests and stop cleanup.
+- **Focused regressions:** core/settings, reader input, reader spreads and library index targets built; CTest **4/4** passed in **55.94 sec**. The input test injects SDL controller START and touch events and checks the shared quick menu in library and reader.
+- **Still open:** full native CTest, full sanitizer suite, physical Joy-Con/backlight/TLS/SD acceptance, measured 100/500/1000-book cover performance, and broader scanner/index/updater redesign. No release, tag, PR, merge or Actions. Overall status **INCOMPLETE — BLOCKERS REMAIN**.
