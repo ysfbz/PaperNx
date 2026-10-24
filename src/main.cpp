@@ -4096,9 +4096,9 @@ private:
             row(10,ui::label("Scan on launch")+": "+ui::label(p.scanOnLaunch?"On":"Off"));
             row(11,ui::label(libraryScanner_.pending()?"Cancel library scan":"Scan library now"));
             const char *styles[]={"Dark","Light","Follow reading theme"};
-            const char *accents[]={"Purple","Blue","Teal","Green","Orange","Red","Pink"};
+            const char *accents[]={"Purple","Blue","Teal","Green","Orange","Red","Pink","Theme accent"};
             row(12,ui::label("Interface appearance")+": "+ui::label(styles[p.interfaceStyle]));
-            row(13,ui::label("Accent color")+": "+ui::label(accents[p.interfaceAccent]));
+            row(13,ui::label("Accent color")+": "+(p.interfaceAccent==7?catLabel("Tema vurgusu","Theme accent"):ui::label(accents[std::clamp(p.interfaceAccent,0,6)])));
             row(14,ui::label("Automatic update check")+": "+ui::label(p.automaticUpdateCheck?"On":"Off"));
             row(15,ui::label("Check for updates"));
             std::string coverLabel;
