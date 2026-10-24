@@ -410,6 +410,16 @@ int px_comic_page_size(fz_context *ctx,fz_document *document,int number,float *w
     *width=entry->width;*height=entry->height;return *width>0 && *height>0;
 }
 
+/* Pure metadata-only lookup. Unknown geometry is deliberately not decoded on
+ * the UI thread. The independent ComicPages worker fills the same memo later. */
+int px_comic_known_size(fz_document *document,int page,float *width,float *height) {
+    ComicDocument *doc=(ComicDocument *)document;
+    if(!doc || !width || !height || page<0 || page>=doc->count)return 0;
+    const ComicEntry *entry=&doc->entries[page];
+    if(!(entry->width>0 && entry->height>0))return 0;
+    *width=entry->width;*height=entry->height;return 1;
+}
+
 /* Called only by this document's owner, with geometry from an independently
  * opened worker document. Avoid archive I/O for warmed neighbouring bounds. */
 int px_comic_remember_size(fz_document *document,int page,float width,float height) {
