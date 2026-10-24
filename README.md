@@ -19,6 +19,9 @@
 
 ---
 
+> [!IMPORTANT]
+> The **unreleased source on `main`** includes recovery changes to the v0.9.2 theme and comic paging paths. These changes are **not** part of the downloadable v0.9.2 NRO and have not yet passed the native Switch/test/release gates. Use the published v0.9.2 artifacts until a validated successor is available.
+
 ## Overview
 
 **PaperNX** is a native, lightweight, and fully offline document and comic reader built specifically for the Nintendo Switch using modern C++17, C11, SDL2, and MuPDF. Designed from the ground up for comfortable handheld reading with Joy-Con controllers detached, PaperNX delivers a fluid touchscreen-first reading experience.
@@ -43,7 +46,7 @@ All books, comic archives, cover art caches, reading progress, and personal read
 - **Robust PDF Engine:** Powered by MuPDF 1.23.11 with fit-to-width, fit-to-page, touch drag-to-pan, zoom, and non-destructive document color filters (Original, Dark, Sepia, Invert).
 - **Overflow-Safe Natural Sorting:** Deterministic numeric ordering for book titles, volumes, authors, and filenames (e.g., Volume 2 before Volume 10) regardless of number length.
 - **Display Orientation & Controller Ergonomics:** Left and right analog sticks have independent deadzones and repeat rates. Trigger axes (ZL/ZR) provide smooth continuous zooming, while analog panning dynamically rotates to match portrait screen orientations. Visible on-screen "Fit page" pill restores 1.0x view instantly.
-- **Unified Paper Appearance:** Choose from nine natural paper color presets (e.g., Pure White, Warm Book, Classic Sepia, Cream, Charcoal, Midnight Dark). The library, navigation chrome, menus, and comic viewport surround share a coordinated palette.
+- **Unified Paper Appearance:** Choose from ten paper presets (Pure Paper, Soft Ivory, Warm Cream, Natural Paper, Vintage Sepia, Linen, Cool Paper, Charcoal Night, OLED Black, Soft E-Ink). The library, navigation chrome, menus, and comic viewport surround can follow the reading palette; explicit Dark/Light interface styling and accent colors remain optional.
 - **Bilingual UI:** Native English and Turkish interface translations. Book titles, table of contents, and document contents remain in their authentic original language (Hebrew/BiDi text shaping excluded per project design).
 - **Persistent Bounded Cover Cache:** 150×210 RGB24 disk cache bounded to 48 MiB / 512 entries, with file stat validation, CRC checks and immediate vector placeholders. The in-memory thumbnail texture cache is separately bounded to 32 MiB.
 - **Reading Journal & Offline Stats:** Tracks reading minutes, sessions, completion percentages, streaks, and period stats entirely offline on SD card.
