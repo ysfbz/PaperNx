@@ -758,9 +758,6 @@ private:
                 lt.stride=cached->stride; lt.rgb=std::move(cached->rgb);
                 lt.state=CoverState::Cached;
                 {std::lock_guard<std::mutex> lock(completedMutex_);completedThumbs_.push_back(std::move(lt));}
-                if (!catalogMetadataCurrent(b, catalog_.get(b.id))) {
-                    collectBookMetadata(b);
-                }
                 continue;
             }
             char err[256] = {};
