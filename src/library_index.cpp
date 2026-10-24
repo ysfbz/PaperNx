@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <charconv>
 #include <chrono>
+#include <iterator>
 #include <unordered_map>
 #include <unordered_set>
 #ifndef _WIN32
@@ -36,6 +37,50 @@ std::optional<std::uintmax_t> regularBookFileSize(const fs::path &path) {
     return size;
 #endif
 }
+std::optional<std::uintmax_t> regularBookFileSize(const fs::path &root,const fs::path &path) {
+#if !defined(_WIN32) && defined(O_NOFOLLOW) && defined(O_DIRECTORY)
+    const auto relative=path.lexically_relative(root);
+    if(relative.empty() || relative.is_absolute())return std::nullopt;
+    int flags=O_RDONLY|O_DIRECTORY|O_NOFOLLOW;
+#ifdef O_CLOEXEC
+    flags|=O_CLOEXEC;
+#endif
+    int directory=::open(root.c_str(),flags);
+    if(directory<0)return std::nullopt;
+    for(auto component=relative.begin();component!=relative.end();++component) {
+        if(*component=="." || *component=="..") {::close(directory);return std::nullopt;}
+        const bool final=std::next(component)==relative.end();
+        int childFlags=O_RDONLY|O_NOFOLLOW|(final?O_NONBLOCK:O_DIRECTORY);
+#ifdef O_CLOEXEC
+        childFlags|=O_CLOEXEC;
+#endif
+        const int child=::openat(directory,component->c_str(),childFlags);
+        ::close(directory);
+        if(child<0)return std::nullopt;
+        if(final) {
+            struct stat info{};
+            const int status=::fstat(child,&info);
+            ::close(child);
+            if(status!=0 || !S_ISREG(info.st_mode) || info.st_size<0)return std::nullopt;
+            return static_cast<std::uintmax_t>(info.st_size);
+        }
+        directory=child;
+    }
+    ::close(directory);
+    return std::nullopt;
+#else
+    const auto relative=path.lexically_relative(root);
+    if(relative.empty() || relative.is_absolute())return std::nullopt;
+    auto current=root;
+    for(const auto &component:relative) {
+        if(component=="." || component=="..")return std::nullopt;
+        current/=component;
+        std::error_code ec;const auto status=fs::symlink_status(current,ec);
+        if(ec || fs::is_symlink(status))return std::nullopt;
+    }
+    return regularBookFileSize(path);
+#endif
+}
 std::vector<Book> InventoryRepository::load() const {
     ProgressStore store(path_);std::vector<Book> books;
     if(!store.load())return books;
@@ -66,7 +111,8 @@ bool InventoryRepository::save(const std::vector<Book> &books,const std::functio
         Progress p;p.bookPath=b.path;p.bookTitle=b.title;p.bookAuthor=std::to_string(b.bytes);p.lastRead=b.modified;cache.put(b.id,std::move(p));
     }
     if(stop())return false;
-    return cache.save();
+    ProgressStore::SaveOptions options;options.cancelled=cancelled;
+    return cache.save(options);
 }
 std::vector<Book> loadLibraryInventory(const fs::path &path) {return InventoryRepository(path).load();}
 
@@ -110,12 +156,15 @@ LibraryScanResult scanLibrary(const ScanRequest &request,const std::function<boo
             add(std::move(book));
         }
         std::sort(result.books.begin(),result.books.end(),[](const Book &a,const Book &b){return naturalCompare(a.path,b.path)<0;});
+        if(cancelledNow()){result.cancelled=true;result.status=ScanStatus::Cancelled;return result;}
         result.complete=true;result.status=ScanStatus::Complete;
         // The inventory is replaced only by a fully traversed, uncancelled snapshot.
         if(!request.inventory.empty()) {
             result.cached=InventoryRepository(request.inventory).save(result.books,cancelled);
-            if(cancelledNow()){result.cancelled=true;result.complete=false;result.status=ScanStatus::Cancelled;result.books.clear();result.cached=false;return result;}
-            if(!result.cached){result.status=ScanStatus::InventoryWriteFailed;result.error="Library cache could not be saved";}
+            if(!result.cached) {
+                if(cancelledNow()){result.cancelled=true;result.complete=false;result.status=ScanStatus::Cancelled;result.books.clear();return result;}
+                result.status=ScanStatus::InventoryWriteFailed;result.error="Library cache could not be saved";
+            }
         }
 #if defined(__cpp_exceptions)
     } catch(const std::exception &error) {result=LibraryScanResult{};result.error=error.what();}
@@ -138,8 +187,7 @@ std::optional<LibraryScanResult> LibraryScanner::take() {
     if(!ready_)return std::nullopt;
     worker_.join();
     auto result=std::move(result_);
-    // A cancel requested before the join always wins: a cancelled snapshot is never complete.
-    if(cancel_.load()){result.cancelled=true;result.complete=false;if(result.status==ScanStatus::Complete)result.status=ScanStatus::Cancelled;}
+    // scanLibrary owns the cancellation/commit boundary; a later cancel cannot undo publication.
     ready_=false;cancel_=false;
     return result;
 }

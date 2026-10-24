@@ -9,6 +9,8 @@
 namespace papernx {
 // Returns a size only for a direct regular file, without following symlinks.
 std::optional<std::uintmax_t> regularBookFileSize(const fs::path &path);
+// Scanning variant: reject symlinks in every component below the already selected root.
+std::optional<std::uintmax_t> regularBookFileSize(const fs::path &root,const fs::path &path);
 
 // Why a scan did or did not publish a replacement snapshot. Only Complete and
 // InventoryWriteFailed carry a trustworthy book list; every other status must leave the
@@ -30,7 +32,7 @@ class InventoryRepository {
 public:
     explicit InventoryRepository(fs::path path):path_(std::move(path)){}
     std::vector<Book> load() const;
-    // Atomic overwrite; returns false (and writes nothing) if cancelled before the write.
+    // Returns false without publishing when cancelled before ProgressStore's commit boundary.
     bool save(const std::vector<Book> &books,const std::function<bool()> &cancelled={}) const;
 private:
     fs::path path_;

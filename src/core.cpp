@@ -1,4 +1,5 @@
 #include "papernx/core.hpp"
+#include "papernx/library_index.hpp"
 #include "papernx/app_settings.hpp"
 #include <algorithm>
 #include <chrono>
@@ -303,13 +304,13 @@ void scanInto(const fs::path &root, std::size_t maxBooks, const std::function<bo
                     const auto path = it->path();
                     const auto type = detectFormat(path);
                     if (type != Format::Unsupported) {
-                        const auto size = it->file_size(ec);
-                        if (ec) { fail(); ec.clear(); }
+                        const auto safeSize = regularBookFileSize(root,path);
+                        if (!safeSize) { fail(); }
                         else {
                             Book b;
                             b.path = path.u8string();
-                            b.bytes = size;
-                            b.id = documentId(b.path, size);
+                            b.bytes = *safeSize;
+                            b.id = documentId(b.path, *safeSize);
                             b.title = defaultTitle(path);
                             b.format = type;
                             const auto mtime = it->last_write_time(ec);
@@ -954,17 +955,23 @@ bool ProgressStore::save(const SaveOptions &options) const {
         // A directory occupying a backup path must fail instead of being discarded.
         if (!writeVerified(backup, read(path_), "backup_copy")) return false;
     }
+    auto cancelled = [&] {
+        if (!options.cancelled || !options.cancelled()) return false;
+        saveDiagnostic_ = "save cancelled before publication";
+        return true;
+    };
     bool noReplace = options.noReplaceRename;
 #if defined(_WIN32) || defined(__SWITCH__)
     // Horizon fsFsRenameFile does not replace an existing destination.
     noReplace = true;
 #endif
     if (noReplace && fs::exists(path_, ec)) {
+        if (cancelled()) return false;
         if (valid(path_) && !valid(backup)) return fail("backup_verify", backup, EIO);
         if (int err = injected("remove_primary")) return fail("remove_primary", path_, err);
         fs::remove(path_, ec);
         if (ec) return fail("remove_primary", path_, ec.value(), nativeError());
-    }
+    } else if (cancelled()) return false;
     if (int err = injected("rename")) return fail("rename", temp, err);
     fs::rename(temp, path_, ec);
     if (ec) return fail("rename", path_, ec.value(), nativeError());

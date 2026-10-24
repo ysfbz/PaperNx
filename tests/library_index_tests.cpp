@@ -76,15 +76,23 @@ int main() {
     const auto keepFile=validationRoot/"keep.cbz",changedFile=validationRoot/"changed.cbz",missingFile=validationRoot/"missing.cbz";
     const auto outsideFile=root/"outside.cbz";
     std::ofstream(keepFile)<<"keep";std::ofstream(changedFile)<<"old";std::ofstream(missingFile)<<"gone";std::ofstream(outsideFile)<<"outside";
+    const auto outsideFolder=root/"outside-folder";fs::create_directories(outsideFolder);std::ofstream(outsideFolder/"escaped.cbz")<<"outside folder";
+    const auto linkedFolder=validationRoot/"linked-folder";std::error_code linkedFolderError;
+    fs::create_directory_symlink(outsideFolder,linkedFolder,linkedFolderError);assert(!linkedFolderError);
+    assert(!regularBookFileSize(validationRoot,linkedFolder/"escaped.cbz"));
     const auto validationInventory=root/"data"/"validated-inventory.txt";LibraryScanner validationScanner;
     assert(validationScanner.start({validationRoot},{},validationInventory));
     const auto validation=wait(validationScanner);assert(validation.complete && validation.cached && validation.books.size()==3);
     std::ofstream(changedFile,std::ios::trunc)<<"changed size";fs::remove(missingFile);
     std::error_code symlinkError;fs::create_symlink(outsideFile,missingFile,symlinkError);
     assert(!symlinkError);
+    const auto scannedAfterSwap=scan(validationRoot);
+    assert(scannedAfterSwap.size()==2);
+    for(const auto &book:scannedAfterSwap)assert(book.path!=missingFile.u8string());
 #ifndef _WIN32
     const auto fifo=validationRoot/"not-a-book.cbz";
     assert(::mkfifo(fifo.c_str(),0600)==0 && !regularBookFileSize(fifo));
+    assert(scan(validationRoot).size()==2);
 #endif
     const auto validatedInventory=loadLibraryInventory(validationInventory);
     assert(validatedInventory.size()==1 && validatedInventory.front().path==keepFile.u8string());
@@ -109,6 +117,21 @@ int main() {
     bool custom=false,replaced=false;
     for(const auto &book:second.books){assert(book.id!=known[1].id);if(book.id==known.front().id)custom=book.title=="Custom title" && book.author=="Author";if(book.path==changed.path)replaced=book.id!=changed.id && book.bytes==16;}
     assert(custom && replaced);
+    const auto commitInventory=root/"data"/"commit-boundary-inventory.txt";
+    InventoryRepository commitRepository(commitInventory);Book previous=second.books.front();
+    assert(commitRepository.save({previous}));
+    std::ifstream priorFile(commitInventory,std::ios::binary);
+    const std::string priorInventoryBytes((std::istreambuf_iterator<char>(priorFile)),{});
+    auto replacement=previous;replacement.title="must not publish after cancel";int cancelChecks=0;
+    assert(!commitRepository.save({replacement},[&]{return ++cancelChecks==3;}));
+    std::ifstream commitFile(commitInventory,std::ios::binary);
+    const std::string afterCancel((std::istreambuf_iterator<char>(commitFile)),{});
+    assert(cancelChecks==3&&afterCancel==priorInventoryBytes);
+    ProgressStore commitRecovered(commitInventory);assert(commitRecovered.load());
+    assert(commitRecovered.get(previous.id).bookTitle==previous.title);
+    const auto failedInventory=root/"data"/"inventory-is-a-directory";fs::create_directories(failedInventory);
+    auto failedSave=scanLibrary(ScanRequest{{unicodeRoot},{},failedInventory},{});
+    assert(failedSave.complete&&!failedSave.cached&&failedSave.status==ScanStatus::InventoryWriteFailed&&failedSave.books.size()==1);
     // Removing a scan root retains already-opened, existing files, without touching progress.
     assert(scanner.start({},second.books,inventory));assert(wait(scanner).books.size()==299);
     const auto savedInventory=inventoryBytes();

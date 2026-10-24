@@ -114,6 +114,8 @@ public:
         // Deterministic storage fault injection for regression tests. Empty in production.
         std::function<int(const char *)> fault;
         bool noReplaceRename{false};
+        // If true at the publication boundary, keep the current primary untouched.
+        std::function<bool()> cancelled;
     };
     explicit ProgressStore(fs::path path);
     bool load();
