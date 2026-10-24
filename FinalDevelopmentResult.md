@@ -637,3 +637,24 @@ Bu tek koşu yazılım renderer’ı host ölçümüdür; hızlanma iddiası de�
 - **Bu turda yapılmadı:** Tam native CTest, ASan/UBSan, Switch cross-build/artifact kontrolü, fiziksel Switch, kapsamlı bağımsız scanner/index/parser yeniden tasarımı ve yeni performans ölçümü. İki kullanıcıya ait untracked dosya değiştirilmedi/stage edilmedi. Release, tag, PR, merge veya Actions çalıştırılmadı.
 
 **Karar: INCOMPLETE — BLOCKERS REMAIN.** Bağımsız mimari çalışması ve belirtilen doğrulama kapıları açık.
+
+## 2026-10-24 — Updater JSON UTF-8 doğrulaması
+
+- **Branch / kaynak commit:** `feature/v0.9.2-complete-reader-enhancements` / `8636f648f03de617c9fc0bc04a60f3218efa089a` (`fix(updater): reject invalid UTF-8 release JSON`). `update_json::Parser` boyutu 4 MiB ile sınırlı yanıtı parse etmeden önce UTF-8 doğruluyor; overlong encoding, UTF-8 surrogate, U+10FFFF üstü ve kesik çok-byte dizileri reddediliyor. Kaçışlı `\u` Unicode çözümü ve geçerli UTF-8 release notes korunuyor.
+- **Regresyon:** `tests/self_update_tests.cpp` bu dört sınır grubunu hatalı yanıt olarak doğruluyor; mevcut Unicode notes, parser ve TLS akışları aynı test hedeflerinde kalıyor.
+- **Gerçek doğrulama:** `docker compose run --rm desktop bash -lc 'cmake --build build-desktop --target PaperNX papernx_self_update_tests --parallel 4 && ctest --test-dir build-desktop --output-on-failure -R "^papernx_self_update_tests$|^papernx_self_update_network_tests$"'` — build **PASS**, parser ve yerel HTTPS CTest **2/2 PASS** (2,33 sn). İlk koşu da 2/2 geçti fakat test fixture döngüsünde kopya uyarısı verdi; const-reference düzeltmesinden sonra son koşu test hedefini yeniden derleyerek uyarısız geçti.
+- **Köken/lisans:** `src/update_json.hpp` güncel blob'u `00fcf74acd987f29e1f2d35ec35778157f6d7d87`; pinned fork blob'u `d4e3bb96dcb2d363e23d40a83775c02768fc5394`. Parser fork-derived/adapted kalır; Refael Avramashvili / AGPL-3.0 attribution korunmuştur. Güncel altı dosya tablosu [`docs/V092_SOURCE_PROVENANCE_AUDIT.md`](docs/V092_SOURCE_PROVENANCE_AUDIT.md) içindedir.
+- **Bu turda yapılmadı:** Switch build, full native CTest, ASan/UBSan, fiziksel Switch TLS ve performans ölçümü. İki kullanıcıya ait untracked dosya değiştirilmedi/stage edilmedi. Genel karar **INCOMPLETE — BLOCKERS REMAIN**.
+
+## 2026-10-24 — UTF-8 kesilme sınırı testi
+
+- **Kaynak/test commitleri:** parser üretim kodu `8636f648f03de617c9fc0bc04a60f3218efa089a`; test-only `e3b9d75` (`test(updater): cover truncated UTF-8 responses`). Fixture, tamamlanmamış çok-byte UTF-8 dizisini de kapsıyor.
+- **Son hedefli doğrulama:** aynı desktop build komutundan sonra `papernx_self_update_tests` ve `papernx_self_update_network_tests` CTest **2/2 PASS** (2,62 sn). Bu son koşuda test hedefi yeniden derlendi.
+- **Açık:** Switch build, full native CTest, ASan/UBSan ve fiziksel TLS bu turda çalıştırılmadı; genel durum **INCOMPLETE — BLOCKERS REMAIN**.
+
+## 2026-10-24 — Targeted sanitizer and current-source Switch verification
+
+- **Source/test HEAD:** production source `8636f648f03de617c9fc0bc04a60f3218efa089a`, test-only HEAD `e3b9d75a78ed29ddd9bd26afaecb7474761663f7`.
+- **ASan/UBSan command:** `docker compose run --rm desktop bash -lc 'cmake -S . -B build-sanitize -DPAPERNX_NATIVE=ON -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined" && cmake --build build-sanitize --target papernx_self_update_tests papernx_library_index_tests --parallel 4 && ctest --test-dir build-sanitize --output-on-failure -R "^papernx_self_update_tests$|^papernx_self_update_network_tests$|^papernx_library_index_tests$"'` — build **PASS**, CTest **3/3 PASS** (10,63 sn). Coverage was limited to inventory and updater parser/network targets, not the full app.
+- **Switch command:** `docker compose run --rm switch bash -lc 'export MUPDF_PREFIX=/work/prefix-mupdf-switch; make all -j4 && python3 scripts/verify_artifacts.py --version 0.9.1'` — **PASS**. AArch64 ELF/NRO linked; RomFS verifier found CA (118 certificates / 200.116 bytes), fonts and icon. NRO 49.588.671 bytes; SHA-256 `d8799c45893dcf4329f6b479cc9e19c499e4c691eb902450bc22c46c0be6d66d`. Hardware **UNVERIFIED**.
+- **Açık:** full native CTest, sanitizer coverage of all targets, physical Switch TLS/Joy-Con/backlight/SD, and broader scanner/index/updater/parser redesign. Release, tag, PR, merge and GitHub Actions were not run. Overall decision remains **INCOMPLETE — BLOCKERS REMAIN**.

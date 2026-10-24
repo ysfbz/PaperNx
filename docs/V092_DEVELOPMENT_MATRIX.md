@@ -355,3 +355,19 @@ Median/p95 warm full-pass times: 100 copies **94/96 ms** with 100 hits; 500 copi
 `loadLibraryInventory()` now distinguishes a genuinely markerless legacy snapshot from a snapshot that contains the reserved schema record with an empty/invalid version. Only the former is accepted as legacy; a present but unsupported marker makes the disposable cache a miss, matching `CatalogStore`'s fail-closed schema check. The dedicated cache still uses the existing atomic/checksummed `ProgressStore` codec; reading progress and bookmarks are untouched.
 
 `PaperNX` and `papernx_library_index_tests` built. Focused CTest passed **1/1** in **2.21 sec**. The regression retains markerless legacy compatibility and rejects both future and empty schema markers. `src/library_index.cpp` remains fork-derived/adapted; this boundary fix does not establish independent authorship. Full native CTest, sanitizer, current-source Switch build, broader scanner/index redesign and physical Switch checks remain open. Overall decision: **INCOMPLETE — BLOCKERS REMAIN**.
+
+## G5 updater strict UTF-8 input — `8636f64`
+
+`update_json::Parser` now rejects invalid UTF-8 across the bounded GitHub response before parsing JSON strings. Tests cover an overlong sequence, encoded surrogate and code point above U+10FFFF; existing escaped Unicode note behavior remains covered.
+
+Desktop `PaperNX` and `papernx_self_update_tests` built; parser and local HTTPS CTest passed **2/2** in **2.33 sec**. This change hardens the fork-derived/adapted parser and preserves Refael Avramashvili / AGPL-3.0 provenance. Switch build, full CTest, sanitizer and physical TLS remain **NOT RUN / UNVERIFIED**; overall status is **INCOMPLETE — BLOCKERS REMAIN**.
+
+### UTF-8 truncation boundary — `e3b9d75`
+
+A test-only follow-up adds an incomplete multibyte UTF-8 sequence. The updater unit and local HTTPS CTests passed **2/2** in **2.62 sec** on production source `8636f64`. No Switch, full suite, sanitizer or physical TLS verification was run.
+
+## Targeted sanitizer and current-source Switch gate — `e3b9d75`
+
+A separate ASan/UBSan build compiled `papernx_library_index_tests` and the updater unit/network tests. Focused CTest passed **3/3** in **10.63 sec**. This is targeted coverage, not a sanitizer run of the full app/test suite.
+
+The current Switch command `docker compose run --rm switch bash -lc 'export MUPDF_PREFIX=/work/prefix-mupdf-switch; make all -j4 && python3 scripts/verify_artifacts.py --version 0.9.1'` passed. It linked AArch64 ELF, produced the NRO, and verified RomFS CA/fonts/icon. CA: 118 certificates / 200,116 bytes. NRO: 49,588,671 bytes; SHA-256 `d8799c45893dcf4329f6b479cc9e19c499e4c691eb902450bc22c46c0be6d66d`. Hardware remains **UNVERIFIED**. Full native CTest and device checks remain open; overall decision is **INCOMPLETE — BLOCKERS REMAIN**.
