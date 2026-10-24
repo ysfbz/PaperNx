@@ -2532,6 +2532,7 @@ private:
     void prefetchComicPages() {
         configureComicPages();const auto now=SDL_GetTicks();
         if(prefetchPage_!=currentPage_) {
+            comicPages_.discardQueuedSpeculative();
             if(prefetchPage_>=0)comicPrefetchDirection_=currentPage_>prefetchPage_?1:-1;
             prefetchPage_=currentPage_;prefetchStep_=0;prefetchDue_=now+60;comicDetailDue_=now+180;return;
         }
