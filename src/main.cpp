@@ -2476,7 +2476,10 @@ private:
     }
     bool ensureComicGroup(int page) {
         if(!comic() || page<0 || page>=pageCount_)return false;
-        configureComicPages();const auto group=comicSpreadPages(page);bool ready=true;
+        configureComicPages();
+        const bool geometryReady=comicSpreadGeometryReady(page);
+        const auto group=comicSpreadPages(page);
+        bool ready=geometryReady;
         for(int side=0;side<group.second;++side) {
             const int member=group.second==2?readerSidePage(group.first,side):group.first;
             if(pageCache_.get(comicTextureKey(member)))continue;
