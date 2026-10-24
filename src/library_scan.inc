@@ -3,6 +3,7 @@ bool libraryScanAgain_{false};
 std::unordered_set<std::string> scanKnownIds_;
 std::unordered_map<std::string,std::size_t> libraryLookup_;
 unsigned completedLibraryScans_{0};
+std::uint64_t libraryScanGeneration_{0}; // only the result of this request may replace books_
 
 void rebuildLibraryLookup() {
     libraryLookup_.clear();libraryLookup_.reserve(books_.size());
@@ -39,17 +40,19 @@ void startLibraryScan() {
         Book book;book.id=id;book.path=p.bookPath;book.title=p.bookTitle;book.author=p.bookAuthor;book.format=format;
         known.push_back(std::move(book));
     }
-    libraryScanner_.start(std::move(roots),std::move(known),root_/"data"/"library-index.txt");dirty_=true;
+    libraryScanGeneration_=libraryScanner_.begin(ScanRequest{std::move(roots),std::move(known),root_/"data"/"library-index.txt"});dirty_=true;
 }
 void processLibraryScan() {
     if(!activeFingers_.empty() || pointerActive_ || !libraryScanner_.ready())return;
     auto result=libraryScanner_.take();if(!result)return;
-    if(result->cancelled) {
+    const bool stale=result->generation!=libraryScanGeneration_;
+    if(result->cancelled || stale) {
         dirty_=true;
         if(libraryScanAgain_){libraryScanAgain_=false;startLibraryScan();}
         return;
     }
     if(!result->complete) {
+        // RootUnavailable/Incomplete/Failed keep the current library; only the message differs.
         if(!result->error.empty())currentErrorMessage_=ui::label(result->error);
         dirty_=true;
         if(libraryScanAgain_){libraryScanAgain_=false;startLibraryScan();}

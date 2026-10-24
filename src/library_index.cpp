@@ -36,12 +36,11 @@ std::optional<std::uintmax_t> regularBookFileSize(const fs::path &path) {
     return size;
 #endif
 }
-std::vector<Book> loadLibraryInventory(const fs::path &path) {
-    ProgressStore store(path);std::vector<Book> books;
+std::vector<Book> InventoryRepository::load() const {
+    ProgressStore store(path_);std::vector<Book> books;
     if(!store.load())return books;
     const auto marker=store.all().find(inventorySchemaId);
     if(marker!=store.all().end() && marker->second.bookTitle!=inventorySchema)return books;
-    // An isolated inventory adapts the existing atomic/checksummed codec:
     // bookPath=path, bookTitle=title, bookAuthor=byte count, lastRead=file mtime.
     for(const auto &[id,p]:store.all()) {
         if(id==inventorySchemaId)continue;
@@ -58,64 +57,89 @@ std::vector<Book> loadLibraryInventory(const fs::path &path) {
     }
     return books;
 }
-bool LibraryScanner::start(std::vector<fs::path> roots,std::vector<Book> known,fs::path inventory) {
-    if(pending())return false;
+bool InventoryRepository::save(const std::vector<Book> &books,const std::function<bool()> &cancelled) const {
+    auto stop=[&]{return cancelled && cancelled();};
+    ProgressStore cache(path_);
+    Progress marker;marker.bookTitle=inventorySchema;cache.put(inventorySchemaId,std::move(marker));
+    for(const auto &b:books){
+        if(stop())return false;
+        Progress p;p.bookPath=b.path;p.bookTitle=b.title;p.bookAuthor=std::to_string(b.bytes);p.lastRead=b.modified;cache.put(b.id,std::move(p));
+    }
+    if(stop())return false;
+    return cache.save();
+}
+std::vector<Book> loadLibraryInventory(const fs::path &path) {return InventoryRepository(path).load();}
+
+LibraryScanResult scanLibrary(const ScanRequest &request,const std::function<bool()> &cancelled) {
+    LibraryScanResult result;
+    auto cancelledNow=[&]{return cancelled && cancelled();};
+#if defined(__cpp_exceptions)
+    try {
+#endif
+        // Roots that vanished (ejected SD, removed folder) are reported separately from traversal
+        // errors, and either way the previous inventory/library is preserved.
+        bool rootMissing=false;
+        for(const auto &root:request.roots){std::error_code ec;if(!fs::is_directory(root,ec) || ec){rootMissing=true;break;}}
+        std::unordered_map<std::string,Book> prior;prior.reserve(request.known.size());
+        for(const auto &book:request.known)prior.emplace(book.id,book);
+        std::unordered_set<std::string> ids;ids.reserve(10000);
+        auto add=[&](Book book) {
+            if(result.books.size()>=10000 || !ids.insert(book.id).second)return;
+            auto old=prior.find(book.id);if(old!=prior.end()){book.title=old->second.title;book.author=old->second.author;}
+            result.books.push_back(std::move(book));
+        };
+        bool traversed=true;
+        for(auto &book:scanRoots(request.roots,10000,cancelled,&traversed))add(std::move(book));
+        if(cancelledNow()){result.cancelled=true;result.status=ScanStatus::Cancelled;result.error.clear();return result;}
+        if(!traversed || rootMissing) {
+            result.status=rootMissing?ScanStatus::RootUnavailable:ScanStatus::Incomplete;
+            result.error=rootMissing?"Library folder unavailable":"Library scan incomplete";
+            return result;
+        }
+        // Independently opened files remain available. Missing source files
+        // leave the inventory without deleting their progress or metadata.
+        for(const auto &[id,old]:prior) {
+            if(cancelledNow()){result.cancelled=true;result.status=ScanStatus::Cancelled;result.books.clear();return result;}
+            if(ids.count(id))continue;
+            const auto path=fs::u8path(old.path);const auto size=regularBookFileSize(path);
+            if(detectFormat(path)==Format::Unsupported || !size)continue;
+            auto book=old;book.bytes=*size;book.id=documentId(book.path,*size);
+            if(book.id!=id){book.title=defaultTitle(path);book.author.clear();}
+            std::error_code ec;
+            auto stamp=fs::last_write_time(path,ec);if(!ec)book.modified=std::chrono::duration_cast<std::chrono::seconds>(stamp.time_since_epoch()).count();
+            add(std::move(book));
+        }
+        std::sort(result.books.begin(),result.books.end(),[](const Book &a,const Book &b){return naturalCompare(a.path,b.path)<0;});
+        result.complete=true;result.status=ScanStatus::Complete;
+        // The inventory is replaced only by a fully traversed, uncancelled snapshot.
+        if(!request.inventory.empty()) {
+            result.cached=InventoryRepository(request.inventory).save(result.books,cancelled);
+            if(cancelledNow()){result.cancelled=true;result.complete=false;result.status=ScanStatus::Cancelled;result.books.clear();result.cached=false;return result;}
+            if(!result.cached){result.status=ScanStatus::InventoryWriteFailed;result.error="Library cache could not be saved";}
+        }
+#if defined(__cpp_exceptions)
+    } catch(const std::exception &error) {result=LibraryScanResult{};result.error=error.what();}
+#endif
+    return result;
+}
+
+std::uint64_t LibraryScanner::begin(ScanRequest request) {
+    if(pending())return 0;
     cancel_=false;ready_=false;result_={};
-    worker_=std::thread([this,roots=std::move(roots),known=std::move(known),inventory=std::move(inventory)] {
-        LibraryScanResult result;
-#if defined(__cpp_exceptions)
-        try {
-#endif
-            std::unordered_map<std::string,Book> prior;prior.reserve(known.size());
-            for(auto &book:known){const auto id=book.id;prior.emplace(id,std::move(book));}
-            std::unordered_set<std::string> ids;ids.reserve(10000);
-            auto add=[&](Book book) {
-                if(result.books.size()>=10000 || !ids.insert(book.id).second)return;
-                auto old=prior.find(book.id);if(old!=prior.end()){book.title=old->second.title;book.author=old->second.author;}
-                result.books.push_back(std::move(book));
-            };
-            bool scanComplete=true;
-            for(auto &book:scanRoots(roots,10000,[this]{return cancel_.load();},&scanComplete))add(std::move(book));
-            if(!scanComplete) {
-                result.error="Library scan incomplete";result.cancelled=cancel_.load();
-                result_=std::move(result);ready_.store(true);return;
-            }
-            // Independently opened files remain available. Missing source files
-            // leave the inventory without deleting their progress or metadata.
-            for(const auto &[id,old]:prior) {
-                if(cancel_)break;
-                if(ids.count(id))continue;
-                const auto path=fs::u8path(old.path);const auto size=regularBookFileSize(path);
-                if(detectFormat(path)==Format::Unsupported || !size)continue;
-                auto book=old;book.bytes=*size;book.id=documentId(book.path,*size);
-                if(book.id!=id){book.title=defaultTitle(path);book.author.clear();}
-                std::error_code ec;
-                auto stamp=fs::last_write_time(path,ec);if(!ec)book.modified=std::chrono::duration_cast<std::chrono::seconds>(stamp.time_since_epoch()).count();
-                add(std::move(book));
-            }
-            std::sort(result.books.begin(),result.books.end(),[](const Book &a,const Book &b){return naturalCompare(a.path,b.path)<0;});
-            result.complete=true;
-            if(!cancel_) {
-                ProgressStore cache(inventory);
-                Progress marker;marker.bookTitle=inventorySchema;cache.put(inventorySchemaId,std::move(marker));
-                for(const auto &b:result.books){if(cancel_)break;Progress p;p.bookPath=b.path;p.bookTitle=b.title;p.bookAuthor=std::to_string(b.bytes);p.lastRead=b.modified;cache.put(b.id,std::move(p));}
-                if(!cancel_){result.cached=cache.save();if(!result.cached)result.error="Library cache could not be saved";}
-            }
-#if defined(__cpp_exceptions)
-        } catch(const std::exception &error) {result.error=error.what();}
-#endif
-        result.cancelled=cancel_.load();
-        // A cancelled scan must never publish as a complete (possibly partial) inventory.
-        if(result.cancelled)result.complete=false;
+    const auto generation=++generation_;
+    worker_=std::thread([this,generation,request=std::move(request)] {
+        auto result=scanLibrary(request,[this]{return cancel_.load();});
+        result.generation=generation;
         result_=std::move(result);ready_.store(true);
     });
-    return true;
+    return generation;
 }
 std::optional<LibraryScanResult> LibraryScanner::take() {
     if(!ready_)return std::nullopt;
     worker_.join();
     auto result=std::move(result_);
-    result.cancelled=result.cancelled||cancel_.load();
+    // A cancel requested before the join always wins: a cancelled snapshot is never complete.
+    if(cancel_.load()){result.cancelled=true;result.complete=false;if(result.status==ScanStatus::Complete)result.status=ScanStatus::Cancelled;}
     ready_=false;cancel_=false;
     return result;
 }
