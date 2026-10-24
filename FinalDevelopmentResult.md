@@ -764,3 +764,60 @@ Bu tek koşu yazılım renderer’ı host ölçümüdür; hızlanma iddiası de�
 - Commitler: ce18220, af31404, 7221720, cfa1192, 5decd13, 93070ea, 64410fc (+ bu rapor).
 - G4 manuel staging, G5 scanner/parser katmanları, G6 dedup+telemetri kodlandı; **hiçbir derleme/test çalıştırılmadı** — hepsi UNVERIFIED. G4 otomatik kurulum BLOCKED.
 - Karar: kaynak bağımsız teste hazır; release/merge hazır DEĞİL. Ayrıntı: docs/V092_CODE_ONLY_HANDOFF.md
+
+
+## 2026-10-24 — v0.9.2 son blocker düzeltmeleri ve doğrulama
+
+- **Başlangıç referansı:** `7ada118bdcc71ee87e2a6d72bad8a3bc5d896157`.
+- **Doğrulanan kod kaynak SHA'sı:** `0eaf3b38defa5a72b2895967f2c2bfb7390b8153`; izlenen kaynak ağacı SHA-256: `8b2da6f807f74065830dec551933ca321c32de1e9eb78a37d0de623448a890ef`. Desktop ve Switch receipt'leri derleme öncesi/sonrası aynı; kapak telemetrisi de aynı kimliği taşıyor. Kimlikteki `dirty:true`, önceden var olan ve kullanıcıya ait dört untracked dosyanın korunup stage/değişiklik yapılmamasından kaynaklanıyor. Kod doğrulamasından sonra yalnızca dokümanlar güncellendi; kaynak ağacı değişmedi.
+- **Aynı feature branch'indeki kod commit'leri:**
+  - `5d3e49a` — doğrulanmış updater staging adaylarını koru.
+  - `ae0a600` — güvenli kitaplık tarama snapshot'larını koru.
+  - `0e0b7ba` — artifact'lere doğrulanmış kaynak kimliğini ekle.
+  - `8305e91` — SDL thumbnail hattını ölç.
+  - `8ce9b53` — Switch doğrulama nesnelerini yalıt.
+  - `0eaf3b3` — libnx uyumlu dosya incelemesi kullan.
+- **Değiştirilen kod alanları:** updater durumu/staging ve testleri (`src/self_update.cpp`, `src/self_update_ui.inc`, `include/papernx/self_update.hpp`, birim/entegrasyon testleri); scanner/index ve güvenlik testleri (`src/library_index.cpp`, `src/library_scan.inc`, `include/papernx/library_index.hpp`, core entegrasyonu); sınırlandırılmış release JSON parser (`src/update_json.hpp`); kaynak kimliği/receipt'ler ve desktop/sanitizer/Switch script'leri (`CMakeLists.txt`, `Makefile`, `scripts/*`, `src/main.cpp`); SDL kapak telemetrisi/benchmark'ı (`include/papernx/cover_pipeline.hpp`, `include/papernx/cover_repository.hpp`, `src/core.cpp`, `tests/*`). Tam liste kod commit'lerinde ve son Git diff'inde bulunuyor.
+
+### Kabul tablosu
+
+| Alan | Kod | Test | Kanıt | Sonuç |
+|---|---|---|---|---|
+| P1 staging candidate preservation | Slot 0/1 bağımsız payload ve manifest; yalnız doğrulanmış aday Ready; iptal/disk dolması/yazma, rename ve fsync hatalarında aktif eski aday korunuyor. | Updater unit + local HTTPS entegrasyon testleri desktop ve ASan/UBSan içinde 2/2. | `build-p1/final-0eaf3b3/desktop-evidence/desktop.log`; `build-p1/final-0eaf3b3/sanitizer-evidence/sanitizers.log`. | PASS (host fault injection); FAT güç kesintisi donanımda doğrulanmadı. |
+| P2 updater install/recovery | Güvenli manuel kurulum; legacy slot 0 salt-okunur migration; marker conflict/missing canonical NRO için fail-closed yönerge. Otomatik chainload/install yapılmıyor. | Unit/network fault matrix tam suite içinde geçti. | `docs/UPDATER.md`; iki verification logu; Switch cross-build artifacts. | Manuel akış PASS; otomatik kurulum BLOCKED/kanıt bekliyor. |
+| P2 scanner/index | Generation/cancellation snapshot, inventory güvenli yayın, no-follow/regular-file kontrolleri; Switch için libnx uyumlu file inspection. | Final desktop ve ASan/UBSan CTest 32/32; Switch derleme/link. | İki log; `build-p1/final-0eaf3b3/switch-preflight-evidence/artifacts.json`. | PASS (host + cross-build), fiziksel SD UNVERIFIED. |
+| P2 release JSON parser | Bounded RFC8259/UTF-8 parser, duplicate key/schema/type/URL/SHA/SemVer doğrulaması. | Unit/network testleri her iki 32 testlik suite içinde PASS. | İki log; parser test çıktıları. | PASS (host). |
+| P2 build source identity | CMake + Switch Makefile revizyon/dirty/tree kimliğini ve build receipt’i aynı sözleşmeyle üretir. | Desktop/Switch receipt before/after aynı; cover telemetry aynı kimlikte. | `desktop-build-receipt.json`, `switch-build-receipt.json`, `cover-benchmark/summary.json`. | PASS; Git olmayan arşiv fallback’i bu turda ayrıca çalıştırılmadı. |
+| P2 100/500/1000 cover benchmark | Gerçek `PaperNxApp` SDL dummy/software akışı: scan, metadata, thumbnail worker, upload, render, scroll, kategori, aç/kapat ve cache temizleme. | 100/500/1000 × cold/warm × 3 = 18 koşu; her koşu tamamlandı, JSON schema doğrulandı. | `build-p1/final-0eaf3b3/cover-benchmark/summary.json`, `summary.md`, `raw-*.json`, `corpus/manifest.json`. | PASS desktop software renderer; Switch/GPU değil. 1.000 warm cache medyanı 4 hit / 651 miss olarak açıkça raporlandı. |
+| Native CTest | Son kod kaynağında desktop verification script’i. | Build 90/90; core 10/10; full CTest 32/32, 0 failed. | `build-p1/final-0eaf3b3/desktop-evidence/desktop.log`. | PASS. |
+| ASan/UBSan | Son kod kaynağında sanitizer verification script’i, leak detection açık. | Build 90/90; full CTest 32/32, 0 failed; ASan/UBSan hata raporu yok. | `build-p1/final-0eaf3b3/sanitizer-evidence/sanitizers.log`. | PASS; bu race-freedom/TSan kanıtı değildir. |
+| Switch cross-build | AArch64 ELF/NRO, libcurl link, RomFS, CA bundle, NACP 0.9.1. Release packaging kolu çalıştırılmadı. | `verify-switch.sh` build-only ve artifact verifier tamamlandı. | `build-p1/final-0eaf3b3/switch-preflight-evidence/switch-build-receipt.json`, `artifacts.json`. | Cross-build PASS; fiziksel Switch UNVERIFIED. |
+
+### Çalıştırılan doğrulama komutları
+
+- `docker compose run --rm -e PAPERNX_VERIFY_ROOT=build-p1/final-0eaf3b3/desktop-evidence -e PAPERNX_BUILD_ROOT=build-p1/final-0eaf3b3/desktop-build desktop bash -lc 'scripts/verify-desktop.sh'` — build 90/90, core 10/10, full CTest 32/32.
+- `docker compose run --rm -e PAPERNX_VERIFY_ROOT=build-p1/final-0eaf3b3/sanitizer-evidence -e PAPERNX_BUILD_ROOT=build-p1/final-0eaf3b3/sanitizer-build desktop bash -lc 'scripts/verify-sanitizers.sh'` — build 90/90, ASan/UBSan full CTest 32/32, `detect_leaks=1`.
+- `docker compose run --rm -e PAPERNX_VERIFY_ROOT=build-p1/final-0eaf3b3/switch-preflight-evidence -e PAPERNX_BUILD_ROOT=build-p1/final-0eaf3b3/switch-preflight -e PAPERNX_MUPDF_BUILD_ROOT=build-p1/final-0eaf3b3/mupdf-preflight -e PAPERNX_MUPDF_PREFIX=/work/prefix-mupdf-switch -e PAPERNX_BUILD_ONLY=1 switch bash -lc 'scripts/verify-switch.sh'` — AArch64 ELF/NRO build + artifact checks PASS; packaging skipped.
+- `docker compose run --rm desktop bash -lc 'python3 tests/run_cover_app_benchmark.py --binary build-p1/final-0eaf3b3/desktop-build/desktop/papernx_cover_app_benchmark --output build-p1/final-0eaf3b3/cover-benchmark'` — 18/18 workload runs PASS. Percentiles use nearest-rank; p95/p99 with n=3 are the maximum observation. Corpus 1,000 paths / 965 unique contents / 3.5% repeated synthetic CBR payloads.
+
+### Cover benchmark özeti
+
+Tüm zamanlar ms cinsinden medyandır; viewport first-visible/fill metriklerinde kitaplığın ilk viewport’u kullanıldı (5 kitap, ilk EPUB kapaksız olduğundan 4 cover-eligible öğe). Her startup örnek sayısı n=3; RSS KiB’dir.
+
+| Kitap / mod | Startup→ilk frame | Tarama | İlk kapak | %50 / %95 dolum | Tam sweep | Peak RSS |
+|---|---:|---:|---:|---:|---:|---:|
+| 100 cold | 387.2 | 126.0 | 199.6 | 305.6 / 554.0 | 5,598 | 60,912 |
+| 100 warm | 741.7 | 155.7 | 226.0 | 226.1 / 411.3 | 6,453 | 60,084 |
+| 500 cold | 414.2 | 1,215.5 | 182.8 | 295.3 / 496.6 | 32,402 | 89,264 |
+| 500 warm | 2,225.6 | 1,221.4 | 1,292.0 | 1,292.0 / 1,294.4 | 33,047 | 88,392 |
+| 1,000 cold | 357.9 | 2,322.4 | 166.7 | 263.3 / 462.5 | 65,747 | 94,320 |
+| 1,000 warm | 4,419.5 | 2,630.1 | 2,712.0 | 2,712.1 / 2,714.6 | 65,020 | 95,688 |
+
+Diğer sonuçlar `docs/V092_COVER_BENCHMARK.md` ve ham JSON’larda: decode/frame/upload wait n, median, p95, p99; metadata/archive open, uploads, stale discard, cache hit/miss sayaçları. Önceki dört tekrar kullanılan fixture benchmark’ı farklı workload olduğundan karşılaştırılabilir “önce” değeri yok; production optimizasyonu ve budget artışı yapılmadı. 48 MiB disk / 512 entry sınırı tutuldu. 1.000 kitapta düşük cache reuse saklanmadı.
+
+### Gerçek engeller ve karar
+
+- Otomatik kurulum/chainload için HBL `envSetNextLoad()` argv/RomFS/reboot recovery sözleşmesi ve FAT rename/flush/güç kesintisi davranışı gerçek Switch’te kanıtlanmadı. Güvenli manuel kurulum destekleniyor; otomatik kurulum bu nedenle **BLOCKED**, kod doğrulaması değil fiziksel kanıt eksik.
+- Switch cross-build donanım testi değildir. Fiziksel cihazda TLS, SD çıkarma/güç kesme, external file-manager replacement/restore, Joy-Con/backlight ve gerçek GPU/frame-time senaryoları **UNVERIFIED**.
+- No-Git tarball fallback, ThreadSanitizer/data-race doğrulaması ve fiziksel Switch ölçümü yapılmadı. Tam release package/build, merge/tag/publish ve GitHub Actions çalıştırılmadı.
+- **Genel karar: INCOMPLETE — release/merge hazır değil.** Kaynak koduyla doğrulanabilen test/build kapıları PASS; fiziksel storage/chainload kapısı açık. Kullanıcıya ait dört untracked dosya korundu ve stage edilmedi. GitHub Actions çalıştırmama talimatına uymak için push yapılmadı; altı kod commit'i yerel feature branch'inde duruyor.

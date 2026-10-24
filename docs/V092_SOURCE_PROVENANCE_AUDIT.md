@@ -499,3 +499,19 @@ Files below were restructured **on top of** fork-derived code; none of this is a
 - `include/papernx/library_index.hpp`, `src/library_index.cpp`, `src/library_scan.inc` (Refael Bar lineage): `ScanRequest`/`ScanStatus`/`InventoryRepository`/`scanLibrary` split and generation check. Still fork-derived/adapted.
 - New PaperNX-authored header `include/papernx/cover_pipeline.hpp` (`MetadataLedger`, `CoverTelemetry`); written for this repo, no fork content.
 - Refael Bar / Refael Avramashvili credits and AGPL-3.0 notices are unchanged.
+
+
+## Son kaynak anlık görüntüsü — 2026-10-24 — `0eaf3b38defa5a72b2895967f2c2bfb7390b8153`
+
+Feature branch'indeki son kaynak derlendi ve test edildi. Bu köken kaydı, üst kaynak çizgisini veya atıfları değiştirmeden PaperNX uyarlamalarını belgeliyor:
+
+| Dosya | Son kaynak blob'u | Köken / atıf |
+|---|---|---|
+| `src/self_update.cpp` | `a3cf5eba6dd6fa8f266dff7e021000d2df43b449` | İki bağımsız doğrulanmış aday yuvası ve manuel kurulum kurtarması içeren fork-türevli updater; Refael Avramashvili / AGPL-3.0 atfını koruyun. |
+| `src/library_index.cpp` | `196723fdbf1a32b1e4d5f14251d86f6dd3084046` | Envanter ve gezinme güvenliği uyarlamaları içeren fork-türevli scanner/index. Desktop POSIX no-follow bileşen denetimini kullanır; çapraz bağlama `openat` bulunmadığını gösterdiği için Switch, libnx uyumlu `open`/`fstat` yolunu kullanır. Refael Bar / AGPL-3.0 atfını koruyun. |
+| `src/library_scan.inc` | `f4778a9e91c4d4898ca0baf8300d5235e474a435` | Fork-türevli SDL scanner entegrasyonu; Refael Bar / AGPL-3.0 atfını koruyun. |
+| `include/papernx/library_index.hpp` | `348cabf5cc9dcdd4befcd4cc7cd305b03d8dbc01` | Fork-türevli/uyarlanmış tarama sözleşmesi; Refael Bar / AGPL-3.0 atfını koruyun. |
+| `src/update_json.hpp` | `a215facb0a48bdd5e8ebfff86b0bcde8f2f63cfc` | Sıkı UTF-8/schema/asset politikası olan fork-türevli, sınırlandırılmış release parser; Refael Avramashvili / AGPL-3.0 atfını koruyun. |
+| `include/papernx/cover_pipeline.hpp` | `cf53bb333bdc8b5d27e23b34215b97d24220189b` | PaperNX tarafından yazılmış telemetri ekleri; çevresindeki fork-türevli uygulama/depo kodunun kökenini değiştirmez. |
+
+Geçmişteki byte-identity bulgusu yalnızca kayıtta belirtilen eski feature revizyonu için geçerlidir. Hash değişiklikleri, yeni sınırlar ve güvenlik uyarlamaları scanner, updater veya parser kodunu clean-room yapmaz. Mevcut yazar ve AGPL-3.0 bildirimleri korunmuştur.

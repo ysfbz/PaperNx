@@ -21,3 +21,15 @@ Code HEAD before this report: `93070ea` (`git log` is authoritative).
 2. Existing `self_update_tests`/`library_index_tests`/`modern_library_tests`/cover tests; add tests for: failed download keeps old `.new`; Verifying cancel; `.boot.ok` with missing NRO; scan cancel/stale generation; `RootUnavailable` keeps inventory; ledger LRU eviction; telemetry epoch/percentiles; JSON export has no paths.
 3. Behaviour risk: duplicate-asset policy moved into `PaperNxAssetPolicy` (expects `assets.size()==2` test still true); scan `take()` now sets `complete=false` if cancelled flag raised.
 4. Benchmark 100/500/1000 with the flag; device checks stay with G9–G12 (not performed).
+
+## Final verification follow-up — source `0eaf3b38defa5a72b2895967f2c2bfb7390b8153`
+
+The code-only status above is historical and is superseded for this source snapshot:
+
+- **Updater:** two candidate slots retain independent payload/record metadata. Desktop and ASan/UBSan full CTest each passed `papernx_self_update_tests` and `papernx_self_update_network_tests` (2/2). `Ready` still means staged, never installed. Automatic installation remains blocked pending real HBL chainload and FAT power-loss evidence; the verified-manual recovery path remains the supported flow.
+- **Scanner/parser:** final desktop and ASan/UBSan CTest both passed 32/32. The Switch cross-build exposed that libnx does not provide `openat`; the final Switch path now uses one `open`/`fstat` handle after root-relative component checks. Desktop POSIX retains `openat`/`O_NOFOLLOW`. Switch SD/FAT path behavior remains untested on a physical console.
+- **Source identity:** desktop and Switch build receipts agree on code SHA `0eaf3b38defa5a72b2895967f2c2bfb7390b8153`, tree SHA `8b2da6f807f74065830dec551933ca321c32de1e9eb78a37d0de623448a890ef`, and the same `git:...:dirty:true:tree:...` identity. The dirty marker reflects preserved user-owned untracked documents and fixture.
+- **Covers:** the app-level SDL dummy/software benchmark completed 100/500/1000 books, cold/warm, three repetitions each. Summary and 18 raw runs are in `build-p1/final-0eaf3b3/cover-benchmark/`. This is desktop software-renderer evidence only; Switch GPU/SD timing is not inferred.
+- **Final verification:** `scripts/verify-desktop.sh` — 90/90 build, core CTest 10/10, full CTest 32/32; `scripts/verify-sanitizers.sh` — 90/90 build, full ASan/UBSan CTest 32/32 with leak detection; `scripts/verify-switch.sh` in build-only mode — AArch64 ELF/NRO and artifact validation PASS. The artifact record explicitly retains `hardware: UNVERIFIED`.
+
+The code remains fork-derived/adapted where recorded in `docs/V092_SOURCE_PROVENANCE_AUDIT.md`; this handoff makes no clean-room claim and preserves all AGPL/author attribution. Overall release readiness remains **INCOMPLETE** until physical Switch and filesystem recovery checks are performed.

@@ -77,3 +77,68 @@ At `d7f3fd3`, `PaperNX` rebuilt and `papernx_cover_tests`, `papernx_cover_perfor
 The focused ASan/UBSan build of `papernx_cover_tests` and `papernx_cover_performance_tests` passed **2/2** (11.99 sec). This covers repository safety and synthetic eviction; it does not instrument the full application or Switch runtime.
 
 The app-level `papernx_modern_library_tests` rebuilt and passed **1/1** (13.83 sec) at the same source revision. It checks visible cover upload priority and stale queue cleanup after results arrive. It does not measure UI queue latency, scroll fill, FPS or Switch SD.
+
+## Final app-level benchmark — source `0eaf3b38defa5a72b2895967f2c2bfb7390b8153`
+
+This section supersedes the earlier four-content fixture benchmark as the current G6 evidence. The current benchmark runs the actual `PaperNxApp` SDL dummy/software path: library scan, metadata worker, thumbnail request/worker, completed queue, SDL texture upload, render, scroll, category changes, book open/return, cache clear and reload.
+
+**Build identity:** app `v0.9.1` development version; source tree SHA-256 `8b2da6f807f74065830dec551933ca321c32de1e9eb78a37d0de623448a890ef`; renderer `software`. Desktop build receipt and every telemetry record use the same source identity. This does not represent Switch GPU or SD-card performance.
+
+### Corpus
+
+The deterministic, copyright-safe 1,000-document corpus contains generated EPUB, PDF and CBZ content, plus five checked-in synthetic CBR sources reused in the 40 CBR paths. It has 965 unique SHA-256 contents overall (3.5% repeated content). The 100 and 500 runs use ordinal subsets of the same corpus. EPUB titles/body metadata vary in length; one EPUB in every ten has no cover. Covers vary from small images to 640×900; PDFs use varied embedded image dimensions; CBZ files contain one to five pages and nested entries.
+
+| Format | Files | Unique contents | File size min / median / max bytes |
+|---|---:|---:|---:|
+| EPUB | 320 | 320 | 1,464 / 49,986 / 1,394,907 |
+| PDF | 320 | 320 | 29,430 / 66,250.5 / 1,392,324 |
+| CBZ | 320 | 320 | 462,005 / 571,004.5 / 2,077,542 |
+| CBR | 40 | 5 | 894 / 966 / 1,108 |
+
+Corpus total: 319,840,078 bytes. CBR repetition is explicit and is the principal corpus limitation. The first viewport has five book rows but four cover-eligible items because the first item is a coverless EPUB; telemetry reports four requested/four loaded. Fill percentages use eligible cover requests, and decode/upload failures stay in the denominator.
+
+Each size/mode has three separate application runs. Each repetition runs cold then warm using the same app root, so warm starts with the persisted cache state from its cold run. Distributions use nearest-rank. For per-run metrics, `n=3`, so p95 and p99 equal the largest of the three values. Decode, frame and upload-wait distributions pool the bounded telemetry rings; the JSON report records each metric's `n` and method.
+
+### Startup, scan, viewport, sweep and memory
+
+All times are milliseconds; RSS is KiB. `First viewport wait` is the harness wait-loop duration. `First visible/fill50/fill95` are telemetry times from the first cover request and are shown separately because a warm cache can resolve before the harness enters its wait loop.
+
+| Books | Mode | Startup median / p95 / p99 | Scan median | First visible | Fill 50% | Fill 95% | Full sweep median | Peak RSS median KiB |
+|---:|---|---:|---:|---:|---:|---:|---:|---:|
+| 100 | cold | 387.2 / 435.8 / 435.8 | 126.0 | 199.6 | 305.6 | 554.0 | 5,598.3 | 60,912 |
+| 100 | warm | 741.7 / 890.2 / 890.2 | 155.7 | 226.0 | 226.1 | 411.3 | 6,453.4 | 60,084 |
+| 500 | cold | 414.2 / 457.0 / 457.0 | 1,215.5 | 182.8 | 295.3 | 496.6 | 32,401.8 | 89,264 |
+| 500 | warm | 2,225.6 / 2,260.6 / 2,260.6 | 1,221.4 | 1,292.0 | 1,292.0 | 1,294.4 | 33,046.8 | 88,392 |
+| 1,000 | cold | 357.9 / 446.6 / 446.6 | 2,322.4 | 166.7 | 263.3 | 462.5 | 65,747.4 | 94,320 |
+| 1,000 | warm | 4,419.5 / 4,839.7 / 4,839.7 | 2,630.1 | 2,712.0 | 2,712.1 | 2,714.6 | 65,020.2 | 95,688 |
+
+### Interaction, decode, queue, frame and counters
+
+Per-run interaction/counter values below are medians. Decode, frame and upload-wait percentiles are pooled from the 3× bounded rings; their exact sample counts are in `summary.json`. The benchmark's upload wait is completion-queue arrival to SDL upload attempt.
+
+| Books | Mode | First viewport wait | Fast scroll | Category change | Open/return | Clear/reload | Decode median / p95 / p99 | Upload wait median / p95 / p99 | Frame median / p95 / p99 |
+|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 100 | cold | 514.8 | 646.0 | 364.8 | 138.5 | 277.2 | 9.04 / 59.87 / 158.25 | 1.62 / 3.45 / 6.92 | 2.65 / 3.89 / 8.35 |
+| 100 | warm | 185.0 | 593.4 | 434.1 | 234.7 | 332.5 | 9.59 / 60.96 / 189.07 | 1.90 / 4.75 / 123.94 | 2.97 / 5.24 / 10.27 |
+| 500 | cold | 450.5 | 606.2 | 403.7 | 202.2 | 1,088.6 | 9.79 / 62.39 / 172.80 | 1.84 / 4.00 / 5.48 | 2.73 / 5.21 / 10.78 |
+| 500 | warm | 2.6 | 536.5 | 455.4 | 258.5 | 1,260.0 | 9.67 / 57.92 / 166.98 | 1.85 / 3.71 / 4.44 | 3.02 / 4.71 / 7.58 |
+| 1,000 | cold | 418.5 | 528.2 | 1,404.6 | 404.8 | 2,440.3 | 11.88 / 70.60 / 180.76 | 1.99 / 4.22 / 6.54 | 3.40 / 9.18 / 12.76 |
+| 1,000 | warm | 2.7 | 642.4 | 961.1 | 308.1 | 1,806.3 | 11.21 / 61.51 / 166.78 | 1.65 / 3.91 / 5.41 | 2.78 / 3.93 / 6.09 |
+
+| Books | Mode | Cover requests | Metadata opens / avoided | Archive opens | Disk cache hits / misses | Successful uploads | Upload failures | Stale discards |
+|---:|---|---:|---:|---:|---:|---:|---:|---:|
+| 100 | cold | 183 | 100 / 70 | 42 | 4 / 70 | 66 | 0 | 113 |
+| 100 | warm | 184 | 0 / 0 | 6 | 4 / 70 | 66 | 0 | 114 |
+| 500 | cold | 856 | 500 / 326 | 186 | 5 / 326 | 309 | 0 | 530 |
+| 500 | warm | 857 | 0 / 0 | 6 | 4 / 326 | 309 | 0 | 531 |
+| 1,000 | cold | 1,182 | 1,000 / 651 | 366 | 4 / 651 | 616 | 0 | 532 |
+| 1,000 | warm | 1,182 | 0 / 5 | 6 | 4 / 651 | 616 | 0 | 532 |
+
+At 1,000 books the observed cache reuse is low (4 hits / 651 misses); it is not hidden or presented as a successful high-hit workload. The 48 MiB disk / 512-entry limits and 32 MiB texture cache were not increased. No production performance optimization was made during this final benchmark, so a before/after comparison is **N/A**; older repeated-fixture results are not comparable to this distinct-content corpus.
+
+### Raw evidence and limits
+
+- Summary: `build-p1/final-0eaf3b3/cover-benchmark/summary.json` and `summary.md`.
+- Raw application outputs: the 18 `raw-<100|500|1000>-<cold|warm>-<1|2|3>.json` files in that directory.
+- Generated corpus and content-hash manifest: `build-p1/final-0eaf3b3/cover-benchmark/corpus/`.
+- All measured runs used SDL dummy/software renderer in the desktop Docker container. No physical Switch, GPU renderer, SD-card scan, Joy-Con, real TLS or hardware frame-time test ran. Do not label these results Switch hardware PASS.
