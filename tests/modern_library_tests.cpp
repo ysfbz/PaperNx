@@ -127,6 +127,33 @@ struct AppTest {
         assert(moved!=app.visibleBooks_.end() && moved-app.visibleBooks_.begin()>=10);
         assert(app.thumbCache_.get("thumb_"+newlyVisible));
     }
+    static void runMetadataIndexRetry(const fs::path &root) {
+        fs::create_directories(root/"books");
+        PaperNxApp app(root);assert(initReady(app));
+        Book book;book.id="eeeeeeeeeeeeeeee";book.path=(root/"books"/"missing.epub").u8string();book.title="Retry";book.format=Format::Epub;book.bytes=123;book.modified=1;
+        app.books_.push_back(book);app.rebuildLibraryLookup();
+        const auto fingerprint=std::to_string(book.bytes)+":"+std::to_string(book.modified)+":series-v1";
+        const auto key=book.id+":"+fingerprint;
+        app.scheduleMetadataIndex();
+        const auto deadline=SDL_GetTicks()+10000;
+        bool released=false;
+        while(SDL_GetTicks()<deadline) {
+            {std::lock_guard<std::mutex> lock(app.queueMutex_);released=!app.metadataIndexedIds_.count(key);}
+            if(released)break;
+            SDL_Delay(2);
+        }
+        assert(released);
+        const auto validPath=root/"books"/"valid.epub";
+        fs::copy_file("tests/fixtures/sample_book.epub",validPath);
+        app.books_.front().path=validPath.u8string();app.scheduleMetadataIndex();
+        const auto retryDeadline=SDL_GetTicks()+10000;
+        while(SDL_GetTicks()<retryDeadline) {
+            app.processCompletedThumbnails();
+            if(app.catalog_.get(book.id).metadataFingerprint==fingerprint)break;
+            SDL_Delay(2);
+        }
+        assert(app.catalog_.get(book.id).metadataFingerprint==fingerprint);
+    }
 };
 }
 int main() {
@@ -145,5 +172,7 @@ int main() {
     AppTest::run(root);const auto historyRoot=fs::temp_directory_path()/"papernx-history-restore";fs::remove_all(historyRoot);
     AppTest::runHistoryRestore(historyRoot);fs::remove_all(historyRoot);
     const auto coverRoot=fs::temp_directory_path()/"papernx-cover-queue-priority";fs::remove_all(coverRoot);
-    AppTest::runCoverQueuePriority(coverRoot);fs::remove_all(coverRoot);fs::remove_all(root);TTF_Quit();SDL_Quit();
+    AppTest::runCoverQueuePriority(coverRoot);fs::remove_all(coverRoot);
+    const auto metadataRoot=fs::temp_directory_path()/"papernx-metadata-index-retry";fs::remove_all(metadataRoot);
+    AppTest::runMetadataIndexRetry(metadataRoot);fs::remove_all(metadataRoot);fs::remove_all(root);TTF_Quit();SDL_Quit();
 }

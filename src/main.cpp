@@ -684,10 +684,10 @@ private:
         }
         queueCv_.notify_one();
     }
-    void collectBookMetadata(const Book &book,PxDocument *document=nullptr) {
+    bool collectBookMetadata(const Book &book,PxDocument *document=nullptr) {
         bool owned=document==nullptr;char error[256]{};
         if(owned)document=px_document_open_metadata(book.path.c_str(),error,sizeof error,isComic(book.format)?96u*1024u*1024u:16u*1024u*1024u);
-        if(!document)return;
+        if(!document)return false;
         char title[512]{},author[512]{},series[512]{},index[64]{};
         px_document_metadata(document,"info:Title",title,sizeof title);
         px_document_metadata(document,"info:Author",author,sizeof author);
@@ -695,6 +695,7 @@ private:
         px_document_metadata(document,"info:SeriesIndex",index,sizeof index);
         {std::lock_guard<std::mutex> lock(completedMutex_);completedMetadata_.push_back({book.id,title,author,series,index});}
         if(owned)px_document_close(document);
+        return true;
     }
     static std::string formatBytes(std::uintmax_t bytes) {
         if (bytes >= 1024 * 1024) return std::to_string(bytes / (1024 * 1024)) + " MB";
@@ -749,7 +750,14 @@ private:
                 coverClearStatus_ = ok ? 2 : 3;
                 continue;
             }
-            if(metadataOnly) {collectBookMetadata(b);continue;}
+            if(metadataOnly) {
+                if(!collectBookMetadata(b)) {
+                    const auto fingerprint=std::to_string(b.bytes)+":"+std::to_string(b.modified)+":series-v1";
+                    std::lock_guard<std::mutex> lock(queueMutex_);
+                    metadataIndexedIds_.erase(b.id+":"+fingerprint);
+                }
+                continue;
+            }
 
             auto cached = coverRepository_.read(b);
             updateCoverCounters();
