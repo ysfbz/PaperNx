@@ -73,7 +73,10 @@ inline ThemePalette resolveInterfacePalette(const ThemePalette &reading,int vari
         palette.bg={245,246,251,255};palette.fg={29,34,53,255};palette.muted={102,111,138,255};
         palette.card={255,255,255,255};palette.header={237,240,249,255};palette.cardBorder={218,223,238,255};
     }
-    palette.accent=accents[std::clamp(accent,0,6)];return palette;
+    // Accent 7 means use the selected paper's own accent. Explicit accent
+    // choices remain available with Dark, Light and Follow reading theme.
+    if (accent >= 0 && accent < 7) palette.accent=accents[accent];
+    return palette;
 }
 // One appearance resolver for both native EPUB and PDF reader chrome.
 // Legacy PDF filter bytes are ignored: PDF derives paper and text colors from
