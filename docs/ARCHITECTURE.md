@@ -5,7 +5,7 @@ Bu doküman mimari tasarım kararlarını ve sistem bileşenlerini içerir. Gün
 PaperNX çevrimdışı, bellek tasarruflu bir C++17 uygulamasıdır:
 - `src/main.cpp`: SDL olay döngüsü, ekran durum makinesi, dokunmatik hareketler ve kumanda yönlendirme ayrıştırması.
 - `src/core.cpp`: Dosya tarama, meta veri ayrıştırma, doğal alfabetik/sayısal sıralama (`compareNatural`) ve kalıcı veri depoları.
-- `src/library_index.cpp` / `src/library_scan.inc`: UI dışı çoklu kök taraması ve disposable envanter önbelleği. Dosya keşfi mevcut `core::scan` yolunu kullanır; sonuçlar SDL olay döngüsünde yayımlanır.
+- `src/library_index.cpp` / `src/library_scan.inc`: UI dışı çoklu kök taraması ve disposable envanter önbelleği. Dosya keşfi PaperNX `scanRoots()` yolunu kullanır; sonuçlar SDL olay döngüsünde yayımlanır. Envanter ayrı `ProgressStore` dosyasında `PAPERNX-LIBRARY-1` marker’ı taşır; önceki marker’sız cache biçimi okunur, tanınmayan schema kullanılmaz ve güvenle yeniden taranır.
 - `src/self_update.cpp` / `src/self_update_ui.inc`: Sabit PaperNX GitHub kaynağına libcurl TLS erişimi, NRO doğrulama ve kullanıcı onaylı aşamalı kurulum. CA trust dosyası `romfs/cacert.pem` içindedir.
 - `include/papernx/theme.hpp`: Okuma ve uygulama ekranlarının ortak tema token'ları; Light, Dark, Follow Reading ve vurgu paletleri burada çözülür.
 - `src/main.cpp`: App settings girişlerini yönlendirir; yazılımsal dimmer her platformda çalışır ve Switch arka ışığı uygun handheld/service koşullarında geçici olarak değiştirilip eski değerine döndürülür.
@@ -32,7 +32,7 @@ Ekran saat yönünde veya tersinde dikey moda (Portrait) döndürüldüğünde, 
 
 ## Kalıcılık ve Veri Güvenliği
 
-Tüm kalıcı depolar (`progress.txt`, `catalog.txt`, `reading-stats.txt`) FNV-1a checksum korumalıdır. Dosya yazma işlemleri önce `.tmp` dosyasına yapılıp fsync ile diske yazılır, byte doğrulaması yapıldıktan sonra eski dosya `.bak` olarak yedeklenip atomik olarak yer değiştirilir.
+Kalıcı depolar (`progress.txt`, `catalog.txt`, `reading-stats.txt` ve `library-index.txt`) FNV-1a checksum korumalı `ProgressStore` taşımasını kullanır. Dosya yazma işlemleri önce `.tmp` dosyasına yapılıp fsync ile diske yazılır, byte doğrulaması yapıldıktan sonra eski dosya `.bak` olarak yedeklenip atomik olarak yer değiştirilir. `library-index.txt` progress/bookmark verisinden ayrı kalır; marker’sız eski envanterler okunur, desteklenmeyen yeni schema ise kullanıcı verisi sayılmadan cache miss olarak ele alınır.
 
 ## Derleme Sistemi
 

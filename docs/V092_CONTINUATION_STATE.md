@@ -2,7 +2,7 @@
 
 **Updated:** 2026-10-24
 **Branch:** `feature/v0.9.2-complete-reader-enhancements`
-**Latest source commit:** `50b9d60023c284fdadc28b92c23f524733920b08` (strict updater release metadata validation).
+**Latest source commit:** `99839eb8e336a76649f433a11e7804263221661a` (versioned disposable library inventory).
 **Latest test-only commit:** `70ac670873af6e254185808ed397ee05b9c46ccc` (10,000/10,001-item scan boundary).
 **Last source commit before the current hardening changes:** `bb9d8579db9ccf0d10b5843e1929c2e696565c59`
 **Hardening source commits:** `913fb8f` and `1cb06a1`.
@@ -37,7 +37,7 @@
 
 ## Next session starting point
 
-At current source HEAD `50b9d60023c284fdadc28b92c23f524733920b08`, G1 cold-page worker and partial-spread error handling are complete, G2/G3 behavior passed focused current-source regressions, and the updater parser rejects mistyped release flags and responses beyond the configured 30-release page. G2/G3 were already implemented in earlier feature commits; see dated checkpoints for the exact test commands. Continue the still-open G5 PaperNX-specific scanner/index/updater responsibility redesign and Ponytail audit, then close only relevant remaining native gates without restarting completed broad chains unnecessarily. Physical acceptance remains unverified; use [`V092_DEVICE_ACCEPTANCE.md`](V092_DEVICE_ACCEPTANCE.md) as the device record. Keep the final decision `INCOMPLETE — BLOCKERS REMAIN` until all required gates have evidence.
+At current source HEAD `99839eb8e336a76649f433a11e7804263221661a`, G1 cold-page worker and partial-spread error handling are complete, G2/G3 behavior passed focused current-source regressions, the updater parser rejects mistyped release flags and responses beyond the configured 30-release page, and the disposable inventory has a schema marker while still reading legacy caches. Continue the larger G5 PaperNX-specific scanner/index/updater responsibility redesign and Ponytail audit, then close only relevant remaining native gates without restarting completed broad chains unnecessarily. Physical acceptance remains unverified; use [`V092_DEVICE_ACCEPTANCE.md`](V092_DEVICE_ACCEPTANCE.md) as the device record. Keep the final decision `INCOMPLETE — BLOCKERS REMAIN` until all required gates have evidence.
 
 ## 2026-10-23 latest continuation checkpoint
 
@@ -235,3 +235,11 @@ The verified/pushed branch HEAD at the start of this note was `ed9e3b69c184de1b4
 - **Build/CTest:** `docker compose run --rm desktop bash -lc 'cmake --build build-desktop --target PaperNX papernx_self_update_tests --parallel 4 && ctest --test-dir build-desktop --output-on-failure -R "^papernx_self_update_tests$|^papernx_self_update_network_tests$"'` — build **PASS**, updater unit + local HTTPS CTest **2/2 PASS** (2.02 seconds). This host run does not validate Switch TLS or link output at this source HEAD.
 - A first build attempt exposed that the test tried to reference the private parser header through the public updater test; the test was changed to exercise the public `selectUpdateRelease()` contract. The corrected test build and CTest passed.
 - **Next:** the larger G5 scanner/index architecture and source/Ponytail audit remain open; parser lineage is still adapted, not clean-room. Full CTest, sanitizers, current-HEAD Switch build and physical Switch remain open. Overall status **INCOMPLETE — BLOCKERS REMAIN**.
+
+## 2026-10-24 — G5 versioned library inventory
+
+- **Source commit / HEAD:** `99839eb8e336a76649f433a11e7804263221661a` (`fix(library): version the disposable inventory`).
+- New inventory snapshots carry `PAPERNX-LIBRARY-1` in the existing dedicated `ProgressStore` file. Markerless prior snapshots remain readable; an unknown non-empty schema marker is treated as an unusable disposable cache and is not published. Progress, bookmarks and their file are untouched.
+- `tests/library_index_tests.cpp` verifies new marker persistence, legacy markerless read, unknown-schema rejection, inventory restore, corruption recovery and separate reading progress. `papernx_library_index_tests` and `papernx_modern_library_tests` built and passed **2/2** in **15.16 seconds**.
+- `src/library_index.cpp` remains fork-derived/adapted despite this PaperNX-specific storage boundary. Refael Bar attribution and AGPL-3.0 notices remain. No Switch build, full CTest or sanitizer was run at this HEAD.
+- **Next:** continue the remaining scanner/index architecture redesign and source/Ponytail audit; overall status **INCOMPLETE — BLOCKERS REMAIN**.

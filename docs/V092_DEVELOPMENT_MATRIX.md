@@ -5,7 +5,7 @@
 
 **Baseline:** `main@8db85384a1b6c277c74766601ef46e9a672328df` (2026-10-23 audit)  
 **Feature branch:** `feature/v0.9.2-complete-reader-enhancements`  
-**Latest source-bearing HEAD:** `50b9d60023c284fdadc28b92c23f524733920b08` (updater release metadata validation).
+**Latest source-bearing HEAD:** `99839eb8e336a76649f433a11e7804263221661a` (versioned disposable library inventory).
 **Fork reference:** `rtk19/PaperNx@d2b4bcfd10b1a66043c5b8cd36da08340cffec6d`  
 **Version remains:** v0.9.1; do not tag, release or merge to main.
 
@@ -291,3 +291,9 @@ The reader-input test uses real SDL `SDL_CONTROLLERBUTTONDOWN` events with `SDL_
 `src/update_json.hpp` now fails closed when `draft` or `prerelease` is present with a non-boolean type. It also enforces the configured GitHub endpoint page size of 30 releases, accepting 30 and rejecting 31. `tests/self_update_tests.cpp` covers both malformed flags and the exact count boundary.
 
 Desktop `PaperNX` and updater test targets built; `papernx_self_update_tests` plus local HTTPS `papernx_self_update_network_tests` passed **2/2** in **2.02 seconds**. The parser still retains fork-derived/adapted lineage and Refael Avramashvili / AGPL-3.0 attribution. No Switch build or full native/sanitizer run was performed at this HEAD; overall decision remains **INCOMPLETE — BLOCKERS REMAIN**.
+
+## G5 versioned inventory boundary — `99839eb`
+
+`src/library_index.cpp` writes the explicit `PAPERNX-LIBRARY-1` marker through the existing dedicated `ProgressStore` transport. It continues reading markerless legacy inventory snapshots; an unknown marked schema is rejected as a disposable cache miss. No parallel inventory codec was added, and the reading-progress file is never used as the cache.
+
+The library-index and modern-library targets built; CTest passed **2/2** in **15.16 seconds**. Tests cover marker persistence, legacy read, unsupported-schema rejection, restoration and progress isolation. The worker remains fork-derived/adapted; no independent-origin claim is made. Switch/full-suite/sanitizer checks were not run at this source HEAD; overall status remains **INCOMPLETE — BLOCKERS REMAIN**.

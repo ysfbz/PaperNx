@@ -506,15 +506,6 @@ Bu tek koşu yazılım renderer’ı host ölçümüdür; hızlanma iddiası de�
 
 **Karar: INCOMPLETE — BLOCKERS REMAIN.** G1 hedefli desktop ve Switch build kanıtı var; bütün 11 alanın current-HEAD full kabulü yok. Release, tag, PR, merge veya GitHub Actions çalıştırılmadı.
 
-## AB. 2026-10-24 — G1 sonrası G2/G3 ve Joy-Con `+` regresyon kontrolü
-
-- **Dal / kaynak HEAD:** `feature/v0.9.2-complete-reader-enhancements` / `d3265ddda21fd2ba5a1ba6fca0d72d95d8420e6b`. Bu kontrol turunda kaynak kod değişmedi.
-- **Build ve odaklı CTest:** `docker compose run --rm desktop bash -lc 'cmake --build build-desktop --target papernx_comic_performance_tests papernx_reader_input_tests papernx_reader_spread_tests papernx_comic_app_tests papernx_page_curl_app_tests papernx_page_curl_tests papernx_page_curl_fallback_tests --parallel 4 && ctest --test-dir build-desktop --output-on-failure -R "^papernx_comic_performance_tests$|^papernx_reader_input_tests$|^papernx_reader_spread_tests$|^papernx_comic_app_tests$|^papernx_page_curl_app_tests$|^papernx_page_curl_tests$|^papernx_page_curl_fallback_tests$"'` — build **PASS**, CTest **7/7 PASS**, 233,14 sn.
-- G2/G3 uygulamaları feature geçmişinde zaten vardı. Bu current-source turu soğuk comic dönüşü/dokunma, spread ve curl yollarını G1’den sonra tekrar doğruladı; G2/G3’ü yeniden uygulamadı.
-- Joy-Con fiziksel `+`, SDL `SDL_CONTROLLER_BUTTON_START` olarak aynı `toggleQuickMenu()`/`quickMenu_` state’ini kullanıyor; ekrandaki dokunmatik `+` de aynı fonksiyonu çağırıyor. Reader input regresyonu aynı menü state’inde dokunma/controller çapraz aç-kapatmayı ve üst iki kısayolun Joy-Con focus/aktivasyonunu doğruluyor. SDL event testi fiziksel Switch Joy-Con eşlemesini veya reconnect’i kanıtlamaz.
-- **Açık:** Tam native CTest, ASan/UBSan, Switch build/artifact doğrulaması bu HEAD’de, fiziksel cihaz, full benchmark ve bağımsız scanner/index/parser mimarisi. Önceden kaydedilmiş Switch PASS başka bir kaynak HEAD’indedir.
-- **Sonraki iş:** G5 kaynak sorumluluğu/provenance ve Ponytail audit’ini sürdür; genel karar **INCOMPLETE — BLOCKERS REMAIN**.
-
 ## AA. 2026-10-24 — G1 follow-up: çift sayfa hata mesajı ve güncel kaynak snapshot’ı
 
 - **Dal / kaynak commit:** `feature/v0.9.2-complete-reader-enhancements` / `d3265ddda21fd2ba5a1ba6fca0d72d95d8420e6b` (`fix(comics): preserve errors on partial spreads`). Başarılı karşı yaprak artık başarısız yaprağın mesajını temizlemiyor; spread/continuous render görünür sayfa hatasını çizim sonunda yeniden değerlendiriyor.
@@ -525,6 +516,15 @@ Bu tek koşu yazılım renderer’ı host ölçümüdür; hızlanma iddiası de�
 - **Performans sınırı:** Bu hata görünürlüğü düzeltmesi yeni performans ölçümü değildir. Önceki G1 tek-koşu host zamanları `a6e01b3` içindir; Switch FPS/RAM, full CTest, sanitizer, artifact receipt/hash ve fiziksel Switch doğrulaması **NOT RUN / UNVERIFIED**.
 - **Sıradaki iş:** execution plan G2 cold-cache queued turn/touch gate. Genel durum **INCOMPLETE — BLOCKERS REMAIN**.
 
+## AB. 2026-10-24 — G1 sonrası G2/G3 ve Joy-Con `+` regresyon kontrolü
+
+- **Dal / kaynak HEAD:** `feature/v0.9.2-complete-reader-enhancements` / `d3265ddda21fd2ba5a1ba6fca0d72d95d8420e6b`. Bu kontrol turunda kaynak kod değişmedi.
+- **Build ve odaklı CTest:** `docker compose run --rm desktop bash -lc 'cmake --build build-desktop --target papernx_comic_performance_tests papernx_reader_input_tests papernx_reader_spread_tests papernx_comic_app_tests papernx_page_curl_app_tests papernx_page_curl_tests papernx_page_curl_fallback_tests --parallel 4 && ctest --test-dir build-desktop --output-on-failure -R "^papernx_comic_performance_tests$|^papernx_reader_input_tests$|^papernx_reader_spread_tests$|^papernx_comic_app_tests$|^papernx_page_curl_app_tests$|^papernx_page_curl_tests$|^papernx_page_curl_fallback_tests$"'` — build **PASS**, CTest **7/7 PASS**, 233,14 sn.
+- G2/G3 uygulamaları feature geçmişinde zaten vardı. Bu current-source turu soğuk comic dönüşü/dokunma, spread ve curl yollarını G1’den sonra tekrar doğruladı; G2/G3’ü yeniden uygulamadı.
+- Joy-Con fiziksel `+`, SDL `SDL_CONTROLLER_BUTTON_START` olarak aynı `toggleQuickMenu()`/`quickMenu_` state’ini kullanıyor; ekrandaki dokunmatik `+` de aynı fonksiyonu çağırıyor. Reader input regresyonu aynı menü state’inde dokunma/controller çapraz aç-kapatmayı ve üst iki kısayolun Joy-Con focus/aktivasyonunu doğruluyor. SDL event testi fiziksel Switch Joy-Con eşlemesini veya reconnect’i kanıtlamaz.
+- **Açık:** Tam native CTest, ASan/UBSan, Switch build/artifact doğrulaması bu HEAD’de, fiziksel cihaz, full benchmark ve bağımsız scanner/index/parser mimarisi. Önceden kaydedilmiş Switch PASS başka bir kaynak HEAD’indedir.
+- **Sonraki iş:** G5 kaynak sorumluluğu/provenance ve Ponytail audit’ini sürdür; genel karar **INCOMPLETE — BLOCKERS REMAIN**.
+
 ## AC. 2026-10-24 — Updater release metadata doğrulaması
 
 - **Dal / kaynak commit:** `feature/v0.9.2-complete-reader-enhancements` / `50b9d60023c284fdadc28b92c23f524733920b08` (`fix(updater): reject invalid release metadata`).
@@ -533,5 +533,15 @@ Bu tek koşu yazılım renderer’ı host ölçümüdür; hızlanma iddiası de�
 - İlk test derlemesi testin private `update_json.hpp` sabitine doğrudan bağlanması nedeniyle başarısız oldu; test public `selectUpdateRelease()` üzerinden düzeltilip yeniden çalıştırıldı. Geçerli son koşu 2/2 geçti.
 - **Provenance:** `src/update_json.hpp` current blob `d36d44850270941d4a06cb38d7d038cec2691527`, pinned fork blob `d4e3bb96dcb2d363e23d40a83775c02768fc5394`. Kod değişikliği fork kökenini silmez; parser fork-derived/adapted kalır ve Refael Avramashvili / AGPL-3.0 atfı korunur.
 - **Açık:** G5 scanner/index sorumluluk tasarımı, full current-HEAD CTest, sanitizer, Switch build/artifact ve fiziksel Switch doğrulaması. Bu değişiklikte Switch doğrulaması çalıştırılmadı.
+
+**Karar: INCOMPLETE — BLOCKERS REMAIN.**
+
+## AD. 2026-10-24 — Kütüphane envanteri schema ve eski cache uyumu
+
+- **Dal / kaynak commit:** `feature/v0.9.2-complete-reader-enhancements` / `99839eb8e336a76649f433a11e7804263221661a` (`fix(library): version the disposable inventory`).
+- Envanter cache’i mevcut ayrı `ProgressStore` dosyasında `PAPERNX-LIBRARY-1` marker’ı yazar. Önceki marker’sız cache’ler okunmaya devam eder; işaretli bilinmeyen schema yayınlanmaz ve güvenle yeniden taranabilir. Okuma progress/bookmark dosyasına dokunulmaz.
+- `papernx_library_index_tests` schema marker’ı, legacy cache okumasını, unknown-schema reddini, bozuk cache recovery’sini ve progress isolation’ı doğruluyor. `papernx_modern_library_tests` uygulama çağrı akışını doğruluyor. Desktop build **PASS**, CTest **2/2 PASS** (15,16 sn).
+- **Provenance:** `src/library_index.cpp` fork blob `e4b3e83e2ddadaa55913b56f7a0a0e31b3f5dd1a` ile byte-eşleşmiyor; current blob `00b940e6ee65a0733c79d958d06a02bb66029e7b`. Worker lineage fork-derived/adapted kalır; Refael Bar atfı ve AGPL-3.0 kaydı korunur. Bu kaynak değişikliği clean-room iddiası değildir.
+- **Açık:** G5’in kapsamlı scanner/index mimari yeniden tasarımı; full current-HEAD CTest, sanitizer, Switch build/artifact ve fiziksel Switch doğrulaması. Bu HEAD’de Switch build çalıştırılmadı.
 
 **Karar: INCOMPLETE — BLOCKERS REMAIN.**
