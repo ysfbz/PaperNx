@@ -14,8 +14,10 @@ int main() {
     const std::array<fs::path,4> sources={"tests/fixtures/sample_book.epub","tests/fixtures/sample_doc.pdf",
         "tests/fixtures/comics/sample.cbz","tests/fixtures/comics/sample-rar4.cbr"};
 
-    for(const int count:{100,500,1000}) {
-        const auto caseRoot=root/std::to_string(count),booksRoot=caseRoot/"books",cacheRoot=caseRoot/"covers";
+    const std::array<std::uintmax_t,2> cacheBudgets={32u*1024u*1024u,48u*1024u*1024u};
+    for(const auto cacheBudget:cacheBudgets)for(const int count:{100,500,1000}) {
+        const auto caseRoot=root/(std::to_string(cacheBudget/(1024u*1024u))+"MiB-"+std::to_string(count));
+        const auto booksRoot=caseRoot/"books",cacheRoot=caseRoot/"covers";
         fs::create_directories(booksRoot);
         std::vector<Book> books;books.reserve(count);
         for(int i=0;i<count;++i) {
@@ -26,7 +28,7 @@ int main() {
             book.id=documentId(book.path,book.bytes);book.format=detectFormat(path);books.push_back(std::move(book));
         }
 
-        CoverRepository cold(cacheRoot);
+        CoverRepository cold(cacheRoot,cacheBudget);
         std::uint64_t coldOpens=0,metadataReads=0,firstColdMs=0;
         const auto coldStarted=Clock::now();
         auto decode=[&](const Book &book,CoverRepository &cache,bool readMetadata,std::uint64_t &opens) {
@@ -58,9 +60,9 @@ int main() {
         const auto coldMs=std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now()-coldStarted).count();
         const auto coldStats=cold.stats();
         assert(coldStats.misses==std::uint64_t(count) && coldStats.hits==0);
-        assert(coldStats.entries<=512 && coldStats.bytes<=32u*1024u*1024u);
+        assert(coldStats.entries<=512 && coldStats.bytes<=cacheBudget);
 
-        CoverRepository warm(cacheRoot);
+        CoverRepository warm(cacheRoot,cacheBudget);
         std::uint64_t warmReopens=0,warmOpens=0,firstWarmMs=0;
         const auto warmStarted=Clock::now();
         for(std::size_t i=0;i<books.size();++i) {
@@ -70,8 +72,8 @@ int main() {
         const auto warmMs=std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now()-warmStarted).count();
         const auto warmStats=warm.stats();
         assert(warmStats.hits+warmStats.misses==std::uint64_t(count));
-        assert(warmReopens==warmStats.misses && warmOpens==warmReopens && warmStats.entries<=512 && warmStats.bytes<=32u*1024u*1024u);
-        std::cout<<count<<" real EPUB/PDF/CBZ/CBR documents: cold first cover="<<firstColdMs
+        assert(warmReopens==warmStats.misses && warmOpens==warmReopens && warmStats.entries<=512 && warmStats.bytes<=cacheBudget);
+        std::cout<<count<<" real EPUB/PDF/CBZ/CBR documents, "<<cacheBudget/(1024u*1024u)<<" MiB disk budget: cold first cover="<<firstColdMs
                  <<" ms, cold fill="<<coldMs<<" ms, opens="<<coldOpens<<", metadata reads on same open="<<metadataReads
                  <<", cache="<<coldStats.entries<<" entries/"<<coldStats.bytes<<" bytes; warm first cover="<<firstWarmMs
                  <<" ms, warm pass="<<warmMs<<" ms, hits="<<warmStats.hits<<", misses/reopens="<<warmStats.misses

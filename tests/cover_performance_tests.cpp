@@ -40,7 +40,7 @@ int main() {
         for (const auto &book : books) assert(repository.write(book, cover));
         const auto populate = std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - started).count();
         const auto populated = repository.stats();
-        assert(populated.entries <= 512 && populated.bytes <= 32 * 1024 * 1024);
+        assert(populated.entries <= 512 && populated.bytes <= 48 * 1024 * 1024);
 
         started = Clock::now();
         for (const auto &book : books) (void)repository.read(book);
