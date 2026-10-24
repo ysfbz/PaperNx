@@ -145,8 +145,29 @@ struct AppTest {
   }
   // Configuration replacement discards old results and closes its worker-owned
   // document. The open document then survives idle longer than the old timeout.
-  ComicPages worker;
   const int lifecyclePage=std::min(2,app.pageCount_-1);
+  ComicPages configWorker;
+  const ComicPages::Spec largeSpec{"same-identity",path,false,0xffffff,0,3072};
+  const auto waitConfigPage=[&] {
+   ComicPages::Result result;bool received=false;const auto deadline=SDL_GetTicks()+20000;
+   while(!received && SDL_GetTicks()<deadline) {
+    for(auto &item:configWorker.take()) {assert(item.identity==largeSpec.identity);result=std::move(item);received=true;}
+    if(!received)SDL_Delay(2);
+   }
+   assert(received && !result.rgb.empty());return result;
+  };
+  configWorker.configure(largeSpec);configWorker.request(lifecyclePage,ComicPages::Priority::Visible);
+  const auto largeResult=waitConfigPage();assert(std::max(largeResult.width,largeResult.height)>1);
+  configWorker.configure(largeSpec);configWorker.request(lifecyclePage,ComicPages::Priority::Visible);
+  const auto repeatedResult=waitConfigPage();assert(repeatedResult.width==largeResult.width && repeatedResult.height==largeResult.height);
+  assert(configWorker.metrics().documentOpens==1 && configWorker.metrics().documentCloses==0);
+  auto smallSpec=largeSpec;smallSpec.textureLimit=1;
+  configWorker.configure(smallSpec);configWorker.request(lifecyclePage,ComicPages::Priority::Visible);
+  const auto limitedResult=waitConfigPage();assert(limitedResult.width==1 && limitedResult.height==1);
+  assert(configWorker.metrics().documentOpens==2 && configWorker.metrics().documentCloses==1);
+  configWorker.stop();assert(configWorker.metrics().documentOpens==2 && configWorker.metrics().documentCloses==2);
+
+  ComicPages worker;
   worker.configure({"old",path});for(int i=0;i<std::min(6,app.pageCount_);++i)worker.request(i);
   const auto openDeadline=SDL_GetTicks()+5000;
   while(worker.metrics().documentOpens==0 && SDL_GetTicks()<openDeadline)SDL_Delay(1);

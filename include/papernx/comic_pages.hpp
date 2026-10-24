@@ -55,7 +55,9 @@ public:
     ~ComicPages() { stop(); }
     void configure(Spec spec) {
         std::lock_guard<std::mutex> lock(mutex_);
-        if (spec.identity == spec_.identity) return;
+        if (spec.identity == spec_.identity && spec.path == spec_.path &&
+            spec.recolor == spec_.recolor && spec.paper == spec_.paper &&
+            spec.ink == spec_.ink && spec.textureLimit == spec_.textureLimit) return;
         spec_ = std::move(spec);
         ++generation_;
         queue_.clear();
