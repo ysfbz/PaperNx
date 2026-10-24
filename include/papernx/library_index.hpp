@@ -7,6 +7,8 @@
 namespace papernx {
 // Disposable inventory; rescans never rewrite reading progress or user metadata.
 std::vector<Book> loadLibraryInventory(const fs::path &path);
+// Returns a size only for a direct regular file, without following symlinks.
+std::optional<std::uintmax_t> regularBookFileSize(const fs::path &path);
 // `complete` means the full bounded snapshot is available; `cached` reports persistence.
 struct LibraryScanResult {std::vector<Book> books;std::string error;bool cached{false},cancelled{false},complete{false};};
 class LibraryScanner {

@@ -103,6 +103,19 @@ struct AppTest {
         assert(found!=app.books_.end() && found->title==p.bookTitle && found->author==p.bookAuthor);
         assert(app.progressStore_.get(id).page==3 && app.progressStore_.get(id).pageCount==10);
     }
+    static void runSymlinkHistoryRestore(const fs::path &root) {
+        fs::create_directories(root/"books");fs::create_directories(root/"data");fs::create_directories(root/"external");
+        const auto target=root/"outside.epub",path=root/"external"/"history.epub";
+        fs::copy_file("tests/fixtures/sample_book.epub",target);fs::create_symlink(target,path);
+        ProgressStore progress(root/"data"/"progress.txt");Progress entry;entry.bookPath=path.u8string();
+        entry.bookTitle="Recovered title";const auto id=documentId(entry.bookPath,fs::file_size(target));
+        progress.put(id,entry);assert(progress.save());
+        AppSettingsStore settings(root/"data"/"settings.txt");auto preferences=settings.get();preferences.scanOnLaunch=false;
+        settings.put(preferences);assert(settings.save());
+        PaperNxApp app(root);assert(app.init());
+        assert(!app.libraryScanner_.pending() && app.books_.empty());
+        assert(app.progressStore_.get(id).bookTitle==entry.bookTitle);
+    }
     static void runCoverQueuePriority(const fs::path &root) {
         fs::create_directories(root/"books");
         PaperNxApp app(root);assert(initReady(app));
@@ -184,6 +197,8 @@ int main() {
     fs::create_directory_symlink(fs::absolute("fonts"),root/"fonts");
     AppTest::run(root);const auto historyRoot=fs::temp_directory_path()/"papernx-history-restore";fs::remove_all(historyRoot);
     AppTest::runHistoryRestore(historyRoot);fs::remove_all(historyRoot);
+    const auto symlinkHistoryRoot=fs::temp_directory_path()/"papernx-symlink-history";fs::remove_all(symlinkHistoryRoot);
+    AppTest::runSymlinkHistoryRestore(symlinkHistoryRoot);fs::remove_all(symlinkHistoryRoot);
     const auto coverRoot=fs::temp_directory_path()/"papernx-cover-queue-priority";fs::remove_all(coverRoot);
     AppTest::runCoverQueuePriority(coverRoot);fs::remove_all(coverRoot);
     const auto metadataRoot=fs::temp_directory_path()/"papernx-metadata-index-retry";fs::remove_all(metadataRoot);

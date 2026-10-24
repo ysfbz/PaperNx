@@ -17,9 +17,9 @@ void restoreLibraryLabels(bool discoverProgressFiles=true) {
             if(!p.bookTitle.empty())book.title=p.bookTitle;
             if(!p.bookAuthor.empty())book.author=p.bookAuthor;
         } else if(discoverProgressFiles && !p.bookPath.empty() && books_.size()<10000) {
-            std::error_code ec;const auto path=fs::u8path(p.bookPath);const auto size=fs::file_size(path,ec);
-            if(ec || detectFormat(path)==Format::Unsupported || documentId(p.bookPath,size)!=id)continue;
-            Book book;book.id=id;book.path=p.bookPath;book.bytes=size;book.format=detectFormat(path);
+            const auto path=fs::u8path(p.bookPath);const auto size=regularBookFileSize(path);const auto format=detectFormat(path);
+            if(!size || format==Format::Unsupported || documentId(p.bookPath,*size)!=id)continue;
+            Book book;book.id=id;book.path=p.bookPath;book.bytes=*size;book.format=format;
             book.title=p.bookTitle.empty()?defaultTitle(path):p.bookTitle;book.author=p.bookAuthor;
             libraryLookup_[id]=books_.size();books_.push_back(std::move(book));
         }

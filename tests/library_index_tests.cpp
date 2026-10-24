@@ -81,6 +81,12 @@ int main() {
     assert(!symlinkError);
     const auto validatedInventory=loadLibraryInventory(validationInventory);
     assert(validatedInventory.size()==1 && validatedInventory.front().path==keepFile.u8string());
+    Book symlinkHistory;symlinkHistory.path=missingFile.u8string();symlinkHistory.bytes=fs::file_size(outsideFile);
+    symlinkHistory.id=documentId(symlinkHistory.path,symlinkHistory.bytes);symlinkHistory.format=Format::Cbz;
+    LibraryScanner retainedSymlinkScanner;const auto retainedSymlinkInventory=root/"data"/"retained-symlink.txt";
+    assert(retainedSymlinkScanner.start({}, {symlinkHistory}, retainedSymlinkInventory));
+    const auto retainedSymlink=wait(retainedSymlinkScanner);
+    assert(retainedSymlink.complete && retainedSymlink.books.empty());
     assert(scanRoots({root/"books"},5).size()==5);
     auto cached=loadLibraryInventory(inventory);assert(cached.size()==300);
     auto inventoryBytes=[&]{std::ifstream in(inventory,std::ios::binary);return std::string(std::istreambuf_iterator<char>(in),{});};

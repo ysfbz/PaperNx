@@ -10,6 +10,13 @@ namespace {
 constexpr const char *inventorySchemaId="libraryindex0001";
 constexpr const char *inventorySchema="PAPERNX-LIBRARY-1";
 }
+std::optional<std::uintmax_t> regularBookFileSize(const fs::path &path) {
+    std::error_code ec;const auto status=fs::symlink_status(path,ec);
+    if(ec || fs::is_symlink(status) || !fs::is_regular_file(status))return std::nullopt;
+    const auto size=fs::file_size(path,ec);
+    if(ec)return std::nullopt;
+    return size;
+}
 std::vector<Book> loadLibraryInventory(const fs::path &path) {
     ProgressStore store(path);std::vector<Book> books;
     if(!store.load())return books;
@@ -22,14 +29,11 @@ std::vector<Book> loadLibraryInventory(const fs::path &path) {
         if(p.bookPath.empty() || p.bookAuthor.empty())continue;
         std::uintmax_t size=0;const auto parsed=std::from_chars(p.bookAuthor.data(),p.bookAuthor.data()+p.bookAuthor.size(),size);
         if(parsed.ec!=std::errc{} || parsed.ptr!=p.bookAuthor.data()+p.bookAuthor.size() || documentId(p.bookPath,size)!=id)continue;
-        const auto path=fs::u8path(p.bookPath);std::error_code ec;
-        const auto status=fs::symlink_status(path,ec);
-        if(ec || fs::is_symlink(status) || !fs::is_regular_file(status))continue;
-        const auto actualSize=fs::file_size(path,ec);
-        if(ec || actualSize!=size)continue;
-        const auto type=detectFormat(path);if(type==Format::Unsupported)continue;
+        const auto bookPath=fs::u8path(p.bookPath);const auto actualSize=regularBookFileSize(bookPath);
+        if(!actualSize || *actualSize!=size)continue;
+        const auto type=detectFormat(bookPath);if(type==Format::Unsupported)continue;
         Book b;b.id=id;b.path=p.bookPath;b.bytes=size;b.title=p.bookTitle;b.modified=p.lastRead;b.format=type;
-        const auto stamp=fs::last_write_time(path,ec);
+        std::error_code ec;const auto stamp=fs::last_write_time(bookPath,ec);
         if(!ec)b.modified=std::chrono::duration_cast<std::chrono::seconds>(stamp.time_since_epoch()).count();
         books.push_back(std::move(b));if(books.size()==10000)break;
     }
@@ -62,11 +66,11 @@ bool LibraryScanner::start(std::vector<fs::path> roots,std::vector<Book> known,f
             for(const auto &[id,old]:prior) {
                 if(cancel_)break;
                 if(ids.count(id))continue;
-                std::error_code ec;const auto path=fs::u8path(old.path);
-                if(detectFormat(path)==Format::Unsupported || !fs::is_regular_file(path,ec) || ec)continue;
-                const auto size=fs::file_size(path,ec);if(ec)continue;
-                auto book=old;book.bytes=size;book.id=documentId(book.path,size);
+                const auto path=fs::u8path(old.path);const auto size=regularBookFileSize(path);
+                if(detectFormat(path)==Format::Unsupported || !size)continue;
+                auto book=old;book.bytes=*size;book.id=documentId(book.path,*size);
                 if(book.id!=id){book.title=defaultTitle(path);book.author.clear();}
+                std::error_code ec;
                 auto stamp=fs::last_write_time(path,ec);if(!ec)book.modified=std::chrono::duration_cast<std::chrono::seconds>(stamp.time_since_epoch()).count();
                 add(std::move(book));
             }
