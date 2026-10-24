@@ -56,3 +56,20 @@ Source review found that `prioritizeCovers()` already removed pending, off-scree
 The visible ID set is now calculated after metadata updates the catalog and reorders the library. The app-level regression moves a completed thumbnail from outside to inside the visible list through a metadata title change and confirms that it is uploaded. The thumbnail worker no longer reads `CatalogStore` on cache hits; stale inventory metadata is already scheduled through the bounded metadata queue at startup and after successful scans. A failed metadata open releases its deduplication key for retry on a later scan.
 
 The `papernx_modern_library_tests` build passed and CTest passed **1/1** (13.13 sec). A missing-file then valid-EPUB scenario verifies retry publication. Switch ELF/NRO and RomFS artifact verification also passed at source `4ab2c02`. These are correctness checks, not performance measurements. Queue wait, interactive scroll fill, frame time, RAM and Switch SD remain unmeasured; `COVER-01` remains **NOT PASSED** and no speedup is claimed.
+
+## Disk budget comparison — source `d7f3fd3`
+
+The fixture-backed benchmark was extended to compare 32 MiB and 48 MiB disk budgets for the same 100/500/1,000 repeated-document workloads. Based on this comparison, `CoverRepository`'s default disk budget is now 48 MiB. The maximum remains 512 entries; the separate in-memory thumbnail texture cache remains 32 MiB.
+
+| Paths | Budget | Cold fill | Retained | Sequential revisit hits / reopens | Revisit time |
+|---:|---:|---:|---:|---:|---:|
+| 100 | 32 MiB | 574 ms | 100 / 8,526,350 bytes | 100 / 0 | 103 ms |
+| 100 | 48 MiB | 454 ms | 100 / 8,526,350 bytes | 100 / 0 | 90 ms |
+| 500 | 32 MiB | 2,575 ms | 393 / 33,502,728 bytes | 136 / 364 | 1,973 ms |
+| 500 | 48 MiB | 2,468 ms | 500 / 42,631,750 bytes | 500 / 0 | 411 ms |
+| 1,000 | 32 MiB | 5,055 ms | 393 / 33,502,728 bytes | 0 / 1,000 | 5,029 ms |
+| 1,000 | 48 MiB | 4,610 ms | 512 / 43,654,912 bytes | 0 / 1,000 | 4,062 ms |
+
+The current-source `papernx_cover_performance_tests` synthetic pass separately reports 500/500 hits at the new default and 512 hits / 488 misses for 1,000 entries. The real-fixture sequential full pass still thrashes at 1,000 because it exceeds both the retained working set and traversal order. Four source contents are repeated across unique paths; these results support a bounded 500-entry workload, not a universal speedup or a prediction for Switch SD/interactive scrolling. Larger byte or entry limits remain unchanged pending real-device and viewport measurements.
+
+At `d7f3fd3`, `PaperNX` rebuilt and `papernx_cover_tests`, `papernx_cover_performance_tests`, and `papernx_cover_document_benchmark` passed **3/3** CTest in **48.32 sec**. The current-source Switch AArch64 ELF/NRO and RomFS verifier also passed; NRO SHA-256 `ddf77b04cdd23c24f89b9c73ae0951d0d20a713209c26905a8c1c3cae56533ef`, CA bundle 118 certificates / 200,116 bytes. Full native suite, UI frame timing and physical SD measurement were not run; `COVER-01` remains partial.
