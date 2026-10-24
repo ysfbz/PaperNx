@@ -716,3 +716,12 @@ Bu tek koşu yazılım renderer’ı host ölçümüdür; hızlanma iddiası de�
 - **Doğrulama:** `docker compose run --rm desktop bash -lc 'cmake --build build-native --target papernx_app_tests --parallel 4 && ctest --test-dir build-native --output-on-failure -R "^papernx_app_tests$"'` — build **PASS**; CTest, gerekli `v03_stress_fixtures` hazırlığı dahil **2/2 PASS** (88,70 sn).
 - `tests/app_tests.cpp` içindeki akış gerçek SDL touch olaylarıyla software/system slider değerlerini değiştiriyor, kaydedip yeniden açıyor, varsayılana döndürüyor ve app background/foreground geçişini çalıştırıyor. Desktop build’deki foreground testi `__SWITCH__` servis çağrısını kapsamaz.
 - **Karar / sınır:** yeni üretim düzeltmesi gerekmedi. `lbl*` gerçek sistem parlaklığı, servis kapanışı/geri yükleme, docked/suspend/HOME ve Switch cihazı **UNVERIFIED**. Tam native CTest ve bütün hedeflerin sanitizer koşusu açık; genel karar **INCOMPLETE — BLOCKERS REMAIN**.
+
+## 2026-10-24 — Tam native CTest ve async comic test düzeltmesi
+
+- **Dal / başlangıç HEAD'i:** `feature/v0.9.2-complete-reader-enhancements` / `9875d65ad6027b727d8b06e4cb47a094e6ddab3c`.
+- **Test commit'i:** `6fe94ecbc821556abdd0eb958a06875d556c7dcd` (`test(reader): wait for asynchronous comic outcomes`). `tests/comic_app_tests.cpp`, `sample.cbz` thumbnail upload'ını ancak arama sonucu görünür olduktan sonra doğruluyor; önceki test katlanmış kütüphane görünümünde gizli kitaba istek yapıp görünürlük filtresinin doğru olarak düşürdüğü sonucu bekliyordu. `tests/page_navigation_tests.cpp`, hasarlı sayfa hatasını ve sonraki sağlam sayfa texture'ını async worker tamamlanana kadar bekliyor. Üretim kodu değişmedi.
+- **Önceki başarısızlıkların sonucu:** iki hata `--rerun-failed` ile tekrarlanmıştı. Yeni test koşulları hedefli çalıştırmalarda geçti.
+- **Tam doğrulama:** `docker compose run --rm desktop bash -lc 'ctest --test-dir build-native --output-on-failure'` — **31/31 PASS**, 450,70 sn. Suite mevcut `build-native` yapılandırmasında çalıştı; iki güncellenmiş test hedefi tam suite öncesinde yeniden derlenmişti.
+- **Git / kapsam:** yalnızca iki test dosyası test commit'ine alındı. Kullanıcıya ait `docs/V092_FINALIZATION_EXECUTION_PLAN.md` ile `tests/fixtures/comics/performance-37.cbr` değiştirilmedi/stage edilmedi.
+- **Kalan işler / karar:** bağımsız scanner/index/updater/parser tasarımı, tüm hedefleri kapsayan sanitizer, güncel kaynakta Switch cross-build ve fiziksel Switch TLS/Joy-Con/backlight/SD doğrulaması açık. Gerçek cover scroll/FPS ölçümü yok. Karar **INCOMPLETE — BLOCKERS REMAIN**.

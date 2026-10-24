@@ -5,7 +5,7 @@
 
 **Baseline:** `main@8db85384a1b6c277c74766601ef46e9a672328df` (2026-10-23 audit)  
 **Feature branch:** `feature/v0.9.2-complete-reader-enhancements`  
-**Latest source-bearing HEAD:** `96d0d799eb834b9b13f860d23cd3d746df433b96` (visible-cover upload priority; current Switch artifact check).
+**Latest source-bearing HEAD:** `0e0b2e060b1b9c857fe6cfa278b72c60245c288a` (strict updater release field validation; native CTest evidence is recorded below).
 **Fork reference:** `rtk19/PaperNx@d2b4bcfd10b1a66043c5b8cd36da08340cffec6d`  
 **Version remains:** v0.9.1; do not tag, release or merge to main.
 
@@ -417,3 +417,9 @@ Desktop updater unit and local HTTPS tests passed **2/2**; targeted ASan/UBSan e
 `papernx_app_tests` built and passed **2/2** including the required `v03_stress_fixtures` test (88.70 sec). Its touch workflow adjusts both sliders, persists/reloads the values, resets them, and dispatches application background/foreground events. No production change was needed.
 
 This verifies UI and host settings persistence. The Switch-only `lbl*` service, real backlight restoration, HOME/suspend, docked fallback and physical hardware remain **UNVERIFIED**. Full native CTest and full sanitizer coverage remain open; status **INCOMPLETE — BLOCKERS REMAIN**.
+
+## Current native CTest gate — `6fe94ec`
+
+`tests/comic_app_tests.cpp` now filters to `sample.cbz` before expecting its thumbnail texture, so the book is actually visible under the library's cover-upload policy. `tests/page_navigation_tests.cpp` waits for the async comic worker to report the damaged-page error and for the next healthy page texture before checking recovery. Production code did not change.
+
+The two focused tests passed after those adjustments. The full native suite then passed **31/31** at test commit `6fe94ecbc821556abdd0eb958a06875d556c7dcd`; command: `docker compose run --rm desktop bash -lc 'ctest --test-dir build-native --output-on-failure'` (450.70 sec). This closes the current native CTest gate only. Full sanitizer coverage, substantial independent scanner/index/updater/parser redesign, actual cover-scroll performance, Switch SD behavior and physical Joy-Con/backlight/TLS remain open or unverified. Overall status remains **INCOMPLETE — BLOCKERS REMAIN**.
