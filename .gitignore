@@ -26,3 +26,15 @@ __pycache__/
 Thumbs.db
 .vscode/
 .idea/
+
+# Internal developer reports/plans and local handoff notes (not for public source)
+/FinalDevelopmentResult.md
+/docs/DEVICE_TEST_PLAN.md
+/docs/DESIGN_SYSTEM.md
+/docs/*_DEVELOPMENT_MATRIX.md
+/docs/*_CONTINUATION_STATE.md
+/docs/*_SOURCE_PROVENANCE_AUDIT.md
+/docs/*_INTERNAL_*.md
+/internal/
+/reports/
+/handoff/

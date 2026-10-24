@@ -42,4 +42,4 @@ docker compose run --rm desktop bash -lc 'scripts/verify-desktop.sh'
 docker compose run --rm desktop bash -lc 'scripts/verify-sanitizers.sh'
 ```
 
-Automated desktop and cross-build checks do not substitute for the physical scenarios in [DEVICE_TEST_PLAN.md](DEVICE_TEST_PLAN.md). See [KNOWN_ISSUES.md](KNOWN_ISSUES.md) for release limits.
+Automated desktop and cross-build checks do not substitute for direct testing on physical Nintendo Switch hardware, including Joy-Con input, touch accuracy, sleep/resume, and SD-card recovery. See [KNOWN_ISSUES.md](KNOWN_ISSUES.md) for release limits.
