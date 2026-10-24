@@ -22,6 +22,34 @@ class Parser {
     const std::string &input_;
     std::size_t pos_{}, nodes_{};
 
+    static bool validUtf8(const std::string &text) {
+        for (std::size_t i = 0; i < text.size();) {
+            const auto first = static_cast<unsigned char>(text[i]);
+            if (first < 0x80) { ++i; continue; }
+            std::size_t width = 0;
+            unsigned char secondMin = 0x80, secondMax = 0xbf;
+            if (first >= 0xc2 && first <= 0xdf) width = 2;
+            else if (first >= 0xe0 && first <= 0xef) {
+                width = 3;
+                if (first == 0xe0) secondMin = 0xa0;
+                if (first == 0xed) secondMax = 0x9f;
+            } else if (first >= 0xf0 && first <= 0xf4) {
+                width = 4;
+                if (first == 0xf0) secondMin = 0x90;
+                if (first == 0xf4) secondMax = 0x8f;
+            } else return false;
+            if (width > text.size() - i) return false;
+            const auto second = static_cast<unsigned char>(text[i + 1]);
+            if (second < secondMin || second > secondMax) return false;
+            for (std::size_t j = 2; j < width; ++j) {
+                const auto continuation = static_cast<unsigned char>(text[i + j]);
+                if (continuation < 0x80 || continuation > 0xbf) return false;
+            }
+            i += width;
+        }
+        return true;
+    }
+
     void space() {
         while (pos_ < input_.size() && (input_[pos_] == ' ' || input_[pos_] == '\n' || input_[pos_] == '\r' || input_[pos_] == '\t')) ++pos_;
     }
@@ -216,7 +244,7 @@ public:
     explicit Parser(const std::string &input) : input_(input) {}
     bool parse(std::vector<Release> &releases) {
         releases.clear();
-        if (input_.size() > 4 * 1024 * 1024 || !account(0) || !take('[')) return false;
+        if (input_.size() > 4 * 1024 * 1024 || !validUtf8(input_) || !account(0) || !take('[')) return false;
         if (!take(']')) {
             do {
                 Release release;

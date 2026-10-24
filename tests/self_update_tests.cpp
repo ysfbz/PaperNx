@@ -38,6 +38,10 @@ static void unit(){
     const auto duplicateAsset=std::string("[{\"tag_name\":\"v0.12.0-reader.10\",\"assets\":[{\"name\":\"PaperNX.nro\",\"size\":20000,\"browser_download_url\":\"")+asset+"PaperNX.nro\"},{\"name\":\"PaperNX.nro\",\"size\":20000,\"browser_download_url\":\""+asset+"PaperNX.nro\"}]}]";
     assert(selectUpdateRelease(duplicateAsset,"0.12.0-reader.4",source,r,error)&&!r.installable());
     for(const auto &bad:{"{}","[{}]","[{\"tag_name\":\"1.0.0\",}]","[{\"tag_name\":\"1.0.0\",\"tag_name\":\"9.0.0\"}]","[", "[{\"body\":\"\\ud800\"}]"})assert(!selectUpdateRelease(bad,"0.12.0-reader.4",source,r,error));
+    for(const std::string &bytes:{std::string(1,char(0xc0)),std::string("\xed\xa0\x80",3),std::string("\xf4\x90\x80\x80",4)}) {
+        std::string malformed="[{\"tag_name\":\"1.0.0\",\"body\":\"";malformed+=bytes;malformed+="\"}]";
+        assert(!selectUpdateRelease(malformed,"0.12.0-reader.4",source,r,error));
+    }
     r.version="stale";r.title="stale";r.notes="stale";r.url="stale";r.checksumUrl="stale";r.sha256="stale";r.bytes=123;
     assert(!selectUpdateRelease("[{\"tag_name\":\"9.0.0\"},{}]","0.12.0-reader.4",source,r,error));
     assert(r.version.empty()&&r.title.empty()&&r.notes.empty()&&r.url.empty()&&r.checksumUrl.empty()&&r.sha256.empty()&&r.bytes==0);
