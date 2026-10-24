@@ -5,6 +5,19 @@ All notable changes to **PaperNX** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — post-v0.9.2 fixes (not yet built, tested or published)
+
+### Reader and theme recovery
+- Restored a unified default application palette that follows the global reading theme while keeping optional Dark/Light interface overrides and seven custom accent colors.
+- Aligned the Turkish paper-preset labels with the actual ten preset identities, and restored v0.9.1-style controller selection/focus behaviour.
+- Added a nonblocking comic-geometry lookup fed by independent background decoding; unknown dimensions are conservatively paired only after discovery.
+- Primed the restored comic page and immediate neighbour on open, expanded direction-aware prefetching with a bounded ZIP-only reverse neighbour, and removed the routine centre-screen “Preparing page” overlay.
+- Retained the existing bounded texture cache, page-curl path, document-scoped controls, and archived format support in source. Physical Switch behaviour has **not** been validated.
+
+### Pending before v0.9.3 release
+- Focused regressions, RAR4/RAR5/solid RAR and CBZ performance measurements, memory and controller acceptance checks, native Switch build/NRO validation, version consistency, source identity, packaging hashes and publication.
+- The current shipping binary and download links remain **v0.9.2** until a new tested release is published.
+
 ## [0.9.2] - 2026-10-24
 
 ### Added
