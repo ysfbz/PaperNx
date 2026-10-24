@@ -78,6 +78,7 @@ inline ThemePalette resolveInterfacePalette(const ThemePalette &reading,int vari
     if (accent >= 0 && accent < 7) palette.accent=accents[accent];
     return palette;
 }
+inline double readingContrast(SDL_Color a,SDL_Color b);
 // One appearance resolver for both native EPUB and PDF reader chrome.
 // Legacy PDF filter bytes are ignored: PDF derives paper and text colors from
 // ReaderPreferences.theme/backgroundColor/textColor like EPUB.
@@ -88,9 +89,13 @@ inline ThemePalette readerChromePalette(const ReaderPreferences &style,bool pdf,
     auto rgb=[](int c){return SDL_Color{Uint8(c>>16),Uint8(c>>8),Uint8(c),255};};
     if(style.backgroundColor>=0) p.bg=rgb(style.backgroundColor);
     if(style.textColor>=0) p.fg=rgb(style.textColor);
+    if(style.backgroundColor>=0 && readingContrast(p.accent,p.bg)<4.5 && readingContrast(p.fg,p.bg)>=4.5) {
+        const auto accent=p.accent;
+        for(int percent=1;percent<=100 && readingContrast(p.accent,p.bg)<4.5;++percent)
+            p.accent=blendColor(accent,p.fg,percent);
+    }
     p.card=blendColor(p.bg,p.fg,5); p.header=blendColor(p.bg,p.fg,8);
     p.cardBorder=blendColor(p.bg,p.fg,24); p.muted=blendColor(p.bg,p.fg,68);
-    p.accent=p.fg;
     return p;
 }
 

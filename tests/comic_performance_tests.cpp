@@ -39,6 +39,25 @@ struct AppTest {
   for(int page=visibleGroup.first;page<visibleGroup.first+visibleGroup.second+2 && page<app.pageCount_;++page)
    assert(app.pageCache_.get(app.comicTextureKey(page)));
   assert(app.pageCache_.currentBytes()<36u*1024u*1024u);
+  // A large fling must stop at the conservative viewport boundary while a
+  // cold comic page's geometry is still being decoded by the worker.
+  if(app.pageCount_>30) {
+   constexpr int coldPage=30;
+   float coldWidth=0,coldHeight=0;
+   assert(!px_document_known_comic_size(app.doc_,coldPage,&coldWidth,&coldHeight));
+   app.comicPages_.setSuspended(true);app.comicPages_.clear();app.comicPagesIdentity_.clear();
+   app.currentPage_=coldPage;app.scrollY_=0;app.scrollVelocity_=0;app.extraStyle_.readingMode=1;
+   const float fallback=app.segmentHeight(coldPage);app.scrollBy(fallback*3);
+   assert(app.currentPage_==coldPage && app.scrollY_==fallback && app.scrollVelocity_==0);
+   app.comicPages_.setSuspended(false);const auto geometryDeadline=SDL_GetTicks()+20000;
+   while(!app.readerPageSize(coldPage,&coldWidth,&coldHeight) && SDL_GetTicks()<geometryDeadline) {
+    app.processComicPages();SDL_Delay(2);
+   }
+   assert(coldWidth>0 && coldHeight>0);
+   app.comicPages_.setSuspended(true);app.comicPages_.clear();app.comicPagesIdentity_.clear();
+   app.currentPage_=original;app.scrollY_=0;app.extraStyle_.readingMode=0;app.pageCache_.clear();
+   app.configureComicPages();app.comicPages_.setSuspended(false);
+  }
   // Cold controller and touch turns wait for the worker instead of rasterizing
   // the target synchronously or saving a position before the page is ready.
   auto settings=app.appSettings_.get();settings.comicLandscapeSpreads=false;settings.pageCurlAnimation=true;app.appSettings_.put(settings);

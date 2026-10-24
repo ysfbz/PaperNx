@@ -31,6 +31,11 @@ struct AppTest {
         }
         assert(!app.pageTurnTouch_.waitingForTexture);
     }
+    static void waitComicGeometry(PaperNxApp &app,int page) {
+        float width=0,height=0;const auto deadline=SDL_GetTicks()+20000;
+        while(!app.readerPageSize(page,&width,&height) && SDL_GetTicks()<deadline) {app.processComicPages();SDL_Delay(2);}
+        assert(width>0 && height>0);
+    }
     static std::vector<Uint32> pixels(PaperNxApp &app) {
         app.render();int w,h;app.getWindowSize(w,h);std::vector<Uint32> out(w*h);
         assert(SDL_RenderReadPixels(app.renderer_,nullptr,SDL_PIXELFORMAT_ARGB8888,out.data(),w*4)==0);return out;
@@ -181,6 +186,7 @@ struct AppTest {
         assert(differingPixels(front,reverse)>front.pixels.size()/100);
         finish(app);singlePrefs.comicLandscapeSpreads=true;app.appSettings_.put(singlePrefs);
         app.closeBook();app.openBook(book("paper-bounds.cbz"));app.toolbarVisible_=false;
+        waitComicGeometry(app,0);waitComicGeometry(app,1);
         for(float zoom:{1.f,1.01f}) {
             app.setPdfView(0);app.currentPage_=0;if(zoom>1)app.zoomPdf(zoom,.5f,.5f,true);
             app.pdfPanX_=app.pdfPanY_=0;

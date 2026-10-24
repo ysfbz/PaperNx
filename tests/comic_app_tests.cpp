@@ -61,6 +61,11 @@ struct AppTest {
         while(app.comicPages_.pending() && SDL_GetTicks()<deadline){app.processComicPages();SDL_Delay(2);}
         app.processComicPages();assert(!app.comicPages_.pending());
     }
+    static void waitComicGeometry(PaperNxApp &app,int page) {
+        float width=0,height=0;const auto deadline=SDL_GetTicks()+20000;
+        while(!app.readerPageSize(page,&width,&height) && SDL_GetTicks()<deadline) {app.processComicPages();SDL_Delay(2);}
+        assert(width>0 && height>0);
+    }
     static void waitTouchTurn(PaperNxApp &app) {
         const auto deadline=SDL_GetTicks()+20000;
         while(app.pageTurnTouch_.waitingForTexture && SDL_GetTicks()<deadline) {
@@ -180,8 +185,9 @@ struct AppTest {
         {
             const auto before=app.appSettings_.get();auto spread=before;
             spread.displayOrientation=0;spread.comicLandscapeSpreads=true;app.appSettings_.put(spread);
-            app.currentPage_=0;assert(app.comicSpreadPages(0).second==2);
-            app.configureComicPages();
+            app.currentPage_=0;app.comicSpreadPages(0);waitComicGeometry(app,0);waitComicGeometry(app,1);
+            assert(app.comicSpreadPages(0).second==2);
+            app.configureComicPages();waitComicPages(app);app.pageCache_.clear();
             app.comicPages_.setSuspended(true);app.failComicPage(0,"synthetic spread failure");app.render();
             assert(!app.pageRenderError_.empty()); // A healthy facing page must not clear its failed partner's message.
             app.comicPages_.clear();app.comicPages_.setSuspended(false);app.closeBook();app.appSettings_.put(before);
@@ -218,6 +224,7 @@ struct AppTest {
         snapshot(app,"touch-curl");touch(app,SDL_FINGERUP,.4f,.3f);finish(app);assert(app.currentPage_==1);
         app.zoomPdf(2);assert(app.canCurlPage());app.handleAnalog(1,1);assert(app.pdfPanX_>=0);
         app.pdfPanY_=150;app.clampPdfPan();
+        waitComicGeometry(app,app.currentPage_+1);
         const auto sheet=app.comicPageRect(app.currentPage_);
         const auto nextSheet=app.comicPageRect(app.currentPage_+1,true);
         turnComicPage(app,1);assert(app.pageTurnAnimation_.active && app.pdfZoom_==2 && app.pdfPanY_==0);
@@ -287,6 +294,7 @@ struct AppTest {
         app.extraStyle_.pdfColorMode&=~COMIC_READING_COLORS;app.queueStyleChange();
         app.extraStyle_.readingMode=1;app.extraStyle_.modeOverride=1;app.queueStyleChange();app.dismissSettings();
         assert(app.continuous() && !app.canCurlPage());app.currentPage_=0;app.scrollY_=0;
+        waitComicGeometry(app,0);waitComicGeometry(app,1);
         const float firstHeight=app.segmentHeight(0);
         app.scrollBy(firstHeight+110);assert(app.currentPage_==1 && std::abs(app.scrollY_-110)<1);
         app.toggleBookmark();const auto bm=app.progressStore_.get(cbz.id).bookmarks.back();
@@ -300,13 +308,14 @@ struct AppTest {
         assert(std::abs(app.scrollY_/app.segmentHeight(app.currentPage_)-fraction)<.0001);
         settings.displayOrientation=0;app.appSettings_.put(settings);app.setPdfView(0);
         app.currentMargin_-=10;app.queueStyleChange();assert(std::abs(app.scrollY_-110)<1);
-        snapshot(app,"continuous");app.saveCurrentPosition();app.closeBook();app.openBook(cbz);
+        snapshot(app,"continuous");app.saveCurrentPosition();app.closeBook();app.openBook(cbz);waitComicGeometry(app,1);
         assert(app.continuous() && app.currentPage_==1 && std::abs(app.scrollY_-110)<1);
         app.closeBook();app.openBook(rar);assert(app.comic() && !app.continuous() && !app.comicReadingColors());
         app.currentPage_=0;turnComicPage(app,1);finish(app);app.toggleBookmark();app.closeBook();app.openBook(rar);
         assert(app.currentPage_==1 && app.progressStore_.get(rar.id).bookmarks.size()==1);app.closeBook();
         auto favorite=app.progressStore_.get(manga.id);favorite.favorite=true;app.progressStore_.put(manga.id,favorite);
         app.openBook(manga);assert(app.readingDirection()==-1);app.currentPage_=0;
+        waitComicGeometry(app,0);waitComicGeometry(app,1);
         touch(app,SDL_FINGERDOWN,.1f,.8f);touch(app,SDL_FINGERMOTION,.7f,.65f);
         waitTouchTurn(app);
         assert(app.pageTurnAnimation_.dragging && app.pageTurnAnimation_.direction==-1 && app.pageTurnAnimation_.targetPage==1);

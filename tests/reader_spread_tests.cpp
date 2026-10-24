@@ -39,6 +39,11 @@ struct AppTest {
         while(app.comicPages_.pending() && SDL_GetTicks()<deadline){app.processComicPages();SDL_Delay(2);}
         app.processComicPages();assert(!app.comicPages_.pending());
     }
+    static void waitComicGeometry(PaperNxApp &app,int page) {
+        float width=0,height=0;const auto deadline=SDL_GetTicks()+20000;
+        while(!app.readerPageSize(page,&width,&height) && SDL_GetTicks()<deadline) {app.processComicPages();SDL_Delay(2);}
+        assert(width>0 && height>0);
+    }
     static void settleLayout(PaperNxApp &app) {
         for(int i=0;i<1000 && (app.layoutPending_ || app.layoutWorker_.joinable());++i) {
             app.processLayout();SDL_Delay(2);
@@ -100,11 +105,16 @@ struct AppTest {
         assert(app.currentPage_==comicPage && app.pdfZoom_==2 && app.pdfPanX_==0 && app.pdfPanY_==0);
         auto spreadPrefs=app.appSettings_.get();spreadPrefs.comicLandscapeSpreads=true;app.appSettings_.put(spreadPrefs);
         SDL_SetWindowSize(app.window_,720,1280);assert(!app.comicSpreadActive() && !app.readerLayout().spread);
-        SDL_SetWindowSize(app.window_,1280,720);assert(app.comicSpreadActive() && app.readerLayout().spread);
+        SDL_SetWindowSize(app.window_,1280,720);app.comicSpreadPages(0);waitComicGeometry(app,0);waitComicGeometry(app,1);
+        assert(app.comicSpreadActive() && app.readerLayout().spread);
         app.extraStyle_.readingMode=1;assert(app.continuous() && !app.comicSpreadActive());app.extraStyle_.readingMode=0;app.closeBook();
         auto spreadDefaults=app.appSettings_.get();spreadDefaults.bookLandscapeSpreads=true;spreadDefaults.comicLandscapeSpreads=true;app.appSettings_.put(spreadDefaults);
         for(const char *name:{"english.epub","hebrew.epub","comic.cbz","comic.cbr","manga.cbz","single.cbz","sample.pdf","spread.pdf"}) {
             app.openBook(book(name));app.extraStyle_.readingMode=0;app.documentMode_=0;
+            if(app.comic()) {
+                app.comicSpreadPages(0);waitComicGeometry(app,0);
+                if(app.pageCount_>1)waitComicGeometry(app,1);
+            }
             for(int theme:{0,5}) {
                 app.currentTheme_=theme;app.extraStyle_.backgroundColor=theme==5?0:0xffffff;
                 app.extraStyle_.textColor=theme==5?0xeae7df:0x242424;
@@ -122,6 +132,10 @@ struct AppTest {
                 const auto prefix=std::string(name)+"-"+std::to_string(theme);
                 save(rest,prefix+"-landscape");
                 app.turnPage(-1);assert(app.currentPage_==0 && !app.pageTurnAnimation_.active);
+                if(app.comic() && app.pageCount_>2) {
+                    waitComicGeometry(app,2);
+                    if(app.pageCount_>3)waitComicGeometry(app,3);
+                }
                 if(app.comic() && app.pageCount_>2 && app.comicSpreadPages(2).second!=2) {
                     app.turnPage(1);waitComicTurn(app);assert(app.currentPage_==2 && app.pageTurnAnimation_.active && !app.pageTurnAnimation_.spread);
                     finish(app);app.turnPage(-1);waitComicTurn(app);finish(app);assert(app.currentPage_==0);
@@ -180,6 +194,7 @@ struct AppTest {
             app.closeBook();
         }
         app.openBook(book("smart.cbz"));app.currentPage_=0;app.toolbarVisible_=false;
+        waitComicGeometry(app,0);waitComicGeometry(app,1);
         assert(app.readerLayout().spread && app.comicSpreadPages(0).second==2);
         const auto left=app.comicLeafArtwork(0,{0,0,640,720}),right=app.comicLeafArtwork(1,{640,0,640,720});
         assert(std::abs(left.x+left.w-639)<.01 && std::abs(right.x-641)<.01); // Real centre gutter, no doubled inner margins.

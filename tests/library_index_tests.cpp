@@ -171,7 +171,7 @@ int main() {
     checks=0;bool interruptedRootsComplete=true;
     const auto multiRootInterrupted=scanRoots({root/"books",root/"books"/"nested"},300,[&]{return ++checks==12;},&interruptedRootsComplete);
     assert(checks==12 && multiRootInterrupted.size()<300&&!interruptedRootsComplete);
-    AppSettingsStore settings(root/"settings.txt");auto prefs=settings.get();assert(prefs.scanOnLaunch && prefs.interfaceStyle==0 && prefs.interfaceAccent==0);
+    AppSettingsStore settings(root/"settings.txt");auto prefs=settings.get();assert(prefs.scanOnLaunch && prefs.interfaceStyle==2 && prefs.interfaceAccent==7);
     prefs.libraryFolders={"/books/a","/books/a","/books/b"};prefs.interfaceStyle=1;prefs.interfaceAccent=5;prefs.scanOnLaunch=false;settings.put(prefs);assert(settings.save());
     AppSettingsStore restored(root/"settings.txt");assert(restored.load());assert(restored.get().libraryFolders.size()==2 && !restored.get().scanOnLaunch && restored.get().interfaceStyle==1 && restored.get().interfaceAccent==5);
     fs::remove_all(root);std::cout<<"PASS: multi-root scan, nested-root deduplication, corrupt inventory recovery, progress isolation, cancellation and persisted preferences\n";

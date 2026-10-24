@@ -78,8 +78,16 @@ int main() {
             assert(contrast(rgb(preset.background),rgb(preset.text))>=4.5);
             ReaderPreferences style;style.theme=preset.theme;style.backgroundColor=preset.background;style.textColor=preset.text;
             auto chrome=readerChromePalette(style,false,0,0);
+            const auto paperAccent=g_palettes[preset.theme].accent;
+            if(readingContrast(paperAccent,chrome.bg)>=4.5)
+                assert(chrome.accent.r==paperAccent.r && chrome.accent.g==paperAccent.g && chrome.accent.b==paperAccent.b);
+            else assert(readingContrast(chrome.accent,chrome.bg)>=4.5);
             assert(contrast(chrome.header,chrome.fg)>=4.5);
-            assert(contrast(chrome.accent,chrome.bg)>=4.5);
+            const auto dark=resolveInterfacePalette(chrome,0,7),light=resolveInterfacePalette(chrome,1,7),follow=resolveInterfacePalette(chrome,2,7);
+            assert(dark.bg.r==10 && dark.bg.g==11 && dark.bg.b==18);
+            assert(light.bg.r==245 && light.bg.g==246 && light.bg.b==251);
+            assert(follow.bg.r==chrome.bg.r && follow.bg.g==chrome.bg.g && follow.bg.b==chrome.bg.b);
+            assert(follow.accent.r==chrome.accent.r && follow.accent.g==chrome.accent.g && follow.accent.b==chrome.accent.b);
         }
         // PDF and EPUB share exactly one resolved ReaderPreferences appearance.
         // Legacy pdfColorMode values never alter canvas, ink or UI chrome.

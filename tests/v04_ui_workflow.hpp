@@ -13,6 +13,13 @@ static void v04UiWorkflow(const fs::path &parent) {
     fs::copy_file("tests/fixtures/sample_doc.pdf",root/"books"/"pdf.pdf");
     {
         PaperNxApp app(root);assert(initReady(app));
+        auto assertReaderChrome=[&](int variant,SDL_Color expected) {
+            auto prefs=app.appSettings_.get();prefs.interfaceStyle=variant;prefs.interfaceAccent=7;app.appSettings_.put(prefs);
+            app.toolbarVisible_=true;app.render();int w,h;app.getWindowSize(w,h);std::vector<Uint32> pixels(w*h);
+            assert(SDL_RenderReadPixels(app.renderer_,nullptr,SDL_PIXELFORMAT_ARGB8888,pixels.data(),w*4)==0);
+            assert((pixels[36*w+20]&0xffffff)==((Uint32(expected.r)<<16)|(Uint32(expected.g)<<8)|expected.b));
+            app.appSettings_.put(prefs);
+        };
         auto testPreferences=app.appSettings_.get();testPreferences.bookLandscapeSpreads=false;testPreferences.comicLandscapeSpreads=false;app.appSettings_.put(testPreferences);
         app.openSettings(true);auto old=app.currentStyle();
         pad(app,SDL_CONTROLLER_BUTTON_DPAD_DOWN);assert(app.aaRow_==1 && app.currentFontFamily_==old.fontFamily);
@@ -49,7 +56,10 @@ static void v04UiWorkflow(const fs::path &parent) {
         app.openSettings();assert(app.palette().bg.r==g_palettes[2].bg.r);snapshot(app,"v04-sepia-epub-settings");closeSettings(app);
         app.currentTheme_=4;app.extraStyle_.backgroundColor=app.extraStyle_.textColor=-1;app.queueStyleChange();v03WaitLayout(app);
         app.screen_=ScreenState::TocModal;snapshot(app,"v04-dark-epub-toc");app.screen_=ScreenState::Reader;
-        app.currentTheme_=5;app.queueStyleChange();v03WaitLayout(app);app.quickMenu_=true;snapshot(app,"v04-oled-quick-menu");app.quickMenu_=false;
+        app.currentTheme_=5;app.queueStyleChange();v03WaitLayout(app);
+        auto followHeader=readerChromePalette(app.presentedStyle(),false,0,0).header;
+        assertReaderChrome(0,{30,33,48,255});assertReaderChrome(1,{237,240,249,255});assertReaderChrome(2,followHeader);
+        app.quickMenu_=true;snapshot(app,"v04-oled-quick-menu");app.quickMenu_=false;
         app.closeBook();
         // One global theme picker controls reader, library, headers and settings.
         // Old separate application/chrome policy settings cannot override it.
@@ -61,6 +71,11 @@ static void v04UiWorkflow(const fs::path &parent) {
             assert(app.settingsRows()==17);
             app.openChoice(7,0);
             assert(app.choiceOptions().size()==10);
+            const char *namesTr[]={"Saf Kâğıt","Yumuşak Fildişi","Sıcak Krem","Doğal Kâğıt","Nostaljik Sepya","Keten","Serin Kâğıt","Kömür Gecesi","OLED Siyah","Yumuşak E-Mürekkep"};
+            ui::language=0;auto labels=app.choiceOptions();
+            for(int i=0;i<10;++i)assert(labels[i]==namesTr[i] && app.paperPresetLabel(i)==namesTr[i]);
+            ui::language=1;labels=app.choiceOptions();
+            for(int i=0;i<10;++i)assert(labels[i]==g_paperPresets[i].name);
             app.choiceIndex_=4;app.commitChoice(); // Vintage Sepia
             const auto defaults=app.progressStore_.get("PAPERNX_DEFAULTS");
             assert(defaults.theme==2 && defaults.backgroundColor==0xe8d6b3);
@@ -144,6 +159,8 @@ static void v04UiWorkflow(const fs::path &parent) {
         }
         auto a=app.appSettings_.get();a.displayOrientation=0;app.appSettings_.put(a);app.persistAppSettings();
         auto pdf=*std::find_if(app.books_.begin(),app.books_.end(),[](const Book &b){return b.format==Format::Pdf;});app.openBook(pdf);
+        followHeader=readerChromePalette(app.presentedStyle(),false,0,0).header;
+        assertReaderChrome(0,{30,33,48,255});assertReaderChrome(1,{237,240,249,255});assertReaderChrome(2,followHeader);
         // The PDF uses EPUB's Appearance palette; the former independent
         // PDF filter is legacy data and may not change reader chrome.
         const auto globalBg=app.palette().bg;
