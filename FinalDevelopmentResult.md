@@ -377,3 +377,14 @@ Bu bölüm, ana v0.9.2 hardening görevinin devamıdır; release hazırlığı v
 | Gerçek belge decode/reopen, UI latency, RAM, baseline, Switch ve tam test zinciri | **NOT RUN / UNVERIFIED** | G6 için yapılmadı. Performans iyileşmesi iddiası yok; `COVER-01` açık. |
 
 **Karar: INCOMPLETE — BLOCKERS REMAIN.** Kapak cache istatistikleri görünür ve ölçüm raporu tekrarlanabilir; gerçek belge ölçeği ve fiziksel cihaz ölçümleri doğrulanmadı. Eski 32 MiB budget korunuyor. Mevcut untracked `docs/V092_FINALIZATION_EXECUTION_PLAN.md` ve `tests/fixtures/comics/performance-37.cbr` bu commitlere alınmadı; release, tag, PR, merge veya workflow çalıştırılmadı.
+
+## Q. 2026-10-24 — G7 kapak kuyruğu adaleti ve host regresyonu
+
+- **Kaynak commit:** `0923141c72d543c0c578da539337f5ec4ad6b1a4` (`perf(cover): prevent metadata queue starvation`). Kapak worker'ı, sürekli dolabilen thumbnail kuyruğunun metadata taramasını aç bırakmasını engelliyor: iki kuyruk doluyken en çok üç kapak işinden sonra bir metadata işi seçiliyor; kapak kuyruğu boşsa metadata hemen çalışıyor. Görünür thumb kuyruğu önceliğini koruyor; yeni worker/queue eklenmedi.
+- **Test:** `tests/modern_library_tests.cpp` scheduler sınırlarını assertion ile doğruluyor. `papernx_modern_library_tests` **1/1 PASS**.
+- **G7 hedefli CTest:** `papernx_core_tests`, `papernx_reader_input_tests`, `papernx_reader_spread_tests`, `papernx_page_curl_app_tests`, `papernx_app_tests` ve CTest fixture setup `v03_stress_fixtures`: **6/6 PASS**. `papernx_app_tests` 134.64 saniyede tamamlandı. Bu testler host üzerinde ayar/migration, parlaklık UI/persist, Joy-Con `+` ortak menü yolu, reader spread/curl ve uygulama akışlarını kapsadı.
+- **Switch cross-build:** `docker compose run --rm switch bash -lc 'export MUPDF_PREFIX=/work/prefix-mupdf-switch; make all -j4'` **PASS**. Güncel worktree ile ELF/NRO linklendi; CA/font RomFS doğrulama adımları geçti. Ayrı release/distribution doğrulaması çalıştırılmadı.
+- **Cihaz planı:** `docs/V092_DEVICE_ACCEPTANCE.md` eklendi; v0.9.1 matrisinin 38 senaryosuna ek olarak 23 v0.9.2 fiziksel senaryosu listeleniyor. Hepsi **UNVERIFIED**; cihaz/firmware/NRO kanıtı girilmedi.
+- **Commitler:** kod `0923141c72d543c0c578da539337f5ec4ad6b1a4`; cihaz kabul planı/matrix/continuation docs `7eb4792f51b3f142f77782f6c68c0ec3b6542506`. Bu rapor eklentisi ayrı commit'te kaydedilecek.
+
+**Karar: INCOMPLETE — BLOCKERS REMAIN.** Gerçek Switch Joy-Con/backlight/SD kullanımı, end-to-end cover decode/latency, full current-HEAD suite/sanitizers ve kaynak modüllerin bağımsız yeniden tasarımı hâlâ doğrulanmış/tamamlanmış değil. Bu host/switch build sonuçları donanım PASS anlamına gelmez.
