@@ -411,3 +411,9 @@ The updater test target rebuilt and CTest passed **1/1**. This host filesystem u
 The release parser now rejects wrong types for optional strings, `assets`, and `size`; null optional values remain accepted. Byte sizes must be unsigned integers. This preserves the bounded parser and avoids accepting malformed GitHub release metadata. `src/update_json.hpp` remains fork-derived/adapted, and Refael Avramashvili / AGPL-3.0 attribution remains appropriate.
 
 Desktop updater unit and local HTTPS tests passed **2/2**; targeted ASan/UBSan equivalents passed **2/2**. Switch AArch64 ELF/NRO and RomFS verification passed at `0e0b2e0`; NRO SHA-256 `d7b5a38f13e6b0c49af824105e188057125f6903b1a057e03636d4e44e50af96`, CA 118 certs / 200,116 bytes. Physical Switch TLS, full native CTest and a broader parser redesign remain open. Overall status **INCOMPLETE — BLOCKERS REMAIN**.
+
+## Brightness UI and host app lifecycle — `0e0b2e0` source
+
+`papernx_app_tests` built and passed **2/2** including the required `v03_stress_fixtures` test (88.70 sec). Its touch workflow adjusts both sliders, persists/reloads the values, resets them, and dispatches application background/foreground events. No production change was needed.
+
+This verifies UI and host settings persistence. The Switch-only `lbl*` service, real backlight restoration, HOME/suspend, docked fallback and physical hardware remain **UNVERIFIED**. Full native CTest and full sanitizer coverage remain open; status **INCOMPLETE — BLOCKERS REMAIN**.

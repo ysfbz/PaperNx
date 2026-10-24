@@ -709,3 +709,10 @@ Bu tek koşu yazılım renderer’ı host ölçümüdür; hızlanma iddiası de�
 - **ASan/UBSan:** updater unit + local HTTPS CTest **2/2 PASS** (5,50 sn).
 - **Switch:** `docker compose run --rm switch bash -lc 'export MUPDF_PREFIX=/work/prefix-mupdf-switch; make all -j4 && python3 scripts/verify_artifacts.py --version 0.9.1'` — AArch64 ELF/NRO ve RomFS doğrulaması **PASS**. NRO 49.588.671 bayt; SHA-256 `d7b5a38f13e6b0c49af824105e188057125f6903b1a057e03636d4e44e50af96`; CA 118 sertifika / 200.116 bayt.
 - **Köken / sınır:** `src/update_json.hpp` blob'u `95ab577f9c0a705ea2de2a20fbb61fe690af3040`; değişiklik fork-derived parser içinde uyarlamadır. Refael Avramashvili / AGPL-3.0 atfı korunuyor; bu değişiklik bağımsız implementasyon değildir. Cihaz TLS, tam native CTest ve release doğrulaması yapılmadı; genel karar **INCOMPLETE — BLOCKERS REMAIN**.
+
+## 2026-10-24 — Brightness UI ve uygulama lifecycle testi
+
+- **Kaynak:** app testi, güncel kaynak commit'i `0e0b2e060b1b9c857fe6cfa278b72c60245c288a` üzerinde çalıştırıldı; üretim kodu değişmedi.
+- **Doğrulama:** `docker compose run --rm desktop bash -lc 'cmake --build build-native --target papernx_app_tests --parallel 4 && ctest --test-dir build-native --output-on-failure -R "^papernx_app_tests$"'` — build **PASS**; CTest, gerekli `v03_stress_fixtures` hazırlığı dahil **2/2 PASS** (88,70 sn).
+- `tests/app_tests.cpp` içindeki akış gerçek SDL touch olaylarıyla software/system slider değerlerini değiştiriyor, kaydedip yeniden açıyor, varsayılana döndürüyor ve app background/foreground geçişini çalıştırıyor. Desktop build’deki foreground testi `__SWITCH__` servis çağrısını kapsamaz.
+- **Karar / sınır:** yeni üretim düzeltmesi gerekmedi. `lbl*` gerçek sistem parlaklığı, servis kapanışı/geri yükleme, docked/suspend/HOME ve Switch cihazı **UNVERIFIED**. Tam native CTest ve bütün hedeflerin sanitizer koşusu açık; genel karar **INCOMPLETE — BLOCKERS REMAIN**.

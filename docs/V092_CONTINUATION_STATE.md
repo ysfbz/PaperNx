@@ -390,3 +390,9 @@ The verified/pushed branch HEAD at the start of this note was `ed9e3b69c184de1b4
 - Desktop `PaperNX` + updater tests built; updater unit and local HTTPS CTest passed **2/2**. Targeted ASan/UBSan updater unit and local HTTPS CTest passed **2/2**.
 - Current-source Switch AArch64 ELF/NRO and RomFS verification passed. NRO SHA-256 `d7b5a38f13e6b0c49af824105e188057125f6903b1a057e03636d4e44e50af96`; CA bundle 118 certs / 200,116 bytes. Physical TLS remains **UNVERIFIED**.
 - `src/update_json.hpp` blob is `95ab577f9c0a705ea2de2a20fbb61fe690af3040`; its fork-derived/adapted origin and Refael Avramashvili / AGPL-3.0 attribution remain. Full native CTest and independent parser redesign remain open; overall status **INCOMPLETE — BLOCKERS REMAIN**.
+
+## 2026-10-24 — Brightness app test checkpoint
+
+- Current source commit `0e0b2e060b1b9c857fe6cfa278b72c60245c288a` was tested without production changes. `papernx_app_tests` rebuilt and passed; CTest ran `v03_stress_fixtures` and app workflow **2/2** in **88.70 sec**.
+- The app test drives software/system brightness sliders through SDL touch events, checks settings persistence/reset, and sends background/foreground events. It does not execute the Switch-only `lbl*` backlight branch.
+- UI, settings persistence and host lifecycle event handling: **PASS**. Physical system backlight restore, HOME/suspend, docked behavior and Switch hardware: **UNVERIFIED**. No source fix was justified by this audit; full native suite and full sanitizer remain open.
