@@ -186,3 +186,12 @@ The verified/pushed branch HEAD at the start of this note was `ed9e3b69c184de1b4
 - The direct large-fixture run `docker compose run --rm desktop bash -lc 'SDL_VIDEODRIVER=dummy build-desktop/papernx_comic_performance_tests tests/fixtures/comics/performance-37.cbr'` **PASS**. The existing 43,484,977-byte, 37-page fixture is RAR5 stored method, not solid; its SHA-256 remained unchanged (`EB9EF2C91FEF3AED592F4A14EBF4524BAC13548E94D1BB9C717ED2B8E79B0E5A`). Timings and limits are in [`V092_COMIC_PERFORMANCE.md`](V092_COMIC_PERFORMANCE.md).
 - `docker compose run --rm desktop bash -lc 'cmake --build build-desktop --target papernx_comic_document_tests --parallel 4 && ctest --test-dir build-desktop --output-on-failure -R "^papernx_comic_document_tests$"'` — build PASS; CTest **1/1 PASS**, 1.25 seconds. Existing small RAR4/RAR5 solid and random-access cases pass.
 - No large solid archive performance/decode-count result, baseline, Switch timing/RAM or hardware result is claimed. Full native suite remains open.
+
+## 2026-10-24 Joy-Con `+` shared quick-menu confirmation
+
+- **Branch HEAD:** `61360beb8bc7525471822800c25a8549ac5f293f`; source-bearing code is unchanged from the prior checkpoint.
+- Scope confirmed: physical Joy-Con `+` toggles the existing touchscreen `+` quick menu. Both inputs call `toggleQuickMenu()` and share the same `quickMenu_` state.
+- **Current targeted verification:** `docker compose run --rm desktop bash -lc 'cmake --build build-desktop --target papernx_reader_input_tests --parallel 4 && ctest --test-dir build-desktop --output-on-failure -R "^papernx_reader_input_tests$"'` — build PASS; CTest **1/1 PASS**. Assertions cover controller `START`, pinned shortcut focus/activation, and touch/controller cross-toggle in the reader. Earlier library and file-browser assertions are recorded under G7 and were not rerun in this checkpoint.
+- The test injects SDL events; physical Joy-Con mapping, button edge behavior on-device and Switch controller reconnect remain **UNVERIFIED**. No production code change was needed.
+- Read-only updater documentation audit found no stale current-behavior claim in `docs/UPDATER.md`.
+- **Next:** resume G5 scanner/index architecture/Ponytail review, then the remaining current-source test gates. Full native CTest, ASan/UBSan, physical Switch and independent reimplementation remain open. Overall status is **INCOMPLETE — BLOCKERS REMAIN**.

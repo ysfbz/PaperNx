@@ -68,6 +68,15 @@
 - `papernx_comic_document_tests` build and CTest **1/1 PASS** in 1.25 seconds, including the existing RAR4/RAR5 solid and random-access fixtures.
 - Fixture identity before/after was unchanged. Full run details, commands and limits are in [`V092_COMIC_PERFORMANCE.md`](V092_COMIC_PERFORMANCE.md). No before/after improvement or large solid-RAR speed claim is made; full CTest and physical Switch performance remain open.
 
+## 2026-10-24 — Joy-Con `+` opens the existing touchscreen quick menu
+
+- **Current branch HEAD:** `61360beb8bc7525471822800c25a8549ac5f293f`; no application source changed in this check.
+- The touchscreen `+` hitbox and SDL `SDL_CONTROLLER_BUTTON_START` both call `toggleQuickMenu()` and therefore operate the same menu state. Modal blocking, `B` close, and controller focus continue through the existing handlers.
+- Current targeted build and CTest: `papernx_reader_input_tests` **PASS, 1/1**. It covers controller open, D-pad/`A` activation of the pinned shortcut and reader touch/controller cross-toggle. Earlier library and file-browser event coverage is in the G7 `papernx_app_tests` result; it was not rerun here.
+- SDL event injection does not prove physical Joy-Con mapping/reconnect behavior. Hardware remains **UNVERIFIED**. The existing menu and input path needed no source change.
+
+**Decision remains INCOMPLETE — BLOCKERS REMAIN.** Full current-HEAD native/sanitizer gates, independent scanner/index/parser redesign and physical Switch acceptance remain open.
+
 ---
 
 ## G. 2026-10-23 final hardening audit — current source of truth

@@ -472,3 +472,13 @@ Bu checkpoint `ComicPages` worker lifecycle ve test edilebilirlik kapsamını g�
 | Büyük solid-RAR decode sayacı, önce/sonra baseline, median/p95, Switch FPS/RAM ve SD | **NOT RUN / UNVERIFIED** | Mevcut test bu ölçümleri üretmiyor. |
 
 Bu tek koşu yazılım renderer’ı host ölçümüdür; hızlanma iddiası değildir. Genel durum **INCOMPLETE — BLOCKERS REMAIN**.
+
+## X. 2026-10-24 — Joy-Con `+` mevcut dokunmatik hızlı menüyü kullanır
+
+- Kullanıcı kapsamı netleştirildi: Joy-Con `+`, ekrandaki dokunmatik `+` düğmesinin açtığı mevcut hızlı menüyü açıp kapatacak.
+- Kaynak denetimi: dokunmatik `+` hitbox’ı ve `SDL_CONTROLLER_BUTTON_START` olayı aynı `toggleQuickMenu()` fonksiyonuna gidiyor; tek `quickMenu_` durumu kullanılıyor. Modal işlemler hızlı menünün üstüne açılmasını engelliyor. `B` kapatma ve D-pad/`A` odağı mevcut akışta korunuyor.
+- **Güncel hedefli doğrulama:** `docker compose run --rm desktop bash -lc 'cmake --build build-desktop --target papernx_reader_input_tests --parallel 4 && ctest --test-dir build-desktop --output-on-failure -R "^papernx_reader_input_tests$"'` — derleme PASS; CTest **1/1 PASS**. Test kitaplık hızlı menüsünde controller `START`, D-pad/`A` ile sabit kısayol odağını ve okuyucuda dokunmatik/controller geçişli aç/kapatmayı doğruluyor. Kitaplık ve dosya gezgini akışlarının daha önceki `papernx_app_tests` kanıtı G7 bölümündedir; bu turda yeniden çalıştırılmadı.
+- **Sınır:** sentetik SDL controller olayı fiziksel Switch Joy-Con `+` eşlemesini doğrulamaz. Donanım durumu **UNVERIFIED**; üretim kodunda değişiklik yapılmadı.
+- Updater dokümanı ayrıca kontrol edildi; mevcut TLS, verified-manual staging ve harici değiştirme/geri-kurtarma açıklamalarında güncel koda aykırı ifade bulunmadı.
+
+**Karar değişmedi: INCOMPLETE — BLOCKERS REMAIN.** Tam güncel native CTest, sanitizers, bağımsız scanner/index/parser tasarımı ve fiziksel Switch kabulü açık.
