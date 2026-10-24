@@ -55,6 +55,17 @@ int main() {
     const auto restoredUnicode=loadLibraryInventory(unicodeInventory);
     assert(restoredUnicode.size()==1 && restoredUnicode.front().id==unicodeResult.books.front().id &&
            restoredUnicode.front().path==unicodeBook.u8string());
+    ProgressStore unicodeIndex(unicodeInventory);assert(unicodeIndex.load() && unicodeIndex.get("libraryindex0001").bookTitle=="PAPERNX-LIBRARY-1");
+    const auto legacyInventory=root/"data"/"legacy-inventory.txt";ProgressStore legacyIndex(legacyInventory);
+    Progress legacyRecord;legacyRecord.bookPath=unicodeResult.books.front().path;legacyRecord.bookTitle=unicodeResult.books.front().title;
+    legacyRecord.bookAuthor=std::to_string(unicodeResult.books.front().bytes);legacyRecord.lastRead=unicodeResult.books.front().modified;
+    legacyIndex.put(unicodeResult.books.front().id,legacyRecord);assert(legacyIndex.save());
+    const auto migratedLegacy=loadLibraryInventory(legacyInventory);
+    assert(migratedLegacy.size()==1 && migratedLegacy.front().id==unicodeResult.books.front().id);
+    const auto futureInventory=root/"data"/"future-inventory.txt";ProgressStore futureIndex(futureInventory);
+    Progress futureMarker;futureMarker.bookTitle="PAPERNX-LIBRARY-2";futureIndex.put("libraryindex0001",futureMarker);
+    futureIndex.put(unicodeResult.books.front().id,legacyRecord);assert(futureIndex.save());
+    assert(loadLibraryInventory(futureInventory).empty());
     assert(scanRoots({root/"books"},5).size()==5);
     auto cached=loadLibraryInventory(inventory);assert(cached.size()==300);
     auto inventoryBytes=[&]{std::ifstream in(inventory,std::ios::binary);return std::string(std::istreambuf_iterator<char>(in),{});};

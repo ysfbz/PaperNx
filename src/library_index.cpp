@@ -6,12 +6,19 @@
 #include <unordered_set>
 
 namespace papernx {
+namespace {
+constexpr const char *inventorySchemaId="libraryindex0001";
+constexpr const char *inventorySchema="PAPERNX-LIBRARY-1";
+}
 std::vector<Book> loadLibraryInventory(const fs::path &path) {
     ProgressStore store(path);std::vector<Book> books;
     if(!store.load())return books;
+    const auto marker=store.get(inventorySchemaId);
+    if(!marker.bookTitle.empty() && marker.bookTitle!=inventorySchema)return books;
     // An isolated inventory adapts the existing atomic/checksummed codec:
     // bookPath=path, bookTitle=title, bookAuthor=byte count, lastRead=file mtime.
     for(const auto &[id,p]:store.all()) {
+        if(id==inventorySchemaId)continue;
         if(p.bookPath.empty() || p.bookAuthor.empty())continue;
         std::uintmax_t size=0;const auto parsed=std::from_chars(p.bookAuthor.data(),p.bookAuthor.data()+p.bookAuthor.size(),size);
         if(parsed.ec!=std::errc{} || parsed.ptr!=p.bookAuthor.data()+p.bookAuthor.size() || documentId(p.bookPath,size)!=id)continue;
@@ -60,6 +67,7 @@ bool LibraryScanner::start(std::vector<fs::path> roots,std::vector<Book> known,f
             result.complete=true;
             if(!cancel_) {
                 ProgressStore cache(inventory);
+                Progress marker;marker.bookTitle=inventorySchema;cache.put(inventorySchemaId,std::move(marker));
                 for(const auto &b:result.books){if(cancel_)break;Progress p;p.bookPath=b.path;p.bookTitle=b.title;p.bookAuthor=std::to_string(b.bytes);p.lastRead=b.modified;cache.put(b.id,std::move(p));}
                 if(!cancel_){result.cached=cache.save();if(!result.cached)result.error="Library cache could not be saved";}
             }
