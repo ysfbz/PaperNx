@@ -311,3 +311,9 @@ Command `docker compose run --rm switch bash -lc 'export MUPDF_PREFIX=/work/pref
 ## Updater cancellation after transfer — `ebf6555`
 
 `SelfUpdater::cancel()` now participates in the same mutex-protected terminal transition as Ready/Error. A cancellation observed after body receipt or NRO/hash validation removes the temporary/staged files; a cancel after Ready is a no-op. The local HTTPS integration suite streams a 16 MiB candidate and requests cancellation at 100% reported progress. Desktop build passed and updater unit/network CTest passed **2/2** in **2.72 seconds**. Switch SD cancellation, full suite and sanitizers were not run at this source commit.
+
+## G5 scan cancellation after completion — `a9a014f`
+
+`LibraryScanner::pending()` remains true until its completed worker is joined by `take()`. `cancel()` now leaves an already published `ready_` result intact, while cancellation during active traversal/persistence remains supported. This avoids discarding a finished scan when a rescan request arrives before the UI consumes it.
+
+The targeted desktop build of `papernx_library_index_tests` passed; CTest passed **1/1** in **2.34 seconds**. The test waits for `ready_`, calls `cancel()`, then verifies the complete result is still returned. Current header blob `7ddb5b8a91fcc5d2306c9e4d766d74288e06b580` remains fork-derived/adapted; no independent-origin claim is made. Broader G5 redesign, full current-source CTest, sanitizers, Switch rebuild and hardware checks remain open.

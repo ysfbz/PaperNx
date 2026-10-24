@@ -267,3 +267,10 @@ The verified/pushed branch HEAD at the start of this note was `ed9e3b69c184de1b4
 - **Tests:** `tests/self_update_integration.py` streams a 16 MiB valid NRO and `tests/self_update_tests.cpp` requests cancellation at reported 100% progress, verifies no `.part`/`.new`/`.ready`, and verifies a later network error remains Error. Desktop build passed; updater unit and local HTTPS CTest **2/2 PASS** (2.72 sec).
 - **Limit:** host race/fault integration does not prove Switch SD behavior or physical cancellation timing. No Switch build/full CTest/sanitizer was run after this source change. Overall decision remains **INCOMPLETE — BLOCKERS REMAIN**.
 - **Next:** continue G5 scanner/index responsibility audit and remaining updater recovery matrix; do not claim power-loss-safe self-install. Current canonical update strategy remains verified download + user-managed replacement.
+
+## 2026-10-24 — G5 completed-scan cancellation guard
+
+- **Source commit / HEAD:** `a9a014f790bd98541876f82947c36eb7b1f6782c` (`fix(library): preserve completed scan results`). `LibraryScanner::cancel()` is a no-op once the worker has published `ready_`; active scans still observe cancellation. `stop()` remains the shutdown cancellation path.
+- **Verification:** desktop `papernx_library_index_tests` build **PASS**; targeted CTest **1/1 PASS** in **2.34 sec**. Regression covers cancel after completion but before `take()`.
+- **Provenance:** `include/papernx/library_index.hpp` blob `7ddb5b8a91fcc5d2306c9e4d766d74288e06b580` is still fork-derived/adapted; Refael Bar / AGPL-3.0 attribution remains. No clean-room claim.
+- **Next:** continue the substantive G5 scanner/index responsibility review and Ponytail audit. The user-owned untracked execution plan and generated 43,484,977-byte CBR fixture remain unmodified and unstaged. Full current-source native CTest, sanitizers, current-source Switch build, 100/500/1000 cover benchmark and physical Switch remain open. Overall decision **INCOMPLETE — BLOCKERS REMAIN**.

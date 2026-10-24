@@ -351,3 +351,11 @@ Each initial feature blob below matches the corresponding path at the cited fork
 | `src/self_update.cpp` | `26990ab0ebd4cb5ea48d85085f4cb03126249893` | `e7e5c52c1b4b2137d92d1c6902a011d1d3b71b6c` | Cancellation is observed through verification/staging and terminal publication is synchronized. This is a PaperNX-specific safety adaptation in historically fork-derived updater code; it is not independent. Preserve Refael Avramashvili / AGPL-3.0 provenance. |
 
 At `ebf6555`, the other five paths retain the blobs in the preceding six-file snapshot: `src/library_scan.inc` `c740ad3397b3b3909312e20f0b97ae5d29dc36cd`, `src/library_index.cpp` `00b940e6ee65a0733c79d958d06a02bb66029e7b`, `include/papernx/library_index.hpp` `d70a7c58985ec8f77e53e54c495d332401124a60`, `src/update_json.hpp` `dc81698b3684b21b1ce0c48d1791780b9b632163`, and deleted `include/papernx/interface_theme.hpp`. No extant path is byte-identical to the pinned fork; all six historical import matches and all contributor notices remain as documented above.
+
+## Current provenance snapshot — completed-scan cancellation guard `a9a014f790bd98541876f82947c36eb7b1f6782c`
+
+| Path | Current feature blob | Pinned fork blob | Finding |
+|---|---|---|---|
+| `include/papernx/library_index.hpp` | `7ddb5b8a91fcc5d2306c9e4d766d74288e06b580` | `8a0ac82707cf5b402d0cbcebd790d751758b0003` | `cancel()` now ignores cancellation after a completed scan has published `ready_`, preventing a ready result from being discarded before `take()`. This is a PaperNX-specific lifecycle adaptation in the historically fork-derived API, not an independent implementation. Preserve Refael Bar credit and AGPL-3.0 provenance. |
+
+The original six paths remain byte-identical to the pinned fork only at historical feature HEAD `a35aa7b0f51aee58f44d524616a2aa55477d670c`. At `a9a014f`, the five extant paths have different blobs and `include/papernx/interface_theme.hpp` remains deleted. The cancellation test in `tests/library_index_tests.cpp` verifies behavior, not authorship. Existing Refael Bar and Refael Avramashvili attribution remains appropriate.
