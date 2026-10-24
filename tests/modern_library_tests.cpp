@@ -103,6 +103,19 @@ struct AppTest {
         assert(found!=app.books_.end() && found->title==p.bookTitle && found->author==p.bookAuthor);
         assert(app.progressStore_.get(id).page==3 && app.progressStore_.get(id).pageCount==10);
     }
+    static void runCoverQueuePriority(const fs::path &root) {
+        fs::create_directories(root/"books");
+        PaperNxApp app(root);assert(initReady(app));
+        app.visibleBooks_.clear();
+        for(int i=0;i<24;++i){Book book;book.id="cover-"+std::to_string(i);book.title=book.id;book.format=Format::Epub;app.visibleBooks_.push_back(std::move(book));}
+        app.viewMode_=ViewMode::List;app.listScroll_=1120;
+        const auto visible=app.visibleBooks_[10].id,stale=app.visibleBooks_[0].id;
+        {std::lock_guard<std::mutex> lock(app.queueMutex_);app.coverStates_[visible]=CoverState::Loading;app.coverStates_[stale]=CoverState::Loading;app.queuedThumbIds_.insert(visible);app.queuedThumbIds_.insert(stale);}
+        {std::lock_guard<std::mutex> lock(app.completedMutex_);app.completedThumbs_.push_back({visible,1,1,3,{1,2,3},CoverState::Loaded});app.completedThumbs_.push_back({stale,1,1,3,{4,5,6},CoverState::Loaded});}
+        app.processCompletedThumbnails();
+        assert(app.thumbCache_.get("thumb_"+visible) && !app.thumbCache_.get("thumb_"+stale));
+        {std::lock_guard<std::mutex> lock(app.queueMutex_);assert(app.coverStates_[stale]==CoverState::NotRequested && app.coverStates_[visible]==CoverState::Loaded);assert(!app.queuedThumbIds_.count(visible) && !app.queuedThumbIds_.count(stale));}
+    }
 };
 }
 int main() {
@@ -119,5 +132,7 @@ int main() {
     fs::copy_file("tests/fixtures/comics/navigation.cbz",root/"import"/"nested"/"third.cbz");
     fs::create_directory_symlink(fs::absolute("fonts"),root/"fonts");
     AppTest::run(root);const auto historyRoot=fs::temp_directory_path()/"papernx-history-restore";fs::remove_all(historyRoot);
-    AppTest::runHistoryRestore(historyRoot);fs::remove_all(historyRoot);fs::remove_all(root);TTF_Quit();SDL_Quit();
+    AppTest::runHistoryRestore(historyRoot);fs::remove_all(historyRoot);
+    const auto coverRoot=fs::temp_directory_path()/"papernx-cover-queue-priority";fs::remove_all(coverRoot);
+    AppTest::runCoverQueuePriority(coverRoot);fs::remove_all(coverRoot);fs::remove_all(root);TTF_Quit();SDL_Quit();
 }

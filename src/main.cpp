@@ -813,6 +813,13 @@ private:
         // A reader opening has priority over background library cover uploads.
         // Never regroup the card under a finger between press and release.
         if(coversPaused_ || !activeFingers_.empty() || pointerActive_)return;
+        std::set<std::string> visibleCovers;
+        bool filterVisibleCovers=false;
+        if(screen_==ScreenState::Library) {
+            bool haveCompleted=false;
+            {std::lock_guard<std::mutex> lock(completedMutex_);haveCompleted=!completedThumbs_.empty();}
+            if(haveCompleted){int w,h;getWindowSize(w,h);visibleCovers=prioritizeCovers(w,h);filterVisibleCovers=true;}
+        }
         std::vector<LoadedMetadata> metadata;
         {
             std::lock_guard<std::mutex> lock(completedMutex_);
@@ -854,12 +861,21 @@ private:
         std::vector<LoadedThumb> toUpload;
         {
             std::lock_guard<std::mutex> lock(completedMutex_);
-            if (completedThumbs_.empty()) return;
-            // Cap renderer-thread texture uploads to two covers per frame.
-            const auto count=std::min<std::size_t>(2,completedThumbs_.size());
-            toUpload.insert(toUpload.end(),std::make_move_iterator(completedThumbs_.begin()),std::make_move_iterator(completedThumbs_.begin()+count));
-            completedThumbs_.erase(completedThumbs_.begin(),completedThumbs_.begin()+count);
+            for(auto it=completedThumbs_.begin();it!=completedThumbs_.end();) {
+                if(filterVisibleCovers && !visibleCovers.count(it->id)) {
+                    std::lock_guard<std::mutex> queueLock(queueMutex_);
+                    queuedThumbIds_.erase(it->id);
+                    if(coverStates_[it->id]==CoverState::Loading)coverStates_[it->id]=CoverState::NotRequested;
+                    it=completedThumbs_.erase(it);continue;
+                }
+                // Cap renderer-thread texture uploads to two covers per frame.
+                if(toUpload.size()<2) {
+                    toUpload.push_back(std::move(*it));it=completedThumbs_.erase(it);continue;
+                }
+                ++it;
+            }
         }
+        if(toUpload.empty())return;
         for (const auto &lt : toUpload) {
             {
                 std::lock_guard<std::mutex> lock(queueMutex_);
@@ -3685,7 +3701,9 @@ private:
         return {32+(i%cols)*cw,98+(i/cols)*64,cw-12,56};
     }
     void placeholderCover(const Book &book,SDL_Rect r,const ThemePalette &pal) {
-        ui::fallbackCover(renderer_,*typography_,r,book,coverStates_[book.id],pal);
+        CoverState state=CoverState::NotRequested;
+        {std::lock_guard<std::mutex> lock(queueMutex_);auto found=coverStates_.find(book.id);if(found!=coverStates_.end())state=found->second;}
+        ui::fallbackCover(renderer_,*typography_,r,book,state,pal);
     }
     void drawCover(const Book &book,SDL_Rect r,const ThemePalette &pal) {
         auto *thumb=getOrRenderThumbnail(book);
@@ -3696,7 +3714,7 @@ private:
         SDL_Rect dst{r.x+(r.w-iw)/2,r.y+(r.h-ih)/2,iw,ih};
         ui::surface(renderer_,r,pal.header,8); SDL_RenderCopy(renderer_,thumb,nullptr,&dst);
     }
-    void prioritizeCovers(int w,int h) {
+    std::set<std::string> prioritizeCovers(int w,int h) {
         ui::LibraryLayout l(w); std::set<std::string> wanted;
         int first=viewMode_==ViewMode::Grid?int(listScroll_/l.stepY)*l.columns:int(listScroll_/112);
         int count=viewMode_==ViewMode::Grid?((h-l.top)/l.stepY+3)*l.columns:(h-l.top)/112+3;
@@ -3705,6 +3723,7 @@ private:
         for(auto it=thumbQueue_.begin();it!=thumbQueue_.end();) {
             if(!wanted.count(it->id)) { queuedThumbIds_.erase(it->id); it=thumbQueue_.erase(it); } else ++it;
         }
+        return wanted;
     }
     void renderLibraryScreen(int w, int h, const ThemePalette &pal) {
         ui::surface(renderer_,{0,0,w,88},pal.card,0);
