@@ -585,3 +585,10 @@ Bu tek koşu yazılım renderer’ı host ölçümüdür; hızlanma iddiası de�
 - **Performans sınırı:** Tam `Book` kopyalarının kaldırılması kod akışından doğrulanabilir; bu değişiklik için RAM byte, süre veya FPS benchmarkı yapılmadı ve hız kazanımı iddia edilmiyor.
 - **Provenance:** `src/library_scan.inc` blob `c6c950712c7b0d34431c8f3994bc4f960e136950` değişti; fork-derived/adapted uygulama entegrasyonu olarak kalır. Değişiklik bağımsız köken iddiası değildir; Refael Bar / AGPL-3.0 atfı korunur.
 - **Açık:** Daha geniş G5 tasarım değerlendirmesi, full native CTest, ASan/UBSan, bu kaynak HEAD'inde Switch build, gerçek cover ölçek benchmarkı ve cihaz kabulü açık; genel durum **INCOMPLETE — BLOCKERS REMAIN**.
+
+## 2026-10-24 — Güncel kaynakta Switch link ve RomFS doğrulaması
+
+- **Doğrulanan HEAD:** `96a10c2e352370383808755badfbb54d15597f16`; en son uygulama kaynak commit'i `761f9b910045d7485a6904d6b96b6bc9d7340257`.
+- **Komut:** `docker compose run --rm switch bash -lc 'export MUPDF_PREFIX=/work/prefix-mupdf-switch; make all -j4 && python3 scripts/verify_artifacts.py --version 0.9.1'` — **PASS**. `PaperNX.elf` AArch64 linklendi, `PaperNX.nro` üretildi ve artifact doğrulayıcı geçti. RomFS CA bundle 118 sertifika / 200.116 bayt; gerekli fontlar ve ikon doğrulandı.
+- **Yerel build artifact:** NRO 49.588.671 bayt, SHA-256 `05e30b184819bc0825e7f737ddceb5366d97d6c2e6f20d3a6cac1be78857515f`; artifact kaynağı `96a10c2` olarak raporlandı. NACP sürümü release öncesi talimat gereği 0.9.1 bırakıldı. Bu dağıtım paketi veya release değildir.
+- **Açık:** Fiziksel Switch, gerçek TLS/NIFM, Joy-Con `+`, donanım parlaklığı, SD kesintisi, tam native CTest ve sanitizer **UNVERIFIED / NOT RUN**. Genel karar **INCOMPLETE — BLOCKERS REMAIN**.

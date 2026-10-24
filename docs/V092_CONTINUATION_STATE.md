@@ -281,3 +281,10 @@ The verified/pushed branch HEAD at the start of this note was `ed9e3b69c184de1b4
 - **Verification:** desktop `PaperNX`, `papernx_modern_library_tests` and `papernx_library_index_tests` built; focused CTest **2/2 PASS** in **14.08 sec**. `git diff --check` passed.
 - **Limits:** allocation reduction is structural; no numeric memory or latency measurement was made. The source remains fork-derived/adapted. Full native CTest, sanitizer, Switch rebuild at this source, 100/500/1000 end-to-end cover benchmark and hardware acceptance remain open.
 - **Next:** continue G5 source responsibility review and updater recovery testing. Keep the execution plan and generated CBR fixture untracked. No release, merge, tag, PR or Actions run; overall **INCOMPLETE — BLOCKERS REMAIN**.
+
+## 2026-10-24 — Current-source Switch link and RomFS check
+
+- **Source HEAD:** `96a10c2e352370383808755badfbb54d15597f16` (application sources include `761f9b910045d7485a6904d6b96b6bc9d7340257`).
+- **Command/result:** `docker compose run --rm switch bash -lc 'export MUPDF_PREFIX=/work/prefix-mupdf-switch; make all -j4 && python3 scripts/verify_artifacts.py --version 0.9.1'` — **PASS**. AArch64 ELF linked, NRO built, artifact verifier passed; RomFS CA contains 118 certs / 200,116 bytes and required fonts/icon.
+- **NRO:** 49,588,671 bytes; SHA-256 `05e30b184819bc0825e7f737ddceb5366d97d6c2e6f20d3a6cac1be78857515f`. NACP remains 0.9.1. This is a local validation artifact, not a release.
+- **Remaining:** physical Switch TLS/Joy-Con/backlight/SD behavior; full native CTest and sanitizer; real cover benchmark; open G5 architecture/Ponytail audit. Continue from G5; do not run Actions or publish. Overall **INCOMPLETE — BLOCKERS REMAIN**.

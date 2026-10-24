@@ -323,3 +323,7 @@ The targeted desktop build of `papernx_library_index_tests` passed; CTest passed
 `src/library_scan.inc::processLibraryScan()` now indexes existing `Book` objects by pointer for the duration of result reconciliation rather than copying every record (including path/title/author strings) into a temporary map. This retains the existing ID lookup and label precedence while reducing transient allocations; no real-device memory/time/FPS improvement is claimed.
 
 `PaperNX`, `papernx_modern_library_tests` and `papernx_library_index_tests` built; focused CTest passed **2/2** in **14.08 seconds**. The module remains fork-derived/adapted and Refael Bar / AGPL-3.0 provenance remains in force. Full suite, sanitizer, current-source Switch and 100/500/1000 cover measurements remain open.
+
+## Switch source/link and CA artifact check — `96a10c2`
+
+Command `docker compose run --rm switch bash -lc 'export MUPDF_PREFIX=/work/prefix-mupdf-switch; make all -j4 && python3 scripts/verify_artifacts.py --version 0.9.1'` passed at HEAD `96a10c2e352370383808755badfbb54d15597f16`, with application source from `761f9b9`. It linked the AArch64 ELF, produced the NRO and verified RomFS CA/fonts/icon. The bundle contains 118 certs / 200,116 bytes. NRO: 49,588,671 bytes, SHA-256 `05e30b184819bc0825e7f737ddceb5366d97d6c2e6f20d3a6cac1be78857515f`. No package/release was created; physical device and full native/sanitizer tests remain unverified/not run.
