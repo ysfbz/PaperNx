@@ -260,3 +260,17 @@ G9 changes only the failure contract of `selectUpdateRelease()`: the caller-prov
 | `src/update_json.hpp` | `677a6931a6fbbf583ba8388fff217dcaef5b091b` | `d4e3bb96dcb2d363e23d40a83775c02768fc5394` | Unchanged from G8; its release-specific bounded parser is a material redesign that retains fork lineage. Retain Refael Avramashvili / AGPL-3.0 attribution. |
 
 The new assertions in `tests/self_update_tests.cpp` seed a prior release result, then verify that malformed JSON and an invalid installed version both leave the output empty. The focused `papernx_self_update_tests` CTest passed 1/1 after rebuilding `PaperNX` and the test target. The HTTPS integration target was not rerun for this small output-contract change. The historical six-path byte-identity statement still applies only to `a35aa7b0f51aee58f44d524616a2aa55477d670c`; none of the five extant paths is byte-identical to the pinned fork at G9, and `include/papernx/interface_theme.hpp` remains deleted. Preserve both fork contributor credits and AGPL-3.0 provenance.
+
+## Current provenance snapshot — G10 scan depth/cancellation fix `1daedb63246384a73afb979978230f75716c2165`
+
+G10 changes the existing PaperNX core walker so depth-limited and cancelled scans report an incomplete result. The library worker consequently preserves its prior inventory instead of saving a partial snapshot. This is a change to pre-existing PaperNX core code and its adapter integration; it does not rewrite any of the six originally audited paths.
+
+| Path | Feature blob at G10 | Provenance |
+|---|---|---|
+| `src/core.cpp` | `1e107466b4e54c42b15136c82d28382b3d042361` | Pre-existing PaperNX core walker, extended to expose incomplete depth/cancellation outcomes; not a fork import. |
+| `include/papernx/core.hpp` | `84671547db165325861b0fd027f7094e621fd32e` | Pre-existing PaperNX core API; `scan()` now has an optional completion output, with old call sites still compiling through its default. |
+| `src/library_index.cpp` | `5319a7f6b66fd764b694be7fb7f770e4e9ebe5f7` | Unchanged from G8. The async worker still uses fork-derived/adapted architecture; Refael Bar / AGPL-3.0 attribution remains. |
+
+`tests/library_index_tests.cpp` covers the depth boundary and verifies that a deeper incomplete scan leaves the previous inventory byte-identical. It also checks incomplete outcomes for cancellation in the single-root and multi-root APIs. The desktop targets `PaperNX`, `papernx_core_tests`, `papernx_library_index_tests`, `papernx_modern_library_tests` and `papernx_catalog_tests` built; focused CTest passed 4/4. A Switch `make all -j4` build produced the AArch64 ELF/NRO and validated RomFS CA/font inputs. No physical Switch behavior was tested.
+
+**Correct wording at G10:** “At feature HEAD `1daedb63246384a73afb979978230f75716c2165`, the original six-path byte-identity statement remains true only at historical feature HEAD `a35aa7b0f51aee58f44d524616a2aa55477d670c`. None of the five extant paths among those six is byte-identical to the pinned fork, and `include/papernx/interface_theme.hpp` is deleted. Scanner/index and updater/parser implementations retain fork-derived/adapted lineage; preserve Refael Bar and Refael Avramashvili attribution with AGPL-3.0 notices. `page_cache.cpp` and `page_curl.hpp` were shared v0.9.1 code already in the main base, not v0.9.2 imports. G10 changes only PaperNX-owned core scan behavior and adds no independent-origin claim.”

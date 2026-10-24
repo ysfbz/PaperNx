@@ -5,7 +5,7 @@
 
 **Baseline:** `main@8db85384a1b6c277c74766601ef46e9a672328df` (2026-10-23 audit)  
 **Feature branch:** `feature/v0.9.2-complete-reader-enhancements`  
-**Latest source-bearing HEAD:** `c81145c9208455008db91bac56d9be4b920d8364` (G8 bounded scan completion checkpoint).
+**Latest source-bearing HEAD:** `1daedb63246384a73afb979978230f75716c2165` (G10 scan depth/cancellation completion).
 **Fork reference:** `rtk19/PaperNx@d2b4bcfd10b1a66043c5b8cd36da08340cffec6d`  
 **Version remains:** v0.9.1; do not tag, release or merge to main.
 
@@ -42,6 +42,13 @@
 - **Source commit:** `ee429ec197a06a3287652985789e53abfcab178c`. `selectUpdateRelease()` clears the output before validation, so malformed release JSON or an invalid installed version cannot leave a stale candidate available to the caller.
 - **Verification:** `PaperNX` and `papernx_self_update_tests` built in the desktop container; focused CTest **1/1 PASS**. The test seeds stale output and checks both error paths clear it.
 - **Not rerun:** HTTPS integration, Switch cross-build, full CTest, sanitizers, and physical Switch. This checkpoint does not close updater hardware or power-loss acceptance and does not change the overall **INCOMPLETE — BLOCKERS REMAIN** decision.
+
+## 2026-10-24 — G10 scan depth and cancellation completion
+
+- **Source commit:** `1daedb63246384a73afb979978230f75716c2165`. The shared core walker marks traversal incomplete when it stops at the depth-16 safety boundary or cancellation. Both single-root `scan()` and multi-root `scanRoots()` expose this result; the async scanner keeps the previous inventory when traversal is incomplete.
+- **Desktop verification:** build of `PaperNX`, core, library-index, modern-library and catalog targets; focused CTest **4/4 PASS**. Regression coverage includes an at-limit file, a deeper file, cancellation, and byte-identical old inventory after a depth-limited scan.
+- **Switch verification:** `make all -j4` in the pinned Switch container built the ELF/NRO and ran RomFS CA/font checks. The build did not exercise physical storage or controller behavior.
+- **Provenance:** only pre-existing PaperNX `core.cpp/core.hpp` and library-index integration changed; G10 does not alter the historical six-file identity statement or fork attribution. No clean-room claim is added. Overall decision remains **INCOMPLETE — BLOCKERS REMAIN**.
 
 ---
 

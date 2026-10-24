@@ -421,3 +421,18 @@ Bu bölüm, ana v0.9.2 hardening görevinin devamıdır; release hazırlığı v
 | HTTPS entegrasyonu, Switch build, tam CTest, ASan/UBSan ve fiziksel Switch | **NOT RUN / UNVERIFIED** | Bu küçük API hata-sözleşmesi değişikliği için tekrar edilmedi; önceki kanıtlar bu HEAD için güncel sayılmaz. |
 
 Provenance eki ve lisans özeti G9 commit/hash ile güncellendi. `src/self_update.cpp` fork kökenli updater’ın PaperNX uyarlaması olarak kalıyor; Refael Avramashvili atfı ve AGPL-3.0 bildirimi korundu. Genel release kararı değişmedi: **INCOMPLETE — BLOCKERS REMAIN**. Bir sonraki iş scanner/index mimari sorumluluklarını ve kalan Ponytail denetimini sürdürmek.
+
+## T. 2026-10-24 — G10: Derinlik sınırında eksik tarama güvenliği
+
+- **Dal / kaynak commit:** `feature/v0.9.2-complete-reader-enhancements` / `1daedb63246384a73afb979978230f75716c2165` (`fix(library): report depth-limited scans incomplete`).
+- `scanInto()` derinlik 16’nın ötesindeki girdileri atlamaya devam ediyor; artık bunu tamamlanmamış tarama olarak bildiriyor. Cancel callback’iyle durma da `complete=false` yapıyor. Tek-root `scan()` bu sonucu isteğe bağlı çıktı parametresiyle sunuyor; önceki çağrı imzaları varsayılan parametreyle uyumlu.
+- `LibraryScanner` kısmi depth sonucu için envanter yazmadığından önceki kitap listesi korunuyor. `tests/library_index_tests.cpp` sınır içi/derin dosya, tekli/çoklu-root cancellation ve envanter byte eşitliği kontrollerini içeriyor.
+
+| Kontrol | Sonuç | Kanıt |
+|---|---|---|
+| Desktop build | **PASS** | `PaperNX`, `papernx_core_tests`, `papernx_library_index_tests`, `papernx_modern_library_tests`, `papernx_catalog_tests`; kaynak build’i tamamlandı. |
+| Odaklı CTest | **PASS, 4/4** | `papernx_core_tests`, `papernx_library_index_tests`, `papernx_modern_library_tests`, `papernx_catalog_tests`. İlk deneme test fixture’ındaki seviye sayısını hatalı kurdu; fixture düzeltmesinden sonraki aynı dört hedef geçti. |
+| Switch build | **PASS** | `docker compose run --rm switch bash -lc 'export MUPDF_PREFIX=/work/prefix-mupdf-switch; make all -j4'`; AArch64 ELF/NRO üretildi, RomFS doğrulaması 118 CA sertifikasını ve fontları kontrol etti. |
+| Full CTest, sanitizers, 10.001 dosya stres testi, fiziksel Switch | **NOT RUN / UNVERIFIED** | Bu turda çalıştırılmadı. Cihaz ve performans kabulü hâlâ açık. |
+
+G10 değişikliği önceden var olan PaperNX `core.cpp/core.hpp` koduna aittir; fork provenance sınıflandırması ve Refael Bar/Refael Avramashvili atıfları değişmedi. Genel durum **INCOMPLETE — BLOCKERS REMAIN**.

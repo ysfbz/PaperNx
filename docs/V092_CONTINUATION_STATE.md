@@ -2,7 +2,7 @@
 
 **Updated:** 2026-10-24
 **Branch:** `feature/v0.9.2-complete-reader-enhancements`
-**Latest source commit:** `ee429ec197a06a3287652985789e53abfcab178c` (G9 updater error-output contract).
+**Latest source commit:** `1daedb63246384a73afb979978230f75716c2165` (G10 scan depth/cancellation completion).
 **Last source commit before the current hardening changes:** `bb9d8579db9ccf0d10b5843e1929c2e696565c59`
 **Hardening source commits:** `913fb8f` and `1cb06a1`.
 **Audit documentation:** committed on this feature branch; use `git log` for the final report commit SHA.
@@ -36,7 +36,7 @@
 
 ## Next session starting point
 
-Read the current source-provenance report and latest `FinalDevelopmentResult.md` section first. Continue only on the existing feature branch. G6 synthetic cache evidence, G7 host/cover queue audit, and G8 scan-cap behavior are recorded below. Continue with the remaining scanner/index/updater/parser design and Ponytail review, then close feasible native gates without restarting completed broad test chains unnecessarily. Physical acceptance remains unverified; use [`V092_DEVICE_ACCEPTANCE.md`](V092_DEVICE_ACCEPTANCE.md) as the device record. Keep the final decision `INCOMPLETE — BLOCKERS REMAIN` until all required gates have evidence.
+Read the current source-provenance report and latest `FinalDevelopmentResult.md` section first. Continue only on the existing feature branch. G6 synthetic cache evidence, G7 host/cover queue audit, G8 scan-cap behavior, and G9 updater error-output safety are recorded below. Continue the scanner/index responsibility audit and Ponytail review; the release JSON parser already has a bounded redesign, so review its security contract and provenance before considering any further replacement. Close feasible native gates without restarting completed broad test chains unnecessarily. Physical acceptance remains unverified; use [`V092_DEVICE_ACCEPTANCE.md`](V092_DEVICE_ACCEPTANCE.md) as the device record. Keep the final decision `INCOMPLETE — BLOCKERS REMAIN` until all required gates have evidence.
 
 ## 2026-10-23 latest continuation checkpoint
 
@@ -157,3 +157,11 @@ The verified/pushed branch HEAD at the start of this note was `ed9e3b69c184de1b4
 - The test covers malformed JSON after an earlier valid release and invalid installed version. HTTPS integration, Switch build, full native CTest and physical Switch were not rerun for this change.
 - Provenance snapshot is recorded in [`V092_SOURCE_PROVENANCE_AUDIT.md`](V092_SOURCE_PROVENANCE_AUDIT.md). Updater lineage remains fork-derived/adapted; Refael Avramashvili attribution and AGPL-3.0 notices remain appropriate.
 - **Next:** continue scanner/index responsibility audit and Ponytail review, then run only remaining feasible focused gates. Keep overall status `INCOMPLETE — BLOCKERS REMAIN`.
+
+## 2026-10-24 G10 bounded scan depth and cancellation
+
+- **Source commit:** `1daedb63246384a73afb979978230f75716c2165` (`fix(library): report depth-limited scans incomplete`). The shared walker no longer treats entries beyond depth 16 or a cancellation as a complete snapshot. The legacy single-root `scan()` API can now return the same completion signal already used by `scanRoots()`.
+- The async scanner discards a depth-limited result before inventory save; a regression assertion confirms the prior 300-book inventory remains byte-identical. Tests also cover a file exactly at the allowed depth, a deeper skipped file, and cancellation completeness.
+- **Desktop:** build targets `PaperNX`, `papernx_core_tests`, `papernx_library_index_tests`, `papernx_modern_library_tests`, `papernx_catalog_tests`; focused CTest **4/4 PASS**. The first run caught an off-by-one in the new test fixture; after correcting the fixture depth, the same four tests passed.
+- **Switch:** `docker compose run --rm switch bash -lc 'export MUPDF_PREFIX=/work/prefix-mupdf-switch; make all -j4'` completed AArch64 ELF/NRO linking and RomFS validation (118 CA certificates / 200,116 bytes). Physical device remains unverified.
+- `src/core.cpp` and `include/papernx/core.hpp` are pre-existing PaperNX core files; no new provenance is claimed for them. The fork-derived scanner/index attribution remains unchanged. Overall status: `INCOMPLETE — BLOCKERS REMAIN`.
