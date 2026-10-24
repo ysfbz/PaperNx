@@ -441,6 +441,7 @@ bool updateVersionNewer(const std::string &candidate, const std::string &current
 
 bool selectUpdateRelease(const std::string &json, const std::string &current, const UpdateSource &source,
                          UpdateRelease &release, std::string &error) {
+    release = {};
     std::vector<update_json::Release> releases;
     if (!update_json::Parser(json).parse(releases)) {
         error = "Invalid release response";
@@ -451,7 +452,6 @@ bool selectUpdateRelease(const std::string &json, const std::string &current, co
         return false;
     }
 
-    release = {};
     for (const auto &item : releases) {
         if (item.draft || item.prerelease) continue;
         const auto &tag = item.tag;

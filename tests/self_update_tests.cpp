@@ -28,6 +28,11 @@ static void unit(){
     const auto spaced=std::string(" \n[ { \"tag_name\" : \"v0.12.0-reader.10\", \"name\" : \"Release\", \"draft\" : false, \"prerelease\" : false, \"body\" : null, \"extra\" : {\"nested\" : [true, null, 3]}, \"assets\" : [ { \"name\" : \"PaperNX.nro\", \"size\" : 20000, \"browser_download_url\" : \"")+asset+"PaperNX.nro\", \"digest\" : \"sha256:"+std::string(64,'a')+"\" } ] } ] \t";
     assert(selectUpdateRelease(spaced,"0.12.0-reader.4",source,r,error)&&r.installable()&&r.title=="Release"&&r.notes.empty()&&r.sha256==std::string(64,'a'));
     for(const auto &bad:{"{}","[{}]","[{\"tag_name\":\"1.0.0\",}]","[{\"tag_name\":\"1.0.0\",\"tag_name\":\"9.0.0\"}]","[", "[{\"body\":\"\\ud800\"}]"})assert(!selectUpdateRelease(bad,"0.12.0-reader.4",source,r,error));
+    r.version="stale";r.title="stale";r.notes="stale";r.url="stale";r.checksumUrl="stale";r.sha256="stale";r.bytes=123;
+    assert(!selectUpdateRelease("[{\"tag_name\":\"9.0.0\"},{}]","0.12.0-reader.4",source,r,error));
+    assert(r.version.empty()&&r.title.empty()&&r.notes.empty()&&r.url.empty()&&r.checksumUrl.empty()&&r.sha256.empty()&&r.bytes==0);
+    r.version="stale";
+    assert(!selectUpdateRelease("[]","invalid",source,r,error)&&r.version.empty());
     assert(!selectUpdateRelease("[{\"tag_name\":\"1.0.0\",\"extra\":1,\"extra\":2}]","0.12.0-reader.4",source,r,error));
     assert(!selectUpdateRelease("[{\"tag_name\":\"1.0.0\",\"extra\":{\"nested\":[{\"key\":1,\"key\":2}]}}]","0.12.0-reader.4",source,r,error));
     assert(!selectUpdateRelease("[{\"tag_name\":12}]","0.12.0-reader.4",source,r,error));
