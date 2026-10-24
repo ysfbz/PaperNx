@@ -17,9 +17,19 @@ struct AppTest {
   PaperNxApp app(root);assert(initReady(app));app.openBook(app.books_.front());assert(app.comic());
   SDL_RendererInfo info{};SDL_GetRendererInfo(app.renderer_,&info);
   std::cout<<"Renderer: "<<info.name<<"; pages="<<app.pageCount_<<"; bytes="<<fs::file_size(app.books_.front().path)<<std::endl;
-  app.currentPage_=app.pageCount_>30?18:4;const int original=app.currentPage_;
-  app.toolbarVisible_=false;app.setPdfView(0);app.render();app.configureComicPages();
-  auto builds=app.comicTextureBuilds_;auto start=SDL_GetTicks();
+  assert(app.pageCount_>=3);
+  app.currentPage_=app.pageCount_>30?18:std::min(4,app.pageCount_-3);const int original=app.currentPage_;
+  app.toolbarVisible_=false;app.setPdfView(0);
+  auto builds=app.comicTextureBuilds_;app.render();
+  assert(app.comicTextureBuilds_==builds && app.comicPages_.pending());
+  drain(app);
+  assert(app.pageCache_.get(app.comicTextureKey(original)) && app.comicTextureBuilds_==builds);
+  app.extraStyle_.readingMode=1;app.pageCache_.clear();app.render();
+  assert(app.comicTextureBuilds_==builds && app.comicPages_.pending());drain(app);
+  assert(app.pageCache_.get(app.comicTextureKey(original)) && app.comicTextureBuilds_==builds);
+  app.extraStyle_.readingMode=0;app.pageCache_.clear();app.render();drain(app);
+  assert(app.pageCache_.get(app.comicTextureKey(original)) && app.comicTextureBuilds_==builds);
+  app.configureComicPages();auto start=SDL_GetTicks();builds=app.comicTextureBuilds_;
   app.prefetchPage_=original;app.prefetchStep_=0;
   for(int i=0;i<4;++i){app.prefetchDue_=0;app.idlePrefetch();app.toolbarVisible_=!app.toolbarVisible_;app.render();}
   std::cout<<"Four idle/toolbar cycles: "<<SDL_GetTicks()-start<<" ms; UI rasterizations="<<app.comicTextureBuilds_-builds<<std::endl;
@@ -75,7 +85,8 @@ struct AppTest {
    app.processComicPages();SDL_Delay(2);
   }
   app.processComicPages();assert(!app.comicPendingTurn_.active && app.currentPage_==failedAnchor);
-  assert(app.progressStore_.get(app.currentBookId_).page==failedProgress && !app.comicTurnError_.empty());
+  assert(app.progressStore_.get(app.currentBookId_).page==failedProgress && !app.comicTurnError_.empty() && !app.pageRenderError_.empty());
+  app.render();assert(!app.comicPages_.pending()); // A failed visible page observes the retry delay instead of reopening each frame.
   currentBook->path=archivePath;app.comicPages_.clear();app.comicPagesIdentity_.clear();app.configureComicPages();
   app.currentPage_=original;app.saveCurrentPosition();app.render();
   app.ensureComicGroup(app.readerTurnTarget(original,1));drain(app);
@@ -97,40 +108,56 @@ struct AppTest {
   // their base images or requiring a decode for each pan/pinch location.
   app.comicDetailDue_=0;app.refineComicZoom();drain(app);
   const auto detailGroup=app.comicSpreadPages(app.currentPage_);
-  assert(app.comicDetails_.size()==static_cast<std::size_t>(detailGroup.second));
-  for(int i=0;i<detailGroup.second;++i){const int page=detailGroup.first+i;int bw,bh,dw,dh;
-   auto base=app.pageCache_.get(app.comicTextureKey(page));assert(base);
+  int limit=std::min(info.max_texture_width>0?info.max_texture_width:3072,
+                     info.max_texture_height>0?info.max_texture_height:3072);
+  std::size_t expectedDetails=0;
+  for(int i=0;i<detailGroup.second;++i) {
+   const int page=detailGroup.first+i;float nw=0,nh=0;
+   assert(px_document_page_size(app.doc_,page,&nw,&nh));
+   const auto baseSize=ComicResolution::size(nw,nh,false,limit);
+   const auto detailSize=ComicResolution::size(nw,nh,true,limit);
+   if(detailSize==baseSize){assert(!app.comicDetails_.count(page));continue;}
+   ++expectedDetails;int bw,bh,dw,dh;auto base=app.pageCache_.get(app.comicTextureKey(page));assert(base);
    SDL_QueryTexture(base,nullptr,nullptr,&bw,&bh);SDL_QueryTexture(app.comicDetails_.at(page).texture.get(),nullptr,nullptr,&dw,&dh);
    assert(dw>bw && dh>bh);
   }
+  assert(app.comicDetails_.size()==expectedDetails);
   for(int i=0;i<10;++i){app.zoomPdf(2+i*.1f,.6f,.4f,true);app.pdfPanY_+=3;app.render();}
   assert(app.comicTextureBuilds_==builds);
   app.closeBook();assert(app.comicDetails_.empty());drain(app);
-  // A visible request displaces speculative work when the bounded queue is full.
-  ComicPages priorityWorker;const auto path=app.books_.front().path;
-  priorityWorker.configure({"priority",path});priorityWorker.setSuspended(true);
-  for(int page=0;page<6;++page)priorityWorker.request(page,false,ComicPages::Priority::SpeculativeForward);
-  priorityWorker.request(6,false,ComicPages::Priority::Visible);priorityWorker.setSuspended(false);
-  std::vector<int> priorityOrder;const auto priorityDeadline=SDL_GetTicks()+20000;
-  while(priorityWorker.pending() && SDL_GetTicks()<priorityDeadline) {
-   for(auto &result:priorityWorker.take()) {
-    assert(result.identity=="priority" && !result.rgb.empty());priorityOrder.push_back(result.page);
+  const auto path=app.books_.front().path;
+  if(app.pageCount_>=7) {
+   // A visible request displaces speculative work when the bounded queue is full.
+   ComicPages priorityWorker;
+   priorityWorker.configure({"priority",path});priorityWorker.setSuspended(true);
+   for(int page=0;page<6;++page)priorityWorker.request(page,false,ComicPages::Priority::SpeculativeForward);
+   priorityWorker.request(6,false,ComicPages::Priority::Visible);priorityWorker.setSuspended(false);
+   std::vector<int> priorityOrder;const auto priorityDeadline=SDL_GetTicks()+20000;
+   while(priorityWorker.pending() && SDL_GetTicks()<priorityDeadline) {
+    for(auto &result:priorityWorker.take()) {
+     assert(result.identity=="priority" && !result.rgb.empty());priorityOrder.push_back(result.page);
+    }
+    SDL_Delay(2);
    }
-   SDL_Delay(2);
+   assert(priorityOrder.size()==6 && priorityOrder.front()==6 &&
+          std::find(priorityOrder.begin(),priorityOrder.end(),5)==priorityOrder.end());
+   priorityWorker.stop();assert(priorityWorker.metrics().documentOpens==1 && priorityWorker.metrics().documentCloses==1);
   }
-  assert(priorityOrder.size()==6 && priorityOrder.front()==6 &&
-         std::find(priorityOrder.begin(),priorityOrder.end(),5)==priorityOrder.end());
-  priorityWorker.stop();assert(priorityWorker.metrics().documentOpens==1 && priorityWorker.metrics().documentCloses==1);
   // Configuration replacement discards old results and closes its worker-owned
   // document. The open document then survives idle longer than the old timeout.
   ComicPages worker;
-  worker.configure({"old",path});for(int i=0;i<6;++i)worker.request(i);
+  const int lifecyclePage=std::min(2,app.pageCount_-1);
+  worker.configure({"old",path});for(int i=0;i<std::min(6,app.pageCount_);++i)worker.request(i);
   const auto openDeadline=SDL_GetTicks()+5000;
   while(worker.metrics().documentOpens==0 && SDL_GetTicks()<openDeadline)SDL_Delay(1);
   assert(worker.metrics().documentOpens==1);
-  worker.configure({"new",path});worker.request(2);bool received=false;const auto deadline=SDL_GetTicks()+20000;
-  while(worker.pending() && SDL_GetTicks()<deadline){for(auto &r:worker.take()){assert(r.identity=="new" && r.page==2 && !r.rgb.empty());received=true;}SDL_Delay(2);}
+  worker.configure({"new",path});worker.request(lifecyclePage);bool received=false;const auto deadline=SDL_GetTicks()+20000;
+  while(worker.pending() && SDL_GetTicks()<deadline){for(auto &r:worker.take()){assert(r.identity=="new" && r.page==lifecyclePage && !r.rgb.empty());received=true;}SDL_Delay(2);}
   assert(received && !worker.pending());auto metrics=worker.metrics();assert(metrics.documentOpens==2 && metrics.documentCloses==1);
+  const auto entryLoads=metrics.pageEntryLoads;assert(entryLoads>0);
+  worker.request(lifecyclePage);received=false;const auto rereadDeadline=SDL_GetTicks()+20000;
+  while(worker.pending() && SDL_GetTicks()<rereadDeadline){for(auto &r:worker.take()){assert(r.identity=="new" && r.page==lifecyclePage && !r.rgb.empty());received=true;}SDL_Delay(2);}
+  metrics=worker.metrics();assert(received && !worker.pending() && metrics.pageEntryLoads==entryLoads);
   int idleSeconds=0;
   for(const int interval:{1,2,7,20}) {
    std::this_thread::sleep_for(std::chrono::seconds(interval));idleSeconds+=interval;
@@ -140,12 +167,15 @@ struct AppTest {
   worker.setSuspended(true);const auto closeDeadline=SDL_GetTicks()+5000;
   while(worker.metrics().documentCloses<2 && SDL_GetTicks()<closeDeadline)SDL_Delay(1);
   assert(worker.metrics().documentCloses==2);
-  worker.setSuspended(false);worker.request(3);received=false;const auto resumeDeadline=SDL_GetTicks()+20000;
-  while(worker.pending() && SDL_GetTicks()<resumeDeadline){for(auto &r:worker.take()){assert(r.identity=="new" && r.page==3 && !r.rgb.empty());received=true;}SDL_Delay(2);}
+  worker.setSuspended(false);worker.request(lifecyclePage);received=false;const auto resumeDeadline=SDL_GetTicks()+20000;
+  while(worker.pending() && SDL_GetTicks()<resumeDeadline){for(auto &r:worker.take()){assert(r.identity=="new" && r.page==lifecyclePage && !r.rgb.empty());received=true;}SDL_Delay(2);}
   assert(received && worker.metrics().documentOpens==3 && worker.metrics().documentCloses==2);
   worker.stop();metrics=worker.metrics();assert(metrics.documentOpens==3 && metrics.documentCloses==3);
-  worker.request(4);assert(worker.metrics().documentOpens==3);
-  std::cout<<"Worker documents: opens="<<metrics.documentOpens<<", closes="<<metrics.documentCloses<<"; idle session retained and suspend released it\n";
+  worker.request(0);assert(worker.metrics().documentOpens==3);
+  std::cout<<"Worker documents: opens="<<metrics.documentOpens<<", closes="<<metrics.documentCloses
+           <<"; page entry loads="<<metrics.pageEntryLoads<<", archive cursor opens/reopens="
+           <<metrics.archiveCursorOpens<<"/"<<metrics.archiveCursorReopens
+           <<", skipped entries="<<metrics.skippedArchiveEntries<<"; idle session retained and suspend released it\n";
   std::cout<<"PASS: bounded base/detail memory; zero hot-path rasterizations; asynchronous CBR/CBZ neighbours; preserved two-page zoom; stale-result cancellation; idle and suspend lifecycle\n";
  }
 };

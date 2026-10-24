@@ -33,6 +33,11 @@ struct AppTest {
         while(app.comicPendingTurn_.active && SDL_GetTicks()<deadline){app.processComicPages();SDL_Delay(2);}
         app.processComicPages();assert(!app.comicPendingTurn_.active);
     }
+    static void waitComicPages(PaperNxApp &app) {
+        const auto deadline=SDL_GetTicks()+20000;
+        while(app.comicPages_.pending() && SDL_GetTicks()<deadline){app.processComicPages();SDL_Delay(2);}
+        app.processComicPages();assert(!app.comicPages_.pending());
+    }
     static void settleLayout(PaperNxApp &app) {
         for(int i=0;i<1000 && (app.layoutPending_ || app.layoutWorker_.joinable());++i) {
             app.processLayout();SDL_Delay(2);
@@ -40,10 +45,16 @@ struct AppTest {
         app.processLayout();assert(!app.layoutPending_ && !app.layoutWorker_.joinable());
     }
     static Shot sheet(PaperNxApp &app,int page) {
+        if(app.comic()){app.comicZoomTexture(page);waitComicPages(app);}
         auto l=app.readerLayout();auto t=app.captureReaderSurface(l.leafWidth(),l.height,[&]{app.drawReaderLeaf(page,{0,0,l.leafWidth(),l.height});});assert(t);
         return read(app,t.get());
     }
     static Shot spread(PaperNxApp &app,int page) {
+        if(app.comic()) {
+            const auto group=app.comicSpreadPages(page);
+            for(int side=0;side<group.second;++side)app.comicZoomTexture(app.readerSidePage(group.first,side));
+            waitComicPages(app);
+        }
         auto l=app.readerLayout();auto t=app.captureReaderSurface(l.width,l.height,[&]{app.drawReaderSheets(page);});assert(t);
         return read(app,t.get());
     }

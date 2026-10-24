@@ -15,6 +15,13 @@ typedef struct PxImage {
     unsigned char *rgb; // 24-bit RGB packed
 } PxImage;
 
+typedef struct PxComicMetrics {
+    uint64_t pageEntryLoads;
+    uint64_t archiveCursorOpens;
+    uint64_t archiveCursorReopens;
+    uint64_t skippedArchiveEntries;
+} PxComicMetrics;
+
 typedef struct PxTocEntry {
     char title[256];
     int page;
@@ -33,6 +40,7 @@ int px_document_page_size(PxDocument *doc, int page, float *width, float *height
 int px_document_is_epub(PxDocument *doc);
 int px_document_is_comic(PxDocument *doc);
 int px_document_page_is_spread(PxDocument *doc,int page);
+int px_document_comic_metrics(PxDocument *doc,PxComicMetrics *metrics);
 // True only for an embedded EPUB cover; PDF thumbnails render page one instead.
 int px_document_has_embedded_cover(PxDocument *doc);
 int px_document_relayout(PxDocument *doc, int width, int height, float em, const char *css, char *error, int capacity);

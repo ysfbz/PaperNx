@@ -7,3 +7,4 @@ int px_comic_toc(fz_context *ctx, fz_document *document, PxTocEntry *entries, in
 int px_comic_page_size(fz_context *ctx, fz_document *document, int page, float *width, float *height);
 int px_comic_page_is_spread(fz_document *document, int page);
 int px_comic_remember_size(fz_document *document, int page, float width, float height);
+void px_comic_get_metrics(fz_document *document, PxComicMetrics *metrics);

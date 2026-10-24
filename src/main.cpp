@@ -571,7 +571,7 @@ private:
     std::map<int,ComicDetail> comicDetails_;
     std::string comicPagesIdentity_;
     int comicPrefetchDirection_{1};
-    std::map<int,Uint32> comicDetailRetry_;
+    std::map<int,Uint32> comicDetailRetry_,comicBaseRetry_;
     Uint32 comicDetailDue_{0};
 
     // Table of contents and bookmarks
@@ -2227,6 +2227,7 @@ private:
         auto key="scroll:"+currentBookId_+":"+std::to_string(page)+":"+std::to_string(tile)+":"+std::to_string(width)+":paper:"+std::to_string(appSettings_.get().paperTexture)+":comic:"+std::to_string(extraStyle_.pdfColorMode)+":"+std::to_string(currentTheme_)+":"+std::to_string(extraStyle_.backgroundColor)+":"+std::to_string(extraStyle_.textColor);
         if(auto tex=pageCache_.get(key)) return tex;
         PxImage image{}; char error[256]{};
+        if(comic())++comicTextureBuilds_;
         if(!px_document_render_tile(doc_,page,y,width,*height,&image,error,sizeof error)) {
             if(page==currentPage_)pageRenderError_=catLabel("Sayfa açılamadı: ","Could not render page: ")+std::to_string(page+1)+" · "+error;
             return nullptr;
@@ -2242,10 +2243,24 @@ private:
         if(tex && !pageCache_.put(key,tex,width,*height)) return nullptr;
         return tex;
     }
-    void renderScroll(int w,int h) {
+    bool renderScroll(int w,int h) {
         pageRenderError_.clear(); // A previous failed page must not label a valid cached strip.
         SDL_Rect viewport{currentMargin_,72,w-currentMargin_*2,std::max(1,h-144)};
         SDL_RenderSetClipRect(renderer_,&viewport);
+        if(comic()) {
+            bool pending=false;
+            int page=currentPage_;float y=72-scrollY_;
+            while(page<pageCount_ && y<h-72+512) {
+                const float height=segmentHeight(page);
+                if(auto texture=comicZoomTexture(page)) {
+                    SDL_Rect destination{viewport.x,int(std::round(y)),viewport.w,std::max(1,int(std::ceil(height)))};
+                    SDL_RenderCopy(renderer_,texture,nullptr,&destination);
+                } else if(!comicBaseRetry_.count(page))pending=true;
+                y+=height;++page;
+            }
+            SDL_RenderSetClipRect(renderer_,nullptr);
+            return pending;
+        }
         if(currentPage_>0 && scrollY_<512) {
             int height; scrollTile(currentPage_-1,std::max(0,int(std::ceil(segmentHeight(currentPage_-1)/512))-1),viewport.w,&height);
         }
@@ -2263,6 +2278,7 @@ private:
             y+=height; ++page;
         }
         SDL_RenderSetClipRect(renderer_,nullptr);
+        return false;
     }
 
     std::string comicTextureIdentity() const {
@@ -2272,41 +2288,27 @@ private:
     std::string comicTextureKey(int page) const {return "comic-base:"+comicTextureIdentity()+":"+std::to_string(page);}
     SDL_Texture *comicZoomTexture(int page=-1) {
         if(page<0)page=currentPage_;
-        const auto colors=palette();const auto identity=comicTextureIdentity();
+        const auto identity=comicTextureIdentity();
         if(pdfZoom_>1.01f) {
             auto detail=comicDetails_.find(page);
             if(detail!=comicDetails_.end() && detail->second.identity==identity){pageRenderError_.clear();return detail->second.texture.get();}
         }
         const auto key=comicTextureKey(page);
         if(auto texture=pageCache_.get(key)){pageRenderError_.clear();return texture;}
-        float pw=0,ph=0;
-        if(!px_document_page_size(doc_,page,&pw,&ph)) {
-            pageRenderError_=catLabel("Sayfa açılamadı: ","Could not render page: ")+std::to_string(currentPage_+1);return nullptr;
+        configureComicPages();
+        auto retry=comicBaseRetry_.find(page);
+        if(retry!=comicBaseRetry_.end()) {
+            if(Sint32(SDL_GetTicks()-retry->second)<0) {
+                const auto group=comicSpreadPages(currentPage_);
+                if(page>=group.first && page<group.first+group.second)
+                    pageRenderError_=catLabel("Sayfa açılamadı: ","Could not render page: ")+std::to_string(page+1);
+                return nullptr;
+            }
+            comicBaseRetry_.erase(retry);
         }
-        SDL_RendererInfo info{};SDL_GetRendererInfo(renderer_,&info);
-        const int limit=std::min(info.max_texture_width>0?info.max_texture_width:3072,info.max_texture_height>0?info.max_texture_height:3072);
-        const auto size=ComicResolution::size(pw,ph,false,limit);
-        int width=size.first,height=size.second;
-        char error[256]{};
-        // Keep a bounded, zoom-independent page texture. Pan and pinch now move
-        // the same GPU surface rather than decoding/uploading a new viewport.
-        for(int attempt=0;attempt<2;++attempt,width=std::max(1,width/2),height=std::max(1,height/2)) {
-            PxImage image{};++comicTextureBuilds_;
-            if(!px_document_render(doc_,page,width,height,&image,error,sizeof error))continue;
-            if(comicReadingColors())px_image_apply_reading_colors(&image,
-                (unsigned(colors.bg.r)<<16)|(unsigned(colors.bg.g)<<8)|colors.bg.b,
-                (unsigned(colors.fg.r)<<16)|(unsigned(colors.fg.g)<<8)|colors.fg.b);
-            auto texture=SDL_CreateTexture(renderer_,SDL_PIXELFORMAT_RGB24,SDL_TEXTUREACCESS_STATIC,image.width,image.height);
-            if(texture && SDL_UpdateTexture(texture,nullptr,image.rgb,image.stride)!=0){SDL_DestroyTexture(texture);texture=nullptr;}
-            const int tw=image.width,th=image.height;px_image_free(&image);
-            if(!texture)continue;
-#if SDL_VERSION_ATLEAST(2,0,12)
-            SDL_SetTextureScaleMode(texture,SDL_ScaleModeLinear);
-#endif
-            if(pageCache_.put(key,texture,tw,th)){pageRenderError_.clear();return texture;}
-        }
-        pageRenderError_=catLabel("Sayfa açılamadı: ","Could not render page: ")+std::to_string(currentPage_+1)+" · "+
-            (error[0]?error:catLabel("Görüntü belleği yetersiz","Not enough image memory"));return nullptr;
+        pageRenderError_.clear();
+        comicPages_.request(page,ComicPages::Priority::Visible);
+        return nullptr;
     }
     void renderComicZoom(int w,int h) {
         auto texture=comicZoomTexture();if(!texture)return;
@@ -2321,7 +2323,7 @@ private:
     }
     void configureComicPages() {
         const auto identity=comicTextureIdentity();if(identity==comicPagesIdentity_)return;
-        comicPagesIdentity_=identity;comicDetails_.clear();comicDetailRetry_.clear();prefetchPage_=-1;comicPrefetchDirection_=1;
+        comicPagesIdentity_=identity;comicDetails_.clear();comicDetailRetry_.clear();comicBaseRetry_.clear();prefetchPage_=-1;comicPrefetchDirection_=1;
         auto book=std::find_if(books_.begin(),books_.end(),[&](const Book &b){return b.id==currentBookId_;});
         if(book==books_.end())return;
         SDL_RendererInfo info{};SDL_GetRendererInfo(renderer_,&info);const auto color=palette();
@@ -2373,6 +2375,15 @@ private:
                                  "Page could not be loaded; stayed on the current page.");
         dirty_=true;
     }
+    void failComicPage(int page,const std::string &error={}) {
+        comicBaseRetry_[page]=SDL_GetTicks()+3000;
+        const auto group=comicSpreadPages(currentPage_);
+        if(page>=group.first && page<group.first+group.second)
+            pageRenderError_=catLabel("Sayfa açılamadı: ","Could not render page: ")+std::to_string(page+1)+
+                (error.empty()?std::string{}:" · "+error);
+        failPendingComicPage(page);
+        dirty_=true;
+    }
     void prefetchComicPages() {
         configureComicPages();const auto now=SDL_GetTicks();
         if(prefetchPage_!=currentPage_) {
@@ -2396,8 +2407,18 @@ private:
            appBackground_ || !activeFingers_.empty() || pageTurnAnimation_.active ||
            std::abs(panVelocityX_)+std::abs(panVelocityY_)>2 || Sint32(SDL_GetTicks()-comicDetailDue_)<0)return;
         configureComicPages();const auto group=comicSpreadPages(currentPage_);
-        for(int i=0;i<group.second;++i)if(!comicDetails_.count(group.first+i) &&
-            (!comicDetailRetry_.count(group.first+i) || Sint32(SDL_GetTicks()-comicDetailRetry_[group.first+i])>=0))comicPages_.request(group.first+i,true);
+        SDL_RendererInfo info{};SDL_GetRendererInfo(renderer_,&info);
+        const int limit=std::min(info.max_texture_width>0?info.max_texture_width:3072,
+                                 info.max_texture_height>0?info.max_texture_height:3072);
+        for(int i=0;i<group.second;++i) {
+            const int page=group.first+i;
+            if(comicDetails_.count(page) ||
+               (comicDetailRetry_.count(page) && Sint32(SDL_GetTicks()-comicDetailRetry_[page])<0))continue;
+            float width=0,height=0;
+            if(!px_document_page_size(doc_,page,&width,&height) ||
+               ComicResolution::size(width,height,false,limit)==ComicResolution::size(width,height,true,limit))continue;
+            comicPages_.request(page,true);
+        }
     }
     void processComicPages() {
         const bool detailAllowed=activeFingers_.empty() && !pageTurnAnimation_.active && std::abs(panVelocityX_)+std::abs(panVelocityY_)<=2;
@@ -2407,7 +2428,7 @@ private:
             if(result.detail && !detailAllowed){comicDetailRetry_[result.page]=SDL_GetTicks()+180;continue;}
             if(result.rgb.empty()){
                 if(result.detail)comicDetailRetry_[result.page]=SDL_GetTicks()+3000;
-                else failPendingComicPage(result.page);
+                else failComicPage(result.page,result.error);
                 continue;
             }
             const auto group=comicSpreadPages(currentPage_);const bool visible=result.page>=group.first && result.page<group.first+group.second;
@@ -2415,8 +2436,8 @@ private:
             const auto key=comicTextureKey(result.page);
             if(!result.detail && pageCache_.get(key))continue;
             auto *texture=SDL_CreateTexture(renderer_,SDL_PIXELFORMAT_RGB24,SDL_TEXTUREACCESS_STATIC,result.width,result.height);
-            if(!texture){if(!result.detail)failPendingComicPage(result.page);continue;}
-            if(SDL_UpdateTexture(texture,nullptr,result.rgb.data(),result.stride)!=0){SDL_DestroyTexture(texture);if(!result.detail)failPendingComicPage(result.page);continue;}
+            if(!texture){if(!result.detail)failComicPage(result.page);continue;}
+            if(SDL_UpdateTexture(texture,nullptr,result.rgb.data(),result.stride)!=0){SDL_DestroyTexture(texture);if(!result.detail)failComicPage(result.page);continue;}
 #if SDL_VERSION_ATLEAST(2,0,12)
             SDL_SetTextureScaleMode(texture,SDL_ScaleModeLinear);
 #endif
@@ -2435,7 +2456,8 @@ private:
                     }
                 };
                 protect(currentPage_);if(comicPendingTurn_.active)protect(comicPendingTurn_.targetPage);
-                if(!pageCache_.put(key,texture,result.width,result.height,protectedKeys))failPendingComicPage(result.page);
+                if(!pageCache_.put(key,texture,result.width,result.height,protectedKeys))failComicPage(result.page);
+                else comicBaseRetry_.erase(result.page);
             }
             if(visible || (comicPendingTurn_.active && result.page>=comicSpreadPages(comicPendingTurn_.targetPage).first &&
                            result.page<comicSpreadPages(comicPendingTurn_.targetPage).first+comicSpreadPages(comicPendingTurn_.targetPage).second))dirty_=true;
@@ -2491,6 +2513,7 @@ private:
             ok = px_document_render(doc_, pageIdx, layout.contentWidth(), layout.contentHeight(), &img, err, sizeof(err));
         } else {
             // PDF: support viewport zoom and panning
+            if(comic())++comicTextureBuilds_;
             if (pdfZoom_ != 1.0f) {
                 ok = px_document_render_view(doc_, pageIdx, pdfZoom_, pdfPanX_, pdfPanY_,
                                              fixedViewportWidth(w), h - 144, &img, err, sizeof(err));
@@ -3750,7 +3773,7 @@ private:
     }
 
     void renderReaderScreen(int w, int h, const ThemePalette &pal) {
-        if(continuous()) renderScroll(w,h);
+        bool comicSurfacePending=continuous()?renderScroll(w,h):false;
         trace("page_begin");
         tickPageTurn();
         const bool gpuComic=comic() && !continuous() && std::abs(pdfZoom_-1.f)>.0001f;
@@ -3774,7 +3797,14 @@ private:
         } else if(!continuous()) {
             drawReaderSheets(currentPage_);
         }
-        if(comic() && (comicPendingTurn_.active || pageTurnTouch_.waitingForTexture)) {
+        if(comic() && !continuous()) {
+            const auto visible=comicSpreadPages(currentPage_);
+            for(int side=0;side<visible.second;++side) {
+                const int page=visible.second==2?readerSidePage(visible.first,side):visible.first;
+                if(!pageCache_.get(comicTextureKey(page)) && !comicBaseRetry_.count(page))comicSurfacePending=true;
+            }
+        }
+        if(comic() && (comicPendingTurn_.active || pageTurnTouch_.waitingForTexture || comicSurfacePending)) {
             const SDL_Rect loading{w/2-104,h/2-22,208,44};
             ui::surface(renderer_,loading,pal.card,12);
             typography_->renderText(renderer_,typography_->smallFont(),catLabel("Sayfa hazırlanıyor…","Preparing page…"),

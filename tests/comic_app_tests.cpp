@@ -55,6 +55,11 @@ struct AppTest {
         while(app.comicPendingTurn_.active && SDL_GetTicks()<deadline){app.processComicPages();SDL_Delay(2);}
         app.processComicPages();assert(!app.comicPendingTurn_.active);
     }
+    static void waitComicPages(PaperNxApp &app) {
+        const auto deadline=SDL_GetTicks()+20000;
+        while(app.comicPages_.pending() && SDL_GetTicks()<deadline){app.processComicPages();SDL_Delay(2);}
+        app.processComicPages();assert(!app.comicPages_.pending());
+    }
     static void waitTouchTurn(PaperNxApp &app) {
         const auto deadline=SDL_GetTicks()+20000;
         while(app.pageTurnTouch_.waitingForTexture && SDL_GetTicks()<deadline) {
@@ -93,8 +98,10 @@ struct AppTest {
         const Uint32 largeDeadline=SDL_GetTicks()+5000;
         while(!app.thumbCache_.get("thumb_"+large.id) && SDL_GetTicks()<largeDeadline){SDL_Delay(10);app.processCompletedThumbnails();}
         assert(app.thumbCache_.get("thumb_"+large.id));
-        app.openBook(large);app.zoomPdf(5);app.render();
-        const unsigned builds=app.comicTextureBuilds_;assert(builds>0);
+        app.openBook(large);app.zoomPdf(5);const unsigned beforeColdRender=app.comicTextureBuilds_;app.render();
+        assert(app.comicTextureBuilds_==beforeColdRender && app.comicPages_.pending());
+        waitComicPages(app);app.render();
+        const unsigned builds=app.comicTextureBuilds_;assert(builds==beforeColdRender && app.pageCache_.get(app.comicTextureKey(app.currentPage_)));
         app.setPdfView(0);app.zoomPdf(3);app.pdfPanY_=400;
         auto imagePoint=[&]{int w,h;app.getWindowSize(w,h);float pw=0,ph=0;assert(px_document_page_size(app.doc_,app.currentPage_,&pw,&ph));
             const float vw=app.fixedViewportWidth(w),vh=app.comicViewportHeight(h),scale=std::min(vw/pw,vh/ph)*app.pdfZoom_;
@@ -120,7 +127,7 @@ struct AppTest {
         touch(app,SDL_FINGERUP,.65f-60*(.2f/1280),.5f);
         app.zoomPdf(4);app.render();app.zoomPdf(5);app.render();
         assert(app.comicTextureBuilds_==builds); // Neither panning nor zooming decodes/uploads another page.
-        std::cout<<"60 high-resolution comic pan frames: "<<std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now()-begin).count()<<" ms; new rasterizations: "<<app.comicTextureBuilds_-builds<<"\n";
+        std::cout<<"60 high-resolution comic pan frames: "<<std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now()-begin).count()<<" ms; UI rasterizations: "<<app.comicTextureBuilds_-builds<<"\n";
         app.pdfPanX_=200;app.pdfPanY_=600;
         touch(app,SDL_FINGERDOWN,.6f,.5f);app.pdfLastMotionTick_=SDL_GetTicks()-16;
         touch(app,SDL_FINGERMOTION,.5f,.5f);touch(app,SDL_FINGERUP,.5f,.5f);
@@ -135,7 +142,26 @@ struct AppTest {
         while(app.comicPages_.pending() && SDL_GetTicks()<detailDeadline){app.processComicPages();SDL_Delay(2);}
         app.processComicPages();
         const auto detailGroup=app.comicSpreadPages(app.currentPage_);
-        for(int page=0;page<detailGroup.second;++page)assert(app.comicDetails_.count(detailGroup.first+page));
+        SDL_RendererInfo rendererInfo{};SDL_GetRendererInfo(app.renderer_,&rendererInfo);
+        const int textureLimit=std::min(rendererInfo.max_texture_width>0?rendererInfo.max_texture_width:3072,
+                                        rendererInfo.max_texture_height>0?rendererInfo.max_texture_height:3072);
+        std::size_t expectedDetails=0,createdDetails=0;
+        for(int side=0;side<detailGroup.second;++side) {
+            const int page=detailGroup.first+side;float width=0,height=0;
+            assert(px_document_page_size(app.doc_,page,&width,&height));
+            if(ComicResolution::size(width,height,false,textureLimit)==ComicResolution::size(width,height,true,textureLimit)) {
+                assert(!app.comicDetails_.count(page));continue;
+            }
+            ++expectedDetails;
+            auto base=app.pageCache_.get(app.comicTextureKey(page));assert(base);
+            if(auto detail=app.comicDetails_.find(page);detail!=app.comicDetails_.end()) {
+                ++createdDetails;int baseWidth=0,baseHeight=0,detailWidth=0,detailHeight=0;
+                SDL_QueryTexture(base,nullptr,nullptr,&baseWidth,&baseHeight);
+                SDL_QueryTexture(detail->second.texture.get(),nullptr,nullptr,&detailWidth,&detailHeight);
+                assert(detailWidth>baseWidth && detailHeight>baseHeight);
+            } else assert(app.comicDetailRetry_.count(page)); // Keep the base texture when MuPDF's bounded worker cannot allocate detail.
+        }
+        assert(app.comicDetails_.size()==createdDetails && createdDetails<=expectedDetails);
         portrait.displayOrientation=0;app.appSettings_.put(portrait);app.setPdfView(0);app.zoomPdf(5);
         snapshot(app,"zoom-reset");
         int width,height;app.getWindowSize(width,height);const auto reset=app.zoomResetRect(width,height);

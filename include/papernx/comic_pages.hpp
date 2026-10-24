@@ -42,12 +42,16 @@ public:
     enum class Priority : std::uint8_t { Visible, CurrentSpreadPartner, TurnTarget, SpeculativeForward, ZoomDetail };
     struct Result {
         std::string identity;
+        std::string error;
         int page{}, width{}, height{}, stride{};
         float nativeWidth{}, nativeHeight{};
         bool detail{};
         std::vector<unsigned char> rgb;
     };
-    struct Metrics { std::uint64_t documentOpens{}, documentCloses{}; };
+    struct Metrics {
+        std::uint64_t documentOpens{}, documentCloses{}, pageEntryLoads{};
+        std::uint64_t archiveCursorOpens{}, archiveCursorReopens{}, skippedArchiveEntries{};
+    };
     ~ComicPages() { stop(); }
     void configure(Spec spec) {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -120,7 +124,9 @@ public:
         wake_.notify_one();
     }
     Metrics metrics() const noexcept {
-        return {documentOpens_.load(std::memory_order_relaxed), documentCloses_.load(std::memory_order_relaxed)};
+        return {documentOpens_.load(std::memory_order_relaxed), documentCloses_.load(std::memory_order_relaxed),
+                pageEntryLoads_.load(std::memory_order_relaxed), archiveCursorOpens_.load(std::memory_order_relaxed),
+                archiveCursorReopens_.load(std::memory_order_relaxed), skippedArchiveEntries_.load(std::memory_order_relaxed)};
     }
     void stop() {
         {
@@ -141,7 +147,8 @@ private:
     Spec spec_;
     std::uint64_t generation_{};
     bool stopped_{false}, suspended_{false}, active_{false};
-    std::atomic<std::uint64_t> documentOpens_{0}, documentCloses_{0};
+    std::atomic<std::uint64_t> documentOpens_{0}, documentCloses_{0}, pageEntryLoads_{0};
+    std::atomic<std::uint64_t> archiveCursorOpens_{0}, archiveCursorReopens_{0}, skippedArchiveEntries_{0};
     std::deque<Job> queue_;
     std::set<std::pair<int, bool>> requested_;
     std::deque<Result> results_;
@@ -153,6 +160,19 @@ private:
         documentCloses_.fetch_add(1, std::memory_order_relaxed);
     }
 
+    void collectMetrics(PxDocument *doc,PxComicMetrics &observed) {
+        PxComicMetrics current{};
+        if(!px_document_comic_metrics(doc,&current))return;
+        const auto add=[](std::atomic<std::uint64_t> &total,std::uint64_t value,std::uint64_t &last) {
+            if(value>last)total.fetch_add(value-last,std::memory_order_relaxed);
+            last=value;
+        };
+        add(pageEntryLoads_,current.pageEntryLoads,observed.pageEntryLoads);
+        add(archiveCursorOpens_,current.archiveCursorOpens,observed.archiveCursorOpens);
+        add(archiveCursorReopens_,current.archiveCursorReopens,observed.archiveCursorReopens);
+        add(skippedArchiveEntries_,current.skippedArchiveEntries,observed.skippedArchiveEntries);
+    }
+
     void run() {
 #ifdef __SWITCH__
         // Keep archive/codec work below the UI thread's normal priority.
@@ -160,6 +180,7 @@ private:
 #endif
         PxDocument *doc = nullptr;
         std::uint64_t opened = ~std::uint64_t{};
+        PxComicMetrics observed{};
         for (;;) {
             Spec spec;
             std::uint64_t generation;
@@ -176,6 +197,7 @@ private:
                     opened = generation_;
                     lock.unlock();
                     closeDocument(doc);
+                    observed={};
                     lock.lock();
                     if (opened != generation_) continue;
                 }
@@ -193,7 +215,7 @@ private:
             char error[256]{};
             if (!doc) {
                 doc = px_document_open_limited(spec.path.c_str(), 0, 0, 16, "", error, sizeof error, 96u * 1024u * 1024u);
-                if (doc) documentOpens_.fetch_add(1, std::memory_order_relaxed);
+                if (doc) {documentOpens_.fetch_add(1, std::memory_order_relaxed);observed={};}
             }
             Result result;
             result.identity = spec.identity;
@@ -210,6 +232,8 @@ private:
                     result.rgb.assign(image.rgb, image.rgb + std::size_t(image.stride) * image.height);
                 }
             }
+            if (error[0]) result.error = error;
+            collectMetrics(doc,observed);
             px_image_free(&image);
             {
                 std::lock_guard<std::mutex> lock(mutex_);

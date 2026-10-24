@@ -45,6 +45,7 @@ typedef struct {
     ar_archive *rar;
     struct archive *cursor;
     int cursor_ordinal;
+    uint64_t page_entry_loads,archive_cursor_opens,archive_cursor_reopens,skipped_archive_entries;
     char title[512], author[1024], genre[512], series[512], number[64];
     PxTocEntry outline[256];
     int outline_count;
@@ -272,13 +273,15 @@ static fz_buffer *page_buffer(fz_context *ctx,ComicDocument *doc,int number) {
         /* Preserve the RAR5 solid dictionary for physical forward reads.
          * Reopening the archive for each page would replay the whole prefix. */
         if(doc->cursor && wanted->ordinal<=doc->cursor_ordinal) {
+            ++doc->archive_cursor_reopens;
             archive_read_free(doc->cursor);doc->cursor=NULL;doc->cursor_ordinal=0;
         }
-        if(!doc->cursor){doc->cursor=open_archive(ctx,doc->path);doc->cursor_ordinal=0;}
+        if(!doc->cursor){doc->cursor=open_archive(ctx,doc->path);if(doc->cursor)++doc->archive_cursor_opens;doc->cursor_ordinal=0;}
         struct archive_entry *entry=NULL;int status;
         while((status=archive_read_next_header(doc->cursor,&entry))==ARCHIVE_OK || status==ARCHIVE_WARN) {
             if(++doc->cursor_ordinal==wanted->ordinal){buffer=read_archive_entry(ctx,doc->cursor,COMIC_MAX_IMAGE);break;}
             if(archive_read_data_skip(doc->cursor)<ARCHIVE_OK)fz_throw(ctx,FZ_ERROR_GENERIC,"Cannot skip damaged comic page");
+            ++doc->skipped_archive_entries;
         }
         if(!buffer)fz_throw(ctx,FZ_ERROR_GENERIC,"Comic archive changed or a page is missing");
     }
@@ -294,6 +297,7 @@ static fz_image *load_image(fz_context *ctx,ComicDocument *doc,int number) {
     fz_var(buffer);fz_var(image);fz_var(pix);
     fz_try(ctx) {
         buffer=page_buffer(ctx,doc,number);
+        ++doc->page_entry_loads;
         const char *extension=strrchr(doc->entries[number].name,'.');
         if(extension && !fz_strcasecmp(extension,".webp")) {
             unsigned char *data=NULL;size_t size=fz_buffer_storage(ctx,buffer,&data);int w,h;
@@ -413,4 +417,14 @@ int px_comic_remember_size(fz_document *document,int page,float width,float heig
     if(page<0 || page>=doc->count || !(width>0 && height>0) || width>100000000.f/height)return 0;
     if(doc->entries[page].height<=0){doc->entries[page].width=width;doc->entries[page].height=height;}
     return 1;
+}
+void px_comic_get_metrics(fz_document *document,PxComicMetrics *metrics) {
+    if(!metrics)return;
+    memset(metrics,0,sizeof(*metrics));
+    if(!document)return;
+    ComicDocument *doc=(ComicDocument *)document;
+    metrics->pageEntryLoads=doc->page_entry_loads;
+    metrics->archiveCursorOpens=doc->archive_cursor_opens;
+    metrics->archiveCursorReopens=doc->archive_cursor_reopens;
+    metrics->skippedArchiveEntries=doc->skipped_archive_entries;
 }
