@@ -5,8 +5,11 @@
     int selectedLibraryFolder_{-1};
 
     std::string paperPresetLabel(int i) const {
-        static const char *namesTr[10] = {"Orijinal", "Koyu", "Sepya", "Ters renkler", "Doğal Kâğıt", "Gece", "Mavi Işık", "Gündüz", "Monokrom", "Soft E-Ink"};
-        if (ui::language == 0 && i >= 0 && i < 10) return namesTr[i];
+        static const char *namesTr[] = {"Saf Kâğıt", "Yumuşak Fildişi", "Sıcak Krem", "Doğal Kâğıt",
+            "Nostaljik Sepya", "Keten", "Serin Kâğıt", "Kömür Gecesi", "OLED Siyah", "Yumuşak E-Mürekkep"};
+        static_assert(sizeof(namesTr)/sizeof(namesTr[0]) == sizeof(g_paperPresets)/sizeof(g_paperPresets[0]),
+                      "Turkish paper labels must match the actual preset order");
+        if (ui::language == 0 && i >= 0 && i < int(sizeof(namesTr)/sizeof(namesTr[0]))) return namesTr[i];
         if (i >= 0 && i < int(sizeof(g_paperPresets)/sizeof(g_paperPresets[0]))) return g_paperPresets[i].name;
         return "";
     }
@@ -18,7 +21,8 @@
         case 7:{std::vector<std::string> out;for(int i=0;i<int(sizeof(g_paperPresets)/sizeof(g_paperPresets[0]));++i)out.push_back(paperPresetLabel(i));return out;}
         case 6:return ui::language?std::vector<std::string>{"Off","Soft paper","Natural paper"}:std::vector<std::string>{"Kapalı","Yumuşak kağıt","Doğal kağıt"};
         case 8:return {ui::label("Dark"),ui::label("Light"),ui::label("Follow reading theme")};
-        case 9:return {ui::label("Purple"),ui::label("Blue"),ui::label("Teal"),ui::label("Green"),ui::label("Orange"),ui::label("Red"),ui::label("Pink")};
+        case 9:return {ui::label("Purple"),ui::label("Blue"),ui::label("Teal"),ui::label("Green"),ui::label("Orange"),ui::label("Red"),ui::label("Pink"),
+                       ui::language?"Theme accent":"Tema vurgusu"};
         case 10:{std::vector<std::string> out{ui::label("Add books folder"),ui::label("Scan all folders")};for(const auto &path:appSettings_.get().libraryFolders)out.push_back(path);return out;}
         case 11:return {ui::label("Browse folder"),ui::label("Stop scanning this folder")};
         default:return {};
@@ -109,6 +113,7 @@
             if(previous) {
                 if(choiceFocusedIndex_>0) {
                     --choiceFocusedIndex_;
+                    choiceIndex_=choiceFocusedIndex_; // v0.9.1: navigation and highlight move together.
                     ensureChoiceVisible(w,h);
                     dirty_=true;
                 }
@@ -116,6 +121,7 @@
             if(next) {
                 if(choiceFocusedIndex_+1<int(options.size())) {
                     ++choiceFocusedIndex_;
+                    choiceIndex_=choiceFocusedIndex_;
                     ensureChoiceVisible(w,h);
                     dirty_=true;
                 }
