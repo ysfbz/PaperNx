@@ -759,3 +759,8 @@ Bu tek koşu yazılım renderer’ı host ölçümüdür; hızlanma iddiası de�
 - Yapılan: updater yedek koruma + manuel kurulum metni; iptal edilen tarama complete değil; cover perf sayaçları + yinelenen metadata açılışı atlama.
 - Çalıştırılan kontrol: YOK (kapsam gereği test/build yasak). Doğrulanmamış: derleme dahil her şey.
 - Karar: SOURCE READY FOR INDEPENDENT TESTING; release/merge hazır DEĞİL. Ayrıntı: docs/V092_CODE_ONLY_HANDOFF.md
+
+## 2026-10-24 (recovery) — G4/G5/G6 code
+- Commitler: ce18220, af31404, 7221720, cfa1192, 5decd13, 93070ea, 64410fc (+ bu rapor).
+- G4 manuel staging, G5 scanner/parser katmanları, G6 dedup+telemetri kodlandı; **hiçbir derleme/test çalıştırılmadı** — hepsi UNVERIFIED. G4 otomatik kurulum BLOCKED.
+- Karar: kaynak bağımsız teste hazır; release/merge hazır DEĞİL. Ayrıntı: docs/V092_CODE_ONLY_HANDOFF.md
