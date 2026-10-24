@@ -5,7 +5,7 @@
 
 **Baseline:** `main@8db85384a1b6c277c74766601ef46e9a672328df` (2026-10-23 audit)  
 **Feature branch:** `feature/v0.9.2-complete-reader-enhancements`  
-**Latest source-bearing HEAD:** `0923141c72d543c0c578da539337f5ec4ad6b1a4` (G7 cover-queue fairness checkpoint).
+**Latest source-bearing HEAD:** `c81145c9208455008db91bac56d9be4b920d8364` (G8 bounded scan completion checkpoint).
 **Fork reference:** `rtk19/PaperNx@d2b4bcfd10b1a66043c5b8cd36da08340cffec6d`  
 **Version remains:** v0.9.1; do not tag, release or merge to main.
 
@@ -93,6 +93,20 @@ Five runs of `papernx_cover_performance_tests` measured repository-only I/O for 
 | Physical console / Switch rendering, input, brightness and SD | NOT RUN / UNVERIFIED | No device was available; the expanded v0.9.2 test record is [`V092_DEVICE_ACCEPTANCE.md`](V092_DEVICE_ACCEPTANCE.md). |
 
 **Decision remains INCOMPLETE — BLOCKERS REMAIN.** This checkpoint covers a starvation edge case and targeted host/cross-build checks only. Real-document cover timing, full acceptance, physical device evidence, independent source redesign, and full current-HEAD sanitizer/native gates remain open.
+
+## R. 2026-10-24 — G8 bounded library scan completion
+
+The shared `scanRoots()` walker now reports `complete=false` if a configured root has unvisited entries after the aggregate `maxBooks` cap is reached, or if later roots remain unvisited. Reaching the limit exactly at the end of the final root remains complete. The async library scanner treats a truncated list as incomplete and does not replace the saved inventory or visible books; the UI shows the localized generic “Library scan incomplete” message.
+
+| Area | G8 result | Evidence |
+|---|---|---|
+| Bounded multi-root completion | TARGETED DESKTOP PASS | `papernx_library_index_tests` covers truncation, exact final-root limit and aggregate multi-root limit. |
+| Inventory and UI regression | TARGETED DESKTOP PASS | `papernx_modern_library_tests` confirms the worker/caller contract; prior-user inventory remains preserved for incomplete scans. |
+| Core, localization and app build | TARGETED DESKTOP PASS | Build targets `PaperNX`, `papernx_library_index_tests`, `papernx_modern_library_tests`, `papernx_core_tests`, `papernx_localization_tests`; CTest **4/4**. |
+| Switch cross-build | PASS | `make all -j4` with `MUPDF_PREFIX=/work/prefix-mupdf-switch`; ELF/NRO and RomFS checks completed. |
+| Fork provenance | Still derived/adapted | `V092_SOURCE_PROVENANCE_AUDIT.md` records current feature/fork blobs and preserves attribution. No independent reimplementation claim. |
+
+**Decision remains INCOMPLETE — BLOCKERS REMAIN.** The 10,000-book ceiling now fails safely rather than persisting a silently truncated inventory. Independent library/updater/parser redesign, full native and sanitizer suites, real cover measurements, and all physical Switch scenarios remain open.
 
 ### Ponytail full audit findings and code decisions
 

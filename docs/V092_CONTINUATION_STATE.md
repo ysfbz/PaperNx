@@ -2,7 +2,7 @@
 
 **Updated:** 2026-10-24
 **Branch:** `feature/v0.9.2-complete-reader-enhancements`
-**Latest source commit:** `0923141c72d543c0c578da539337f5ec4ad6b1a4` (G7 cover-queue fairness checkpoint).
+**Latest source commit:** `c81145c9208455008db91bac56d9be4b920d8364` (G8 bounded scan completion checkpoint).
 **Last source commit before the current hardening changes:** `bb9d8579db9ccf0d10b5843e1929c2e696565c59`
 **Hardening source commits:** `913fb8f` and `1cb06a1`.
 **Audit documentation:** committed on this feature branch; use `git log` for the final report commit SHA.
@@ -36,7 +36,7 @@
 
 ## Next session starting point
 
-Read the current source-provenance report and latest `FinalDevelopmentResult.md` section first. Continue only on the existing feature branch. G6 counters and synthetic scale evidence and the G7 cover queue fairness/host audit are recorded below. Continue with the remaining source redesign and Ponytail review, then close feasible native gates without restarting completed broad test chains unnecessarily. Physical acceptance remains unverified; use [`V092_DEVICE_ACCEPTANCE.md`](V092_DEVICE_ACCEPTANCE.md) as the device record. Keep the final decision `INCOMPLETE — BLOCKERS REMAIN` until all required gates have evidence.
+Read the current source-provenance report and latest `FinalDevelopmentResult.md` section first. Continue only on the existing feature branch. G6 synthetic cache evidence, G7 host/cover queue audit, and G8 scan-cap behavior are recorded below. Continue with the remaining scanner/index/updater/parser design and Ponytail review, then close feasible native gates without restarting completed broad test chains unnecessarily. Physical acceptance remains unverified; use [`V092_DEVICE_ACCEPTANCE.md`](V092_DEVICE_ACCEPTANCE.md) as the device record. Keep the final decision `INCOMPLETE — BLOCKERS REMAIN` until all required gates have evidence.
 
 ## 2026-10-23 latest continuation checkpoint
 
@@ -139,3 +139,12 @@ The verified/pushed branch HEAD at the start of this note was `ed9e3b69c184de1b4
 - **Switch cross-build:** `docker compose run --rm switch bash -lc 'export MUPDF_PREFIX=/work/prefix-mupdf-switch; make all -j4'` completed from this source worktree. Build output confirmed AArch64 ELF/NRO link and validated RomFS CA/fonts; no release/distribution or GitHub Actions run.
 - **Device matrix:** added [`V092_DEVICE_ACCEPTANCE.md`](V092_DEVICE_ACCEPTANCE.md). All inherited 38 checks and 23 v0.9.2-specific scenarios are UNVERIFIED; no physical Switch evidence is available.
 - **Still open:** full native/sanitizer suites, physical Joy-Con/backlight/SD, real-document cover performance, and the source redesign/Ponytail audit. Overall decision remains `INCOMPLETE — BLOCKERS REMAIN`.
+
+## 2026-10-24 G8 bounded scan checkpoint
+
+- **Source commit:** `c81145c9208455008db91bac56d9be4b920d8364` (`fix(library): reject truncated index scans`). `scanRoots()` now distinguishes an exact final-root limit from a limit that leaves entries or roots unvisited. `LibraryScanner` will not persist or publish the latter partial snapshot.
+- **Targeted build/CTest:** `PaperNX`, `papernx_library_index_tests`, `papernx_modern_library_tests`, `papernx_core_tests`, `papernx_localization_tests` built; CTest **4/4 PASS**.
+- **Switch:** `docker compose run --rm switch bash -lc 'export MUPDF_PREFIX=/work/prefix-mupdf-switch; make all -j4'` completed from the exact source worktree; ELF/NRO link and RomFS CA/font validation passed.
+- **Provenance:** current blob snapshot appended to [`V092_SOURCE_PROVENANCE_AUDIT.md`](V092_SOURCE_PROVENANCE_AUDIT.md). The library scanner/index still retains fork-derived/adapted history; Refael Bar and AGPL-3.0 attribution remain.
+- **Not run / still open:** 10,001-item end-to-end scanner stress, full CTest, ASan/UBSan, source clean-room redesign, updater parser redesign, physical Switch and real cover performance. No independent-origin claim is made.
+- **Next:** continue source-boundary cleanup and Ponytail audit; keep overall status `INCOMPLETE — BLOCKERS REMAIN`.
