@@ -41,15 +41,17 @@ std::vector<std::string> split(const std::string &value, char separator) {
     return parts;
 }
 
-bool validIdentifiers(const std::vector<std::string> &parts, bool numericOnly) {
+bool validIdentifiers(const std::vector<std::string> &parts, bool numericOnly,
+                      bool rejectNumericLeadingZero = false) {
     for (const auto &part : parts) {
         if (part.empty() || part.size() > 32) return false;
         for (unsigned char c : part) {
             if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
                   (c >= '0' && c <= '9') || c == '-')) return false;
         }
-        if (numericOnly && (!digits(part) || (part.size() > 1 && part.front() == '0'))) return false;
-        if (!numericOnly && digits(part) && part.size() > 1 && part.front() == '0') return false;
+        const bool numeric = digits(part);
+        if (numericOnly && !numeric) return false;
+        if (rejectNumericLeadingZero && numeric && part.size() > 1 && part.front() == '0') return false;
     }
     return true;
 }
@@ -68,12 +70,12 @@ Version parseVersion(std::string value) {
     const auto dash = value.find('-');
     if (dash != std::string::npos) {
         parsed.prerelease = split(value.substr(dash + 1), '.');
-        if (!validIdentifiers(parsed.prerelease, false)) return Version{};
+        if (!validIdentifiers(parsed.prerelease, false, true)) return Version{};
         value.resize(dash);
     }
 
     const auto components = split(value, '.');
-    if (components.size() != parsed.core.size() || !validIdentifiers(components, true)) return Version{};
+    if (components.size() != parsed.core.size() || !validIdentifiers(components, true, true)) return Version{};
     for (std::size_t i = 0; i < components.size(); ++i) {
         const auto result = std::from_chars(components[i].data(), components[i].data() + components[i].size(), parsed.core[i]);
         if (result.ec != std::errc{} || result.ptr != components[i].data() + components[i].size()) return Version{};

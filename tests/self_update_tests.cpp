@@ -19,6 +19,7 @@ static void unit(){
     assert(updateVersionNewer("0.13.0","0.12.0-reader.4"));
     assert(updateVersionNewer("0.13.1","0.13.0"));
     assert(updateVersionNewer("0.14.0","0.13.99"));
+    assert(updateVersionNewer("0.14.0+switch.001","0.13.99"));
     assert(!updateVersionNewer("0.12.1","0.13.0"));
     for(auto p:{std::pair<const char*,const char*>{"v0.12.0-reader.10","0.12.0-reader.9"},{"0.12.0","0.12.0-reader.10"},{"0.13.0-reader.1","0.12.0"},{"1.0.0-beta","1.0.0-alpha"},{"1.0.0-alpha.1","1.0.0-alpha"}})assert(updateVersionNewer(p.first,p.second));
     for(const auto &bad:{"","vnope","1.2","01.2.3","1.2.3-reader.01","1.2.3-","1.2.3+","1.2.3-../bad"})assert(!updateVersionNewer(bad,"0.0.0"));
