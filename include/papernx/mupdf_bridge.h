@@ -36,6 +36,8 @@ PxDocument *px_document_open_limited(const char *path, int width, int height, fl
 PxDocument *px_document_open_metadata(const char *path,char *error,int capacity,size_t memory_limit);
 int px_document_pages(PxDocument *doc);
 int px_document_remember_comic_size(PxDocument *doc,int page,float width,float height);
+// Reads memoized comic geometry without touching archive I/O or image decoders.
+int px_document_known_comic_size(PxDocument *doc,int page,float *width,float *height);
 int px_document_page_size(PxDocument *doc, int page, float *width, float *height);
 int px_document_is_epub(PxDocument *doc);
 int px_document_is_comic(PxDocument *doc);
