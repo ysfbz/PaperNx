@@ -348,6 +348,8 @@ Median/p95 warm full-pass times: 100 copies **94/96 ms** with 100 hits; 500 copi
 
 The default disk cover cache is now 48 MiB, selected from a same-run 32/48 MiB host comparison. The 512-entry disk cap and 32 MiB RAM thumbnail texture cache stay unchanged. Current-source `PaperNX` build passed; cover repository, synthetic cache performance and real-fixture 100/500/1,000-path benchmark targets passed **3/3** CTest in **48.32 sec**.
 
+The cover repository and synthetic performance tests also rebuilt with ASan/UBSan and passed **2/2** CTest in **11.99 sec**.
+
 With repeated EPUB/PDF/CBZ/CBR fixture contents, the 500-path sequential revisit changed from 136 hits / 364 reopens at 32 MiB to 500 hits / 0 reopens at 48 MiB; measured pass was 1,973 ms vs 411 ms in this run. For 1,000 paths, 48 MiB retained 512 entries / 43,654,912 bytes; the full same-order pass still had 0 hits / 1,000 reopens, while the cache-only synthetic test had 512 hits / 488 misses. These are host fixture workload results, not a general speedup or Switch SD/viewport measurement. Full CTest remains **NOT RUN**; current-source Switch ELF/NRO and RomFS verification passed with SHA-256 `ddf77b04cdd23c24f89b9c73ae0951d0d20a713209c26905a8c1c3cae56533ef` and 118 embedded CA certificates. `COVER-01` remains partial pending device/interactive evidence.
 
 ## G5 stale metadata result guard — `0fd94c7`
