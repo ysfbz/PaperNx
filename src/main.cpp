@@ -2528,14 +2528,25 @@ private:
             prefetchPage_=currentPage_;prefetchStep_=0;prefetchDue_=now+60;comicDetailDue_=now+180;return;
         }
         if(now<prefetchDue_)return;
-        if(prefetchStep_<2) {
+        if(prefetchStep_<4) {
             const auto group=comicSpreadPages(currentPage_);
             const int step=prefetchStep_++;
-            // Read in the navigation direction. Speculative backward reads
-            // would repeatedly restart decompression of a solid RAR archive.
-            const int target=comicPrefetchDirection_>0?group.first+group.second+step:group.first-1-step;
-            if(target>=0 && target<pageCount_ && !pageCache_.get(comicTextureKey(target)))comicPages_.request(target);
-            prefetchDue_=now+30;return;
+            // Three pages in reading order and one reverse neighbour on ZIP.
+            // Solid RAR backward speculation would reopen/replay its cursor.
+            const bool reverse=step==3;
+            if(reverse) {
+                const auto book=std::find_if(books_.begin(),books_.end(),
+                    [&](const Book &b){return b.id==currentBookId_;});
+                if(book==books_.end() || book->format!=Format::Cbz) {
+                    prefetchDue_=now+700;return;
+                }
+            }
+            const int direction=(comicPrefetchDirection_>0?1:-1)*(reverse?-1:1);
+            const int target=direction>0?group.first+group.second+(reverse?0:step):
+                                             group.first-1-(reverse?0:step);
+            if(target>=0 && target<pageCount_ && !pageCache_.get(comicTextureKey(target)))
+                comicPages_.request(target,ComicPages::Priority::SpeculativeForward);
+            prefetchDue_=now+(reverse?700:35);return;
         }
         refineComicZoom();
     }
@@ -3928,7 +3939,7 @@ private:
     }
 
     void renderReaderScreen(int w, int h, const ThemePalette &pal) {
-        bool comicSurfacePending=continuous()?renderScroll(w,h):false;
+        if(continuous())renderScroll(w,h);
         trace("page_begin");
         tickPageTurn();
         const bool gpuComic=comic() && !continuous() && std::abs(pdfZoom_-1.f)>.0001f;
@@ -3961,16 +3972,12 @@ private:
                 if(comicBaseRetry_.count(page)) {
                     if(!failed)pageRenderError_=catLabel("Sayfa açılamadı: ","Could not render page: ")+std::to_string(page+1);
                     failed=true;
-                } else comicSurfacePending=true;
+                } else comicPages_.request(page,ComicPages::Priority::Visible);
             }
             if(!failed)pageRenderError_.clear();
         }
-        if(comic() && (comicPendingTurn_.active || pageTurnTouch_.waitingForTexture || comicSurfacePending)) {
-            const SDL_Rect loading{w/2-104,h/2-22,208,44};
-            ui::surface(renderer_,loading,pal.card,12);
-            typography_->renderText(renderer_,typography_->smallFont(),catLabel("Sayfa hazırlanıyor…","Preparing page…"),
-                                    loading.x+12,loading.y+13,pal.muted,loading.w-24);
-        }
+        // A cold page stays asynchronous; do not interrupt normal turns with a
+        // centred loading overlay. Corrupt pages still show an actionable error.
         trace("page_end");
         if(showZoomReset()){
             ui::button(renderer_,*typography_,zoomResetRect(w,h),catLabel("Sayfaya sığdır","Fit page"),pal);
