@@ -7,6 +7,7 @@
 #include <vector>
 
 namespace papernx::update_json {
+constexpr std::size_t maxReleaseCount = 30;
 struct Asset {
     std::string name, url, digest;
     std::uint64_t bytes{};
@@ -140,7 +141,7 @@ class Parser {
         if (!account(depth)) return false;
         if (literal("true")) { out = true; return true; }
         if (literal("false")) { out = false; return true; }
-        return skipBody(depth);
+        return false;
     }
     bool assetArray(std::vector<Asset> &assets, int depth) {
         if (!account(depth)) return false;
@@ -214,6 +215,7 @@ public:
             do {
                 Release release;
                 if (!releaseObject(release)) return false;
+                if (releases.size() == maxReleaseCount) return false;
                 releases.push_back(std::move(release));
                 if (take(']')) break;
             } while (take(','));
