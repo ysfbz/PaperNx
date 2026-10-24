@@ -163,7 +163,7 @@ class Parser {
     bool optionalString(std::string &out, int depth) {
         if (!account(depth)) return false;
         if (input_[pos_] == '"') return string(out);
-        return skipBody(depth);
+        return literal("null");
     }
     bool optionalBool(bool &out, int depth) {
         if (!account(depth)) return false;
@@ -173,7 +173,7 @@ class Parser {
     }
     bool assetArray(std::vector<Asset> &assets, int depth) {
         if (!account(depth)) return false;
-        if (input_[pos_] != '[') return skipBody(depth);
+        if (input_[pos_] != '[') return literal("null");
         ++pos_;
         if (take(']')) return true;
         do {
@@ -207,11 +207,15 @@ class Parser {
             else if (key == "size") {
                 if (!account(depth + 1)) return false;
                 std::string value;
-                if (number(&value)) {
+                if (input_[pos_] == 'n') {
+                    if (!literal("null")) return false;
+                } else {
+                    if (!number(&value) || value.front() == '-' || value.find_first_of(".eE") != std::string::npos) return false;
                     std::uint64_t bytes = 0;
                     const auto parsed = std::from_chars(value.data(), value.data() + value.size(), bytes);
-                    if (!value.empty() && value.front() != '-' && parsed.ec == std::errc{} && parsed.ptr == value.data() + value.size()) asset.bytes = bytes;
-                } else if (!skipBody(depth + 1)) return false;
+                    if (parsed.ec != std::errc{} || parsed.ptr != value.data() + value.size()) return false;
+                    asset.bytes = bytes;
+                }
             } else if (!skipValue(depth + 1)) return false;
             if (take('}')) return true;
         } while (take(','));
