@@ -93,9 +93,13 @@ static void unit(){
     {std::ofstream(executable.string()+".swap")<<"staged";}
     assert(recovery.prepareBoot(error)==SelfUpdater::BootRecovery::Error&&!error.empty());
     fs::remove(executable.string()+".swap");
-    {std::ofstream(executable)<<"current";std::ofstream(executable.string()+".old")<<"orphan";}
+    {std::ofstream(executable)<<"current";std::ofstream(executable.string()+".old")<<"user backup";}
     assert(recovery.prepareBoot(error)==SelfUpdater::BootRecovery::Normal);
-    assert(read(executable)=="current"&&!fs::exists(executable.string()+".old"));
+    assert(read(executable)=="current"&&read(executable.string()+".old")=="user backup");
+    fs::remove(executable);
+    assert(recovery.prepareBoot(error)==SelfUpdater::BootRecovery::Error&&!error.empty());
+    assert(read(executable.string()+".old")=="user backup");
+    std::ofstream(executable)<<"current";
     {std::ofstream(executable)<<"candidate";std::ofstream(executable.string()+".old")<<"previous";
      std::ofstream(executable.string()+".boot")<<std::string(64,'a')<<"\n0.13.0\n4096\n";
      std::ofstream(executable.string()+".boot.started");}
@@ -113,6 +117,8 @@ static void network(int argc,char **argv){
     auto userDataUnchanged=[&]{for(const auto &relative:{"books/keep.epub","data/progress.dat","logs/journal.dat","settings.ini"})assert(read(root/relative)=="user data");};
     if(scenario=="stale-part") {std::ofstream(path.string()+".part")<<"partial";std::ofstream(path.string()+".ready.tmp")<<"partial";}
     if(scenario=="orphan-new") std::ofstream(path.string()+".new")<<"incomplete";
+    if(scenario=="orphan-old") std::ofstream(path.string()+".old")<<"user backup";
+    if(scenario=="legacy-state") std::ofstream(path.string()+".swap")<<"legacy transaction";
     if(scenario=="stale-part-error") {fs::create_directories(path.string()+".part");std::ofstream(path.string()+".part/sentinel")<<"preserve";}
     const auto original=read(path);UpdateSource source{base+"api",base+"download/"};
     SelfUpdater updater;updater.configureForTesting(path,"0.12.0-reader.4",ca,source);
@@ -132,6 +138,10 @@ static void network(int argc,char **argv){
     if(scenario=="current"||scenario=="downgrade"){assert(state.state==UpdateState::Current);return;}
     assert(state.state==UpdateState::Available&&state.release.version=="0.13.0");
     if(scenario=="missing"||scenario=="oversized"){assert(!state.release.installable()&&!updater.download());return;}
+    if(scenario=="legacy-state") {
+        assert(!updater.download()&&updater.status().state==UpdateState::Error);
+        assert(read(path)==original&&fs::exists(path.string()+".swap"));userDataUnchanged();return;
+    }
     if(scenario=="write-error"){fs::create_directories(path.string()+".part");std::ofstream(path.string()+".part/sentinel")<<"keep";}
     assert(updater.download());assert(!updater.download());
     if(scenario=="cancel"){std::this_thread::sleep_for(std::chrono::milliseconds(70));updater.cancel();state=wait(updater);}
@@ -162,7 +172,8 @@ static void network(int argc,char **argv){
     assert(state.state==UpdateState::Ready);const auto downloaded=read(path.string()+".new");assert(downloaded.size()==state.release.bytes);
     assert(read(path)==original&&downloaded.size()==state.release.bytes);
     assert(fs::exists(path.string()+".new")&&fs::exists(path.string()+".ready"));
-    assert(!fs::exists(path.string()+".old")&&!fs::exists(path.string()+".swap")&&!fs::exists(path.string()+".boot"));
+    assert((scenario=="orphan-old" ? read(path.string()+".old")=="user backup" : !fs::exists(path.string()+".old")) &&
+           !fs::exists(path.string()+".swap")&&!fs::exists(path.string()+".boot"));
     if(scenario=="tampered"){
         std::fstream f(path.string()+".new",std::ios::in|std::ios::out|std::ios::binary);f.seekp(0x200);f.put('!');f.close();
         updater.stop();SelfUpdater recheck;recheck.configureForTesting(path,"0.12.0-reader.4",ca,source);

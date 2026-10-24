@@ -124,7 +124,7 @@ def main():
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         base = f"https://localhost:{server.server_port}/"
-        scenarios = ("current", "downgrade", "missing", "oversized", "success", "checksum-fallback",
+        scenarios = ("current", "downgrade", "missing", "oversized", "success", "checksum-fallback", "orphan-old", "legacy-state",
                      "corrupt", "badapp", "badversion", "truncated", "cancel", "cancel-near-completion", "write-error",
                      "stale-part", "stale-part-error", "orphan-new", "resume-ready", "tampered", "missing-marker",
                      "malformed", "tls-reject", "http")

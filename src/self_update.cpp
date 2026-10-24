@@ -595,7 +595,9 @@ bool SelfUpdater::download() {
     const auto snapshot = status();
     if (snapshot.state != UpdateState::Available || !snapshot.release.installable()) return false;
     if (worker_.joinable()) worker_.join();
-    if (pathExists(executable_.string() + ".old") || pathExists(executable_.string() + ".boot")) {
+    const auto path = executable_.string();
+    if (pathExists(path + ".boot") || pathExists(path + ".boot.started") ||
+        pathExists(path + ".boot.ok") || pathExists(path + ".swap")) {
         publish(UpdateState::Error, "A previous update still needs boot recovery");
         return false;
     }
@@ -722,8 +724,8 @@ SelfUpdater::BootRecovery SelfUpdater::prepareBoot(std::string &error) {
             error = "Update recovery data is incomplete; preserve the NRO files and restore PaperNX.nro manually";
             return BootRecovery::Error;
         }
-        if (pathExists(backup) && pathExists(executable_) && std::remove(backup.c_str()) != 0) {
-            error = "An unused update backup could not be cleaned up";
+        if (pathExists(backup) && !pathExists(executable_)) {
+            error = "PaperNX.nro is missing; restore the retained .old backup manually";
             return BootRecovery::Error;
         }
         return BootRecovery::Normal;
