@@ -66,6 +66,9 @@ int main() {
     Progress futureMarker;futureMarker.bookTitle="PAPERNX-LIBRARY-2";futureIndex.put("libraryindex0001",futureMarker);
     futureIndex.put(unicodeResult.books.front().id,legacyRecord);assert(futureIndex.save());
     assert(loadLibraryInventory(futureInventory).empty());
+    const auto brokenMarkerInventory=root/"data"/"broken-marker-inventory.txt";ProgressStore brokenMarkerIndex(brokenMarkerInventory);
+    brokenMarkerIndex.put("libraryindex0001",Progress{});brokenMarkerIndex.put(unicodeResult.books.front().id,legacyRecord);
+    assert(brokenMarkerIndex.save() && loadLibraryInventory(brokenMarkerInventory).empty());
     assert(scanRoots({root/"books"},5).size()==5);
     auto cached=loadLibraryInventory(inventory);assert(cached.size()==300);
     auto inventoryBytes=[&]{std::ifstream in(inventory,std::ios::binary);return std::string(std::istreambuf_iterator<char>(in),{});};

@@ -13,8 +13,8 @@ constexpr const char *inventorySchema="PAPERNX-LIBRARY-1";
 std::vector<Book> loadLibraryInventory(const fs::path &path) {
     ProgressStore store(path);std::vector<Book> books;
     if(!store.load())return books;
-    const auto marker=store.get(inventorySchemaId);
-    if(!marker.bookTitle.empty() && marker.bookTitle!=inventorySchema)return books;
+    const auto marker=store.all().find(inventorySchemaId);
+    if(marker!=store.all().end() && marker->second.bookTitle!=inventorySchema)return books;
     // An isolated inventory adapts the existing atomic/checksummed codec:
     // bookPath=path, bookTitle=title, bookAuthor=byte count, lastRead=file mtime.
     for(const auto &[id,p]:store.all()) {
