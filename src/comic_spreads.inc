@@ -7,7 +7,11 @@ bool comicSpreadActive() {
 bool comicWidePage(int page) {
     if(px_document_page_is_spread(doc_,page))return true;
     float w=0,h=0;
-    return page>=0 && page<pageCount_ && px_document_page_size(doc_,page,&w,&h) && h>0 && w/h>=1.2f;
+    // Unknown archive headers are conservatively treated as unpaired until
+    // a background decode publishes their dimensions. Never block the UI.
+    if(page<0 || page>=pageCount_)return false;
+    if(!readerPageSize(page,&w,&h))return true;
+    return h>0 && w/h>=1.2f;
 }
 std::string comicGroupsBook_;
 std::map<int,int> comicGroups_;
@@ -49,7 +53,7 @@ SDL_Rect visibleComicRect(SDL_Rect rect) {
     SDL_Rect visible{};return SDL_IntersectRect(&rect,&viewport,&visible)?visible:SDL_Rect{rect.x,rect.y,0,0};
 }
 SDL_FRect comicLeafArtwork(int page,SDL_Rect leaf) {
-    float pw=0,ph=0;if(!px_document_page_size(doc_,page,&pw,&ph) || pw<=0 || ph<=0)return {};
+    float pw=0,ph=0;if(!readerPageSize(page,&pw,&ph) || pw<=0 || ph<=0)return {};
     const auto group=comicSpreadPages(page);
     const bool pair=comicSpreadActive() && group.second==2;
     const bool left=pair && page==readerSidePage(group.first,0);
