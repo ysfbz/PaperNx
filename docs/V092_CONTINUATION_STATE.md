@@ -3,6 +3,7 @@
 **Updated:** 2026-10-24
 **Branch:** `feature/v0.9.2-complete-reader-enhancements`
 **Latest source commit:** `1daedb63246384a73afb979978230f75716c2165` (G10 scan depth/cancellation completion).
+**Latest test-only commit:** `70ac670873af6e254185808ed397ee05b9c46ccc` (10,000/10,001-item scan boundary).
 **Last source commit before the current hardening changes:** `bb9d8579db9ccf0d10b5843e1929c2e696565c59`
 **Hardening source commits:** `913fb8f` and `1cb06a1`.
 **Audit documentation:** committed on this feature branch; use `git log` for the final report commit SHA.
@@ -165,3 +166,10 @@ The verified/pushed branch HEAD at the start of this note was `ed9e3b69c184de1b4
 - **Desktop:** build targets `PaperNX`, `papernx_core_tests`, `papernx_library_index_tests`, `papernx_modern_library_tests`, `papernx_catalog_tests`; focused CTest **4/4 PASS**. The first run caught an off-by-one in the new test fixture; after correcting the fixture depth, the same four tests passed.
 - **Switch:** `docker compose run --rm switch bash -lc 'export MUPDF_PREFIX=/work/prefix-mupdf-switch; make all -j4'` completed AArch64 ELF/NRO linking and RomFS validation (118 CA certificates / 200,116 bytes). Physical device remains unverified.
 - `src/core.cpp` and `include/papernx/core.hpp` are pre-existing PaperNX core files; no new provenance is claimed for them. The fork-derived scanner/index attribution remains unchanged. Overall status: `INCOMPLETE — BLOCKERS REMAIN`.
+
+## 2026-10-24 G10 follow-up — real 10,000-item scan boundary
+
+- **Test-only commit:** `70ac670873af6e254185808ed397ee05b9c46ccc` (`test(library): cover exact 10k scan boundary`); production source remains at G10 `1daedb6`.
+- `papernx_library_index_tests` creates 10,000 real filesystem book entries and verifies an exact-limit complete result, then adds item 10,001 and verifies `complete=false` while the result stays bounded at 10,000.
+- **Desktop CTest:** `papernx_library_index_tests` **1/1 PASS**, 2.37 seconds. This closes the previously listed 10,001-entry core scan stress gap; async preservation at depth limit and existing multi-root tests remain separately covered.
+- Full native suite, sanitizers, physical Switch and end-to-end performance remain open. Overall status remains `INCOMPLETE — BLOCKERS REMAIN`.

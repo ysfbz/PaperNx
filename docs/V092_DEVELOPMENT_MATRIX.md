@@ -50,6 +50,12 @@
 - **Switch verification:** `make all -j4` in the pinned Switch container built the ELF/NRO and ran RomFS CA/font checks. The build did not exercise physical storage or controller behavior.
 - **Provenance:** only pre-existing PaperNX `core.cpp/core.hpp` and library-index integration changed; G10 does not alter the historical six-file identity statement or fork attribution. No clean-room claim is added. Overall decision remains **INCOMPLETE — BLOCKERS REMAIN**.
 
+## 2026-10-24 — G10 follow-up: 10,000/10,001 scan boundary
+
+- **Test-only commit:** `70ac670873af6e254185808ed397ee05b9c46ccc`; production source remains `1daedb63246384a73afb979978230f75716c2165`.
+- `papernx_library_index_tests` creates 10,000 actual filesystem entries and confirms the exact cap is complete. Adding entry 10,001 leaves the output bounded at 10,000 and sets `complete=false`.
+- **Result:** CTest `papernx_library_index_tests` **1/1 PASS** in 2.37 seconds. This is a scan-cap host stress check, not a Switch SD performance measurement. Full CTest and physical device checks remain open.
+
 ---
 
 ## G. 2026-10-23 final hardening audit — current source of truth

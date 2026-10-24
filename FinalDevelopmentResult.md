@@ -436,3 +436,10 @@ Provenance eki ve lisans özeti G9 commit/hash ile güncellendi. `src/self_updat
 | Full CTest, sanitizers, 10.001 dosya stres testi, fiziksel Switch | **NOT RUN / UNVERIFIED** | Bu turda çalıştırılmadı. Cihaz ve performans kabulü hâlâ açık. |
 
 G10 değişikliği önceden var olan PaperNX `core.cpp/core.hpp` koduna aittir; fork provenance sınıflandırması ve Refael Bar/Refael Avramashvili atıfları değişmedi. Genel durum **INCOMPLETE — BLOCKERS REMAIN**.
+
+## U. 2026-10-24 — G10 follow-up: 10.000 öğe tarama sınırı
+
+- **Test-only commit:** `70ac670873af6e254185808ed397ee05b9c46ccc` (`test(library): cover exact 10k scan boundary`); üretim kaynak commit’i `1daedb63246384a73afb979978230f75716c2165` olarak kaldı.
+- `tests/library_index_tests.cpp` 10.000 gerçek filesystem girişi oluşturuyor: tam sınırda `complete=true`, 10.001’inci giriş eklendiğinde 10.000 kitaplık sonuç ve `complete=false` bekleniyor.
+- **Gerçek doğrulama:** `docker compose run --rm desktop bash -lc 'cmake --build build-desktop --target papernx_library_index_tests --parallel 4 && ctest --test-dir build-desktop --output-on-failure -R "^papernx_library_index_tests$"'` — CTest **1/1 PASS**, 2,37 saniye.
+- Bu yalnız host filesystem cap stress testidir; Switch SD performansı, full native CTest ve fiziksel Switch doğrulaması değildir. Genel karar **INCOMPLETE — BLOCKERS REMAIN**.
