@@ -1,6 +1,6 @@
 # PaperNX — Mimari notlar
 
-Bu doküman mimari tasarım kararlarını ve sistem bileşenlerini içerir. Güncel v0.9.1 sürümü, fiziksel doğrulama durumu ve derleme yönergeleri için [STATUS.md](STATUS.md), [KNOWN_ISSUES.md](KNOWN_ISSUES.md) ve [BUILD_SWITCH.md](BUILD_SWITCH.md) belgeleri esas alınmalıdır.
+Bu doküman PaperNX v0.9.2 mimari tasarım kararlarını ve sistem bileşenlerini içerir. Güncel bilinen sınırlar için [KNOWN_ISSUES.md](KNOWN_ISSUES.md), derleme ve kurulum için [BUILD_SWITCH.md](BUILD_SWITCH.md) esas alınmalıdır.
 
 PaperNX çevrimdışı, bellek tasarruflu bir C++17 uygulamasıdır:
 - `src/main.cpp`: SDL olay döngüsü, ekran durum makinesi, dokunmatik hareketler ve kumanda yönlendirme ayrıştırması.

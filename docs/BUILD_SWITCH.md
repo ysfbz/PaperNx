@@ -1,60 +1,45 @@
-# PaperNX v0.9.1 — Nintendo Switch build and installation
+# PaperNX v0.9.2 — Nintendo Switch build and installation
 
-This guide follows the checked-in [Dockerfile](../Dockerfile), [Compose service](../compose.yaml), `scripts/verify-switch.sh`, `Makefile` and `scripts/package_release.py`.
+This guide uses the checked-in [Dockerfile](../Dockerfile), [Compose service](../compose.yaml), `Makefile`, and `scripts/verify-switch.sh`. The Switch target is AArch64/libnx; desktop builds are for development and automated checks.
 
-## Requirements
+## Build and package
 
-Windows 11 with Docker Desktop (WSL 2 backend, Linux containers) or Linux with Docker Engine/Compose; Git; available disk space and network access for devkitPro packages and pinned MuPDF 1.23.11 source. Container volumes map the repository root to `/work`.
-
-## Build from Windows Terminal / PowerShell or Linux shell
+Requirements: Docker with Compose, Git, network access for the configured devkitPro packages, and enough disk space for the pinned MuPDF build and artifacts.
 
 ```bash
 git clone https://github.com/ysfbz/PaperNx.git
 cd PaperNx
 docker compose build switch
-docker compose run --rm switch
+docker compose run --rm -e PAPERNX_RELEASE_VERSION=v0.9.2 switch bash -lc 'scripts/verify-switch.sh'
 ```
 
-The `switch` service's default command runs `bash scripts/verify-switch.sh`. Explicitly equivalent after building the image:
+The default release version is `v0.9.2`. Set `PAPERNX_BUILD_ONLY=1` to build and verify without packaging. A full release run creates `dist/v0.9.2/` with `PaperNX.nro`, its SHA-256 sidecar, the SD ZIP and its sidecar, the separate license ZIP and its sidecar, and `manifest.json`. The receipt is written under `verification/switch-build-receipt.json`. `PAPERNX_LICENSES_ROOT` can point to an isolated staging directory for collected dependency notices.
 
-```bash
-docker compose run --rm switch bash scripts/verify-switch.sh
-```
+The script verifies the MuPDF source checksum, the AArch64 ELF/NRO, NACP identity/version, embedded icon, RomFS fonts and CA bundle, package contents, source/build receipt, archive integrity, license notices and checksums. This is a cross-build and package check; it does not prove behavior on a physical console.
 
-The script validates/downloads MuPDF 1.23.11 with pinned source SHA256 `478f2a167feae2a291c8b8bc5205f2ce2f09f09b574a6eb0525bfad95a3cfe66`, verifies/reuses the AArch64 prefix, captures source/build receipts, runs `make all -B -j4`, inspects ELF/NRO/NACP/branding/RomFS, collects SDK/MuPDF license notices, packages `dist/v0.9.1/` and verifies ZIP integrity.
+## NACP and embedded assets
 
-The Dockerfile pins the devkitA64 base-image digest and updates the devkitPro package index during image construction. Its declared package set includes `switch-curl`, required by the native updater, plus the Switch SDL, archive and compression dependencies. `Makefile` links `-lcurl` inside the static-library group. The hardening audit used `make all` directly; it did not run the release packaging script.
+The Switch Makefile defines title `PaperNX`, author `Yusuf Buzrul`, version `0.9.2`, the project icon and `romfs/`. RomFS includes Noto Sans Regular/SemiBold, Noto Serif, `OFL.txt` and `cacert.pem` used for updater TLS verification. The Switch build links libcurl using the libnx TLS backend.
 
-## NACP and assets
+## Install and upgrade
 
-[Makefile](../Makefile) defines `APP_TITLE = PaperNX`, `APP_AUTHOR = Yusuf Buzrul`, `APP_VERSION = 0.9.1`, `ICON = assets/branding/PaperNX-icon-switch.jpg` and `ROMFS = romfs`. The RomFS bundles Noto Sans Regular/SemiBold, Noto Serif and its OFL notice, plus `cacert.pem` for updater TLS verification. The Switch build requires devkitPro's `switch-curl` package (libcurl's libnx TLS backend); its declared `switch-zlib` and `libnx` dependencies are installed by the build image. The CMake desktop target likewise requires libcurl and links its discovered transitive dependencies.
-
-## Distribution files
-
-`dist/v0.9.1/` contains `PaperNX.nro`, `PaperNX-switch-v0.9.1.zip`, `PaperNX-licenses-v0.9.1.zip`, three `.sha256` files and `manifest.json` (local receipt). The microSD ZIP contains:
+Extract `PaperNX-switch-v0.9.2.zip` to the microSD root (`sdmc:/`). The archive installs:
 
 ```text
-switch/
-  PaperNX/
-    PaperNX.nro
-    books/                  (empty)
-    fonts/
-      NotoSans-Regular.ttf
-      NotoSans-SemiBold.ttf
-      NotoSerif-Regular.ttf
-      OFL.txt
+switch/PaperNX/PaperNX.nro
+switch/PaperNX/books/                 (empty placeholder)
+switch/PaperNX/fonts/                 (bundled fonts and OFL notice)
 ```
 
-Extract the Switch ZIP to the microSD root (`sdmc:/`), put EPUB, PDF, CBZ and CBR comic books in `sdmc:/switch/PaperNX/books/`, and open PaperNX from Homebrew Menu. On upgrade, back up `books/` and `data/` first. The distribution does not overwrite existing user databases or bookmarks. License/SDK notices ship separately in `PaperNX-licenses-v0.9.1.zip`.
+Place books in `sdmc:/switch/PaperNX/books/` or use the in-app file browser. Before upgrading, back up `books/` and `data/`, close PaperNX, and replace the NRO with the release copy. Keep the previous NRO until the new version has launched successfully. Neither the install ZIP nor the updater writes books, settings, progress, bookmarks or Reading Journal data.
 
-## Optional desktop regression runs
+The in-app updater stages a validated candidate but does not install it or restart into it. See [UPDATER.md](UPDATER.md) for the manual flow and recovery limits. The separate `PaperNX-licenses-v0.9.2.zip` contains project attribution and collected dependency notices.
+
+## Desktop checks
 
 ```bash
-docker compose build desktop
-docker compose run --rm desktop bash scripts/verify-desktop.sh
-docker compose run --rm desktop bash scripts/verify-pinned-desktop.sh
-docker compose run --rm desktop bash scripts/verify-v04.sh native
-docker compose run --rm desktop bash scripts/verify-v04.sh sanitizers
+docker compose run --rm desktop bash -lc 'scripts/verify-desktop.sh'
+docker compose run --rm desktop bash -lc 'scripts/verify-sanitizers.sh'
 ```
 
-Desktop tests are not a substitute for [38 real-device checks](DEVICE_TEST_PLAN.md). See [release artifact hashes](RELEASE_REPORT.md).
+Automated desktop and cross-build checks do not substitute for the physical scenarios in [DEVICE_TEST_PLAN.md](DEVICE_TEST_PLAN.md). See [KNOWN_ISSUES.md](KNOWN_ISSUES.md) for release limits.

@@ -1,4 +1,4 @@
-# PaperNX native design system — v0.4-origin design used by v0.9.1
+# PaperNX native design system — v0.4-origin design used by v0.9.2
 
 SDL2 drawing, SDL_ttf typography and MuPDF document rendering remain native. Sources: `ui.hpp`, `theme.hpp`, `orientation.hpp`, `focus.hpp`, `typography.cpp`, `main.cpp` and screen include fragments. No web engine/framework.
 

@@ -1,37 +1,21 @@
-# PaperNX v0.9.1 — Known limitations and validation gaps
+# PaperNX v0.9.2 — Known limitations
 
-Not every limitation here is a defect. This document distinguishes implemented behavior, deferred features, and unverified hardware-dependent paths.
+These are known scope or platform limits, not claims of failures observed in the release.
 
-## P1 — Real Nintendo Switch hardware validation
+## Switch hardware and installation
 
-The published v0.9.1 NRO has **38/38 physical-device acceptance checks marked UNVERIFIED** in [DEVICE_TEST_PLAN.md](DEVICE_TEST_PLAN.md). Priority cases: Joy-Con-detached touch, both portrait modes and touch mapping, PDF/CBZ/CBR gestures, restart and sleep/resume, docked/handheld transitions, controller reconnect, SD card write resilience and Unicode glyph rendering. Passing native desktop tests and producing AArch64 NRO binaries do not substitute for real-device physical acceptance testing.
+- Broad v0.9.2 acceptance on a physical Nintendo Switch has not been completed. Touch feel, Joy-Con reconnect, sleep/resume, portrait mapping, system brightness, SD durability, real GPU frame time and device memory remain **UNVERIFIED**. See the [physical test plan](DEVICE_TEST_PLAN.md).
+- Updates are downloaded, verified and staged; the user manually replaces the NRO. No automatic launcher/chainload install or power-loss-safe replacement is provided. Keep a known-good NRO and back up `books/` and `data/` before updating. See [updater behavior](UPDATER.md).
+- First startup and cover-cache behavior for very large libraries varies with the document mix, console and SD card. Desktop software-renderer measurements are not Switch performance guarantees.
+- Sudden power loss or SD-card failure can still lose unsaved data despite temporary writes and recovery copies.
 
-## Known implementation constraints
+## Reader scope
 
-- **Storage:** Atomic temp writes, backup recovery, and retries lower corruption risk, but power loss, FAT/microSD limitations, and abruptly interrupted writes can still lose unsaved progress. Back up `books/` and `data/` before upgrading.
-- **Book identity:** Primarily path and file-size based; moving or replacing files creates a new identity without automatically merging history records.
-- **EPUB position restoration:** Malformed or image-only chapters use approximate geometric fallbacks after layout recalculations.
-- **PDF & Comic Rendering:** Whole-page pixel transformations (contrast/invert) affect images and illustrations. Built-in PDF crop, OCR, and true text reflow are not supported. Comic reader supports CBZ (ZIP) and CBR (RAR4/RAR5/Solid) archives in original RGB format within bounded memory budgets (48 MiB image buffer, 100 MP limit).
-- **File management:** Deletion uses explicit two-step confirmation and path/extension validation. There is no trash bin or undo. Test permanent deletion only on disposable copies.
-- **Reading statistics:** Active reading time and finish estimates use interaction-derived heuristics, not eye tracking or proof the screen was actively read. Chapter ETA and advanced calendar reporting are not implemented.
-- **Catalog metadata:** Automatic moved-file reconciliation and normalized multi-author/subject indexing remain limited.
-- **Physical ergonomics:** Focus ring visibility, long title labels, portrait ergonomics, and sleep/restart behavior require physical on-device verification.
+- PDF OCR, PDF text reflow, in-book full-text search, annotations and dictionary lookup are not included.
+- Hebrew/BiDi shaping is outside the current localization scope; the interface is available in English and Turkish.
+- EPUB position restoration can be approximate for malformed or image-only chapters after layout changes.
+- Book identity uses file metadata/path characteristics; moving or replacing a file does not automatically merge its reading history.
+- Permanent file deletion has confirmation but no trash/undo. Use disposable copies for deletion testing.
+- Reading-time and completion statistics are interaction-based estimates, not evidence that the screen was actively read.
 
-## Planned / not included in v0.9.1
-
-- **Hebrew language and BiDi text shaping:** Excluded per project design.
-- **In-book full-text search:** Deferred.
-- **Highlights and annotations:** Deferred.
-- **Offline dictionary lookup:** Deferred.
-- **PDF reflow / OCR:** Deferred.
-- **Arbitrary gesture remapping:** Deferred.
-
-See [Roadmap](PRODUCT_ROADMAP_2026.md) for future candidate milestones.
-
-## Evidence
-
-[Verified Automated Tests](TEST_RESULTS.md) · [Current Release Report](RELEASE_REPORT.md) · [Hardware Acceptance Checklist](DEVICE_TEST_PLAN.md).
-
-## Verification and attribution notes
-
-The repository currently records 38 physical Switch acceptance checks as UNVERIFIED; that does not assert the application is defective. Rare archive-specific page-turn latency and memory pressure can only be characterized with repeatable on-device measurements; desktop tests and static code review establish neither a user-visible freeze nor its absence. For incorporated upstream-fork code and third-party obligations see [LICENSES.md](LICENSES.md).
+The release is a stable software release, not a hardware-certified build. Passing desktop tests and Switch cross-compilation do not change the **UNVERIFIED** physical-device status.

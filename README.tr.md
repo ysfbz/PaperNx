@@ -2,7 +2,7 @@
   <img src="assets/branding/PaperNX-icon-512.png" alt="PaperNX Logo" width="160">
 </p>
 
-<h1 align="center">PaperNX — Türkçe Dokümantasyon</h1>
+<h1 align="center">PaperNX v0.9.2 — Türkçe Dokümantasyon</h1>
 
 <p align="center">
   <strong>Nintendo Switch için yerel, çevrimdışı EPUB, PDF, CBZ ve CBR okuyucu.</strong>
@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/Lisans-AGPL_3.0-blue.svg" alt="AGPL-3.0 Lisansı"></a>
-  <a href="https://github.com/ysfbz/PaperNx/releases/tag/v0.9.1"><img src="https://img.shields.io/badge/S%C3%BCr%C3%BCm-v0.9.1-brightgreen.svg" alt="Sürüm v0.9.1"></a>
+  <a href="https://github.com/ysfbz/PaperNx/releases/tag/v0.9.2"><img src="https://img.shields.io/badge/S%C3%BCr%C3%BCm-v0.9.2-brightgreen.svg" alt="Sürüm v0.9.2"></a>
   <img src="https://img.shields.io/badge/Platform-Nintendo_Switch-e60012.svg" alt="Platform Nintendo Switch">
   <img src="https://img.shields.io/badge/Dil-C%2B%2B17%20%2F%20C11-00599C.svg" alt="Dil C++17 / C11">
   <img src="https://img.shields.io/badge/Grafik-SDL2-black.svg" alt="Grafik SDL2">
@@ -32,18 +32,22 @@ Tüm kitaplarınız, çizgi roman arşivleriniz, kapak önbelleğiniz, okuma ge�
 
 ## Temel Özellikler
 
-- **Dokunmatik Odaklı Ergonomi:** Tüm okuma ve menü eylemleri doğrudan ve hassas dokunmatik hedeflerle yönetilir (minimum 56px dokunmatik alan ve dokunulduğunda görsel basılma tepkisi). Joy-Con ve Pro Controller tuşları isteğe bağlı kısayol olarak tam desteklenir.
+- **Dokunmatik ve Kumanda Kontrolleri:** Kitaplık, menüler ve okuma hareketleri doğrudan dokunmatik girişleri destekler; Joy-Con ve Pro Controller tuşları da kısayol olarak kullanılabilir.
+- **Varsayılan Tek Sayfa:** Sayfalı EPUB/PDF tek sayfayla açılır; EPUB/PDF ve çizgi romanlarda isteğe bağlı çift sayfa, çizgi romanlarda akıllı spread ve geniş sayfayı tek gösterme kullanılabilir.
 - **CBZ & CBR Çizgi Roman Desteği:** `.cbz` (ZIP) ve `.cbr` (RAR4, RAR5 ve solid arşivler, bütünleşik `unarr` kütüphanesiyle) formatlarında tam çizgi roman okuma desteği. Yanlış adlandırılmış arşivleri sihirli baytlarla algılama, orijinal RGB renklerini koruma, isteğe bağlı geri alınabilir okuma paleti, 48 MiB görsel ve 100 MP piksel güvenlik sınırları.
 - **İnteraktif 3D Sayfa Çevirme (Page Curl):** Fiziksel silindir geometrisiyle çalışan, parmak takip eden, tutuş yüksekliği (`anchorY`) ve dikey çekme (`dragY`) dinamiklerini yansıtan, arka yüz kağıt tonlaması, parlama ve temas gölgesi içeren gerçekçi sayfa kıvrılma animasyonu. Sayfalı EPUB, PDF, CBZ ve CBR (RTL manga dahil) belgelerde çalışır, **Ayarlar → Navigasyon** üzerinden kapatılıp açılabilir.
 - **Çizgi Roman Seri Yönetimi ve 3 Sekmeli Gezinti:** Çok sayılı çizgi roman serilerini (`#1`, `01`, `v01`, `Vol 01`, `ComicInfo.xml`) ana kütüphanede tek bir seri kartı altında toplar. 3 sekmeli (`Bölümler`, `Tüm sayfalar`, `Yer imleri`) içindekiler modalı, arka planda küçük resim üretimi ve canlı önizleme baloncuğuna sahip sayfa gezinti çubuğu (scrubber).
 - **Doğal Sayısal Sıralama (Natural Sort):** Cilt ve bölüm numaralarını doğru sırada dizen taşma korumalı `compareNatural` algoritması (Örn: Cilt 2, Cilt 10'dan önce doğru sıralanır).
 - **Gelişmiş Kumanda ve Ekran Yönü Uyumu:** Dikey modlarda ekrana göre yönlenen analog kaydırma ve menü gezintisi; okuyucuda dikey tutuşta dahi doğrudan yatay sayfa çeviren D-pad kontrolleri; ZL/ZR tetik tuşlarıyla pürüzsüz sürekli yakınlaştırma; ekrandaki "Sayfaya sığdır" butonuyla anında 1.0x görünüme dönüş.
 - **Gerçek Dikey Sürekli EPUB Kaydırma:** Sahte sayfa hissi olmadan akıcı dikey piksel kaydırma, ayarlanabilir momentum ve pürüzsüz bölüm geçişleri. Klasik sayfalı yatay okuma modu da eksiksiz korunur.
+- **Hızlı Menü ve Ekran Ayarları:** Dokunmatik `+` menüsü Joy-Con Plus tuşuyla aynıdır. Natural Paper ve Soft E-Ink görünümleri, yazılımsal karartma ve desteklenen elde kullanım parlaklık ayarı sunulur.
+- **Asenkron Kitaplık Tarama:** Kök dizinler arka planda taranır; iptal veya eksik tarama son başarılı kitaplık envanterini değiştirmez.
 - **Güçlü PDF Motoru:** MuPDF 1.23.11 tabanlı; genişliğe/sayfaya sığdırma, serbest analog ve dokunmatik kaydırma, yakınlaştırma ve belge renk filtreleri (Orijinal, Koyu, Sepya, Ters).
 - **Bütünleşik Kâğıt Görünümü:** Dokuz doğal kâğıt teması (Beyaz, Kitap Kâğıdı, Klasik Sepya, Krem, Koyu Kömür, Gece vb.). Kitaplık, araç çubukları, çizgi roman dış kenarları ve okuma pencereleri ortak renk paletini paylaşır.
 - **Çift Dilli Arayüz:** Doğal Türkçe ve İngilizce dil desteği. Kitap içerikleri ve içindekiler orijinal dilinde korunur (İbranice/BiDi metin dizimi proje tasarımı gereği hariç tutulmuştur).
-- **Disk Üzerinde Kapak Önbelleği:** 150×210 RGB24 boyutunda, 32 MiB / 512 dosya ile sınırlandırılmış hızlı kapak önbelleği; çizgi romanlar için genişletilmiş 96 MiB worker bütçesi, sağlama toplamı doğrulaması ve anında beliren şık vektörel kapak yer tutucuları.
+- **Disk Üzerinde Kapak Önbelleği:** 150×210 RGB24 kapaklar için 48 MiB / 512 kayıt sınırı, dosya bilgisi ve CRC denetimi; ayrıca bellekteki küçük resim texture cache'i 32 MiB ile sınırlıdır. Kapak yüklenene kadar vektörel yer tutucu görünür.
 - **Okuma Günlüğü ve Çevrimdışı İstatistikler:** Okuma süresi, oturumlar, tamamlama oranları ve günlük hedefleri tamamen yerel olarak takip eder.
+- **Doğrulanmış Manuel Güncelleme:** TLS, SHA-256, NRO/NACP kimliği ve sürüm denetiminden geçen aday staging alanına yazılır. Kurulu NRO'yu değiştirme adımı dosya yöneticisiyle manuel yapılır.
 - **Veri Koruma ve Kurtarma:** Geçici dosya yazımı, `.bak` yedekleme ve otomatik kurtarma mekanizmaları veri kaybı riskini asgariye indirir. Paket kullanıcı veritabanlarını içermez.
 
 ---
@@ -52,18 +56,18 @@ Tüm kitaplarınız, çizgi roman arşivleriniz, kapak önbelleğiniz, okuma ge�
 
 ### Temiz Kurulum
 
-1. Güncel sürüm arşivini [`PaperNX-switch-v0.9.1.zip`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.1/PaperNX-switch-v0.9.1.zip) indirin.
+1. Güncel sürüm arşivini [`PaperNX-switch-v0.9.2.zip`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.2/PaperNX-switch-v0.9.2.zip) indirin.
 2. Arşivi Switch microSD kartınızın ana dizinine (`sdmc:/`) çıkartın.
 3. `.epub`, `.pdf`, `.cbz` ve `.cbr` dosyalarınızı `sdmc:/switch/PaperNX/books/` dizinine kopyalayın.
 4. Homebrew Menu üzerinden **PaperNX** uygulamasını başlatın.
 
-#### Doğrulanmış Dağıtım Dosyaları (v0.9.1)
+#### SHA-256 Sağlama Toplamları (v0.9.2)
 
-| Dosya | Boyut | SHA256 Özeti |
-|---|---:|---|
-| `PaperNX.nro` | 48.8 MB | `f411daf2e02f5483ab49563295ea7832ca3e9b0455f433b7c8bfe6db909fced1` |
-| `PaperNX-switch-v0.9.1.zip` | 33.6 MB | `898a1f07e4898c164a3e57f17e7af52d7eda553c92f85892aac9bda8eaf249e9` |
-| `PaperNX-licenses-v0.9.1.zip` | 207 KB | `2890920a31aac7293e92c45ae90ef5d18e274df844daf74ef42db3539df8f005` |
+| Dosya | SHA256 sidecar |
+|---|---|
+| [`PaperNX.nro`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.2/PaperNX.nro) | [`PaperNX.nro.sha256`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.2/PaperNX.nro.sha256) |
+| [`PaperNX-switch-v0.9.2.zip`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.2/PaperNX-switch-v0.9.2.zip) | [`PaperNX-switch-v0.9.2.zip.sha256`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.2/PaperNX-switch-v0.9.2.zip.sha256) |
+| [`PaperNX-licenses-v0.9.2.zip`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.2/PaperNX-licenses-v0.9.2.zip) | [`PaperNX-licenses-v0.9.2.zip.sha256`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.2/PaperNX-licenses-v0.9.2.zip.sha256) |
 
 ```text
 sdmc:/switch/PaperNX/
@@ -74,10 +78,10 @@ sdmc:/switch/PaperNX/
 
 ### Önceki Sürümden Güncelleme
 
-Yeni `PaperNX.nro` dosyasını `sdmc:/switch/PaperNX/PaperNX.nro` üzerine kopyalamanız yeterlidir.
+Önce `books/` ve `data/` klasörlerinizi yedekleyip PaperNX'i kapatın. Doğrulanmış v0.9.2 Switch ZIP'ini microSD kartın ana dizinine (`sdmc:/`) açın ve içindeki NRO'yu `sdmc:/switch/PaperNX/PaperNX.nro` ile değiştirin. Yeni sürüm başarıyla açılana kadar eski NRO'nun bir kopyasını saklayın. Uygulama içi güncelleme de doğrulanmış adayı staging alanına alır; dosyayı uygulama kendisi kurmaz veya yeniden başlatmaz.
 
 > [!IMPORTANT]
-> Dağıtım paketi yalnızca uygulama dosyaları, fontlar ve boş bir `books/` yer tutucusu içerir. Asla `data/` klasörünü içermez; bu sayede mevcut yer imleriniz, okuma istatistikleriniz ve özel temalarınız korunur. Güncelleme öncesinde `books/` ve `data/` klasörlerinizi yedeklemeniz önerilir.
+> Dağıtım paketi uygulamayı, fontları ve boş bir `books/` yer tutucusunu içerir; kitaplarınızı, `data/` klasörünü, ayarları, ilerlemeyi, yer imlerini, Okuma Günlüğünü veya logları içermez ve üzerine yazmaz. Yine de güncellemeden önce `books/` ve `data/` klasörlerinizi yedekleyin.
 
 ---
 
@@ -110,7 +114,7 @@ git clone https://github.com/ysfbz/PaperNx.git
 cd PaperNx
 
 # Nintendo Switch NRO ve paket derlemesi
-docker compose run --rm switch bash scripts/verify-switch.sh
+docker compose run --rm -e PAPERNX_RELEASE_VERSION=v0.9.2 switch bash -lc 'scripts/verify-switch.sh'
 
 # Masaüstü testleri ve sanitizer doğrulamaları
 docker compose run --rm desktop bash scripts/verify-desktop.sh
@@ -125,5 +129,5 @@ docker compose run --rm desktop bash scripts/verify-sanitizers.sh
 - Yusuf Buzrul tarafından yapay zekâ desteğiyle geliştirilmiştir.
 - GitHub: [@ysfbz](https://github.com/ysfbz) ([https://github.com/ysfbz](https://github.com/ysfbz))  
 - Depo: [https://github.com/ysfbz/PaperNx](https://github.com/ysfbz/PaperNx)
-- Lisans: [GNU AGPL-3.0](LICENSE); kaynak kökeni ve üçüncü taraf bildirimleri: [docs/LICENSES.md](docs/LICENSES.md)
+- Lisans: [GNU AGPL-3.0](LICENSE); kaynak kökeni ve üçüncü taraf bildirimleri: [docs/LICENSES.md](docs/LICENSES.md), [docs/SOURCE_ATTRIBUTION.md](docs/SOURCE_ATTRIBUTION.md)
 

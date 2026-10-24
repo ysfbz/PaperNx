@@ -5,6 +5,36 @@ All notable changes to **PaperNX** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.2] - 2026-10-24
+
+### Added
+- Optional two-page EPUB/PDF and comic layouts, smart comic spread pairing, and wide-page handling; single-page remains the default.
+- Interactive page curl, comic series and page navigation, reading journal, book-scoped reading settings, and Natural Paper / Soft E-Ink appearance options.
+- Shared touch `+` / Joy-Con Plus quick menu, asynchronous library scanning, and supported software/system brightness controls.
+
+### Changed
+- Improved EPUB, PDF, CBZ and CBR reading, including RAR4/RAR5/solid comic archives, cover loading and reader navigation.
+- Updates are staged only after TLS, SHA-256, NRO/NACP identity and version validation. Installing the staged NRO remains a manual file-manager action.
+
+### Fixed
+- Preserved the last complete library inventory when scans are cancelled, incomplete, stale, or cannot save their inventory.
+- Preserved the previous verified update candidate across cancellation and staging write, rename, or storage failures.
+- Hardened release metadata parsing, scanner path checks, candidate selection, and cover telemetry accounting.
+
+### Performance
+- Added application-level 100/500/1,000-book cover-pipeline measurement and bounded telemetry for startup, viewport fill, cache, decode, upload queue and frame times.
+- Reduced avoidable metadata work and kept the existing 48 MiB disk / 512-entry cover cache bounds.
+
+### Security
+- The updater keeps TLS peer/host verification enabled and fails closed on invalid certificates, release metadata, hashes, NRO identity or versions.
+- The running canonical NRO is not changed by download/staging. The distribution ZIP excludes user books, settings, progress, bookmarks and Reading Journal data.
+- Retained AGPL-3.0 and upstream/fork attribution; see [LICENSES.md](docs/LICENSES.md) and [SOURCE_ATTRIBUTION.md](docs/SOURCE_ATTRIBUTION.md).
+
+### Known Limitations
+- Verified updates are staged; replacing the installed NRO is manual. There is no power-loss-tolerant automatic launcher installation.
+- Broad physical Nintendo Switch acceptance testing has not been completed; this release is not hardware-certified.
+- First startup and cover-cache performance for large libraries varies with the console, SD card, document mix and cache state.
+
 ## [0.9.1] - 2026-10-20
 
 ### Documentation clarification (main branch, after binary re-release)
