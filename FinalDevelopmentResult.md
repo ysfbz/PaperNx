@@ -752,3 +752,10 @@ Bu tek koşu yazılım renderer’ı host ölçümüdür; hızlanma iddiası de�
 - **ASan/UBSan:** aynı comic worker hedefi rebuild edildi; CTest 1/1 PASS (38,59 sn).
 - **Switch:** docker compose run --rm switch bash -lc 'export MUPDF_PREFIX=/work/prefix-mupdf-switch; make all -j4 && python3 scripts/verify_artifacts.py --version 0.9.1' PASS. Kaynak revision a486060; AArch64 ELF/NRO, RomFS CA 118 sertifika / 200.116 bayt. NRO 49.588.671 bayt, SHA-256 20b3e4d202bc15c3250c32dec2ad0ab300cfc7620fce2688a4ffa3f79f9050a0. Bu cross-build'dir; fiziksel Switch UNVERIFIED.
 - **Kapsam sınırı:** tam native CTest ve bütün hedefleri kapsayan sanitizer bu commit'te çalıştırılmadı; önceki 31/31 sonucu daha eski 6fe94ec test HEAD'indedir. Genel karar INCOMPLETE — BLOCKERS REMAIN; updater güvenli kurtarma, türev modül mimarisi, G6/G7 tüm kabulleri, tam doğrulama ve fiziksel cihaz kapısı sürüyor.
+
+
+## 2026-10-24 — v0.9.2 G4/G5/G6 code-only
+- Commitler: ab0f3dd, 4ff3469 (feature/v0.9.2-complete-reader-enhancements, push edildi).
+- Yapılan: updater yedek koruma + manuel kurulum metni; iptal edilen tarama complete değil; cover perf sayaçları + yinelenen metadata açılışı atlama.
+- Çalıştırılan kontrol: YOK (kapsam gereği test/build yasak). Doğrulanmamış: derleme dahil her şey.
+- Karar: SOURCE READY FOR INDEPENDENT TESTING; release/merge hazır DEĞİL. Ayrıntı: docs/V092_CODE_ONLY_HANDOFF.md
