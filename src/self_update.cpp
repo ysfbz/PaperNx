@@ -393,6 +393,19 @@ bool removeUpdaterFile(const std::filesystem::path &path) {
     return std::remove(path.string().c_str()) == 0 || errno == ENOENT;
 }
 
+// Ownership of update files next to PaperNX.nro:
+//  * Manual staging (this build): .part, .new, .ready, .ready.tmp - written/removed only by SelfUpdater::download/check.
+//  * Legacy self-install transaction (older builds): .old, .boot, .boot.started, .boot.ok, .swap - only prepareBoot/
+//    confirmBoot/rollbackBoot may act on them, and staging refuses to start while any of them exists.
+struct LegacyMarkers {
+    bool boot, started, confirmed, swap, backup;
+    bool transactionOpen() const {return boot || started || confirmed || swap;}
+};
+LegacyMarkers inspectLegacyMarkers(const std::string &executable) {
+    return {pathExists(executable + ".boot"), pathExists(executable + ".boot.started"), pathExists(executable + ".boot.ok"),
+            pathExists(executable + ".swap"), pathExists(executable + ".old")};
+}
+
 bool restoreBackup(const std::filesystem::path &executable, std::string &error) {
     const auto backup = executable.string() + ".old";
     const auto failed = executable.string() + ".failed";
@@ -599,8 +612,7 @@ bool SelfUpdater::download() {
     if (snapshot.state != UpdateState::Available || !snapshot.release.installable()) return false;
     if (worker_.joinable()) worker_.join();
     const auto path = executable_.string();
-    if (pathExists(path + ".boot") || pathExists(path + ".boot.started") ||
-        pathExists(path + ".boot.ok") || pathExists(path + ".swap")) {
+    if (inspectLegacyMarkers(path).transactionOpen()) {
         publish(UpdateState::Error, "A previous update still needs boot recovery");
         return false;
     }
