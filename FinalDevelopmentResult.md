@@ -524,3 +524,14 @@ Bu tek koşu yazılım renderer’ı host ölçümüdür; hızlanma iddiası de�
 - **Kaynak kökeni:** Altı scanner/index/updater/theme dosyasının ilk feature HEAD’deki byte eşleşmesi tarihsel; güncel `d3265dd`’de beş extant path’in blob’u farklı, interface-theme header silinmiş. Atıflar ve AGPL-3.0 kaydı korunuyor. G1 comic worker/archive dosyalarının fork-derived geçmişi provenance raporunda hash ve Git geçmişiyle açıklandı; bağımsız/clean-room iddiası yok.
 - **Performans sınırı:** Bu hata görünürlüğü düzeltmesi yeni performans ölçümü değildir. Önceki G1 tek-koşu host zamanları `a6e01b3` içindir; Switch FPS/RAM, full CTest, sanitizer, artifact receipt/hash ve fiziksel Switch doğrulaması **NOT RUN / UNVERIFIED**.
 - **Sıradaki iş:** execution plan G2 cold-cache queued turn/touch gate. Genel durum **INCOMPLETE — BLOCKERS REMAIN**.
+
+## AC. 2026-10-24 — Updater release metadata doğrulaması
+
+- **Dal / kaynak commit:** `feature/v0.9.2-complete-reader-enhancements` / `50b9d60023c284fdadc28b92c23f524733920b08` (`fix(updater): reject invalid release metadata`).
+- `src/update_json.hpp` yanlış tipte gelen `draft`/`prerelease` alanlarını reddediyor. GitHub endpoint’i `per_page=30` istediğinden parser 30 release kabul ediyor ve daha büyük listeyi fail-closed reddediyor.
+- `tests/self_update_tests.cpp` bozuk boolean tipleri, tam 30 kabul ve 31 reddi doğruluyor. Desktop `PaperNX` ve `papernx_self_update_tests` build **PASS**; updater unit ve yerel HTTPS CTest **2/2 PASS** (2,02 sn).
+- İlk test derlemesi testin private `update_json.hpp` sabitine doğrudan bağlanması nedeniyle başarısız oldu; test public `selectUpdateRelease()` üzerinden düzeltilip yeniden çalıştırıldı. Geçerli son koşu 2/2 geçti.
+- **Provenance:** `src/update_json.hpp` current blob `d36d44850270941d4a06cb38d7d038cec2691527`, pinned fork blob `d4e3bb96dcb2d363e23d40a83775c02768fc5394`. Kod değişikliği fork kökenini silmez; parser fork-derived/adapted kalır ve Refael Avramashvili / AGPL-3.0 atfı korunur.
+- **Açık:** G5 scanner/index sorumluluk tasarımı, full current-HEAD CTest, sanitizer, Switch build/artifact ve fiziksel Switch doğrulaması. Bu değişiklikte Switch doğrulaması çalıştırılmadı.
+
+**Karar: INCOMPLETE — BLOCKERS REMAIN.**

@@ -2,7 +2,7 @@
 
 **Updated:** 2026-10-24
 **Branch:** `feature/v0.9.2-complete-reader-enhancements`
-**Latest source commit:** `d3265ddda21fd2ba5a1ba6fca0d72d95d8420e6b` (G1 comic spread error visibility follow-up).
+**Latest source commit:** `50b9d60023c284fdadc28b92c23f524733920b08` (strict updater release metadata validation).
 **Latest test-only commit:** `70ac670873af6e254185808ed397ee05b9c46ccc` (10,000/10,001-item scan boundary).
 **Last source commit before the current hardening changes:** `bb9d8579db9ccf0d10b5843e1929c2e696565c59`
 **Hardening source commits:** `913fb8f` and `1cb06a1`.
@@ -37,7 +37,7 @@
 
 ## Next session starting point
 
-At current source HEAD `d3265ddda21fd2ba5a1ba6fca0d72d95d8420e6b`, G1 cold-page worker and partial-spread error handling are complete. G2 queued cold-cache turns and G3 comic paper-back/fixed-folio work were already implemented in earlier feature commits; their focused regressions were rerun after G1 and passed 7/7 (see the latest dated checkpoint). Continue the still-open G5 PaperNX-specific scanner/index/updater responsibility redesign and Ponytail audit, then close only relevant remaining native gates without restarting completed broad chains unnecessarily. Physical acceptance remains unverified; use [`V092_DEVICE_ACCEPTANCE.md`](V092_DEVICE_ACCEPTANCE.md) as the device record. Keep the final decision `INCOMPLETE — BLOCKERS REMAIN` until all required gates have evidence.
+At current source HEAD `50b9d60023c284fdadc28b92c23f524733920b08`, G1 cold-page worker and partial-spread error handling are complete, G2/G3 behavior passed focused current-source regressions, and the updater parser rejects mistyped release flags and responses beyond the configured 30-release page. G2/G3 were already implemented in earlier feature commits; see dated checkpoints for the exact test commands. Continue the still-open G5 PaperNX-specific scanner/index/updater responsibility redesign and Ponytail audit, then close only relevant remaining native gates without restarting completed broad chains unnecessarily. Physical acceptance remains unverified; use [`V092_DEVICE_ACCEPTANCE.md`](V092_DEVICE_ACCEPTANCE.md) as the device record. Keep the final decision `INCOMPLETE — BLOCKERS REMAIN` until all required gates have evidence.
 
 ## 2026-10-23 latest continuation checkpoint
 
@@ -227,3 +227,11 @@ The verified/pushed branch HEAD at the start of this note was `ed9e3b69c184de1b4
 - The selection covers pending cold comic turns/touch, shared touch/controller `+` quick-menu state and shortcut focus, spread/layout behavior, partial-spread error visibility, and curl geometry/application paths. The prior G2 and G3 implementation commits remain in feature history; this is a regression revalidation after G1, not a duplicate implementation.
 - Full native CTest, ASan/UBSan, Switch build at this HEAD, and physical Switch/controller/page-curl behavior were not run in this checkpoint. Overall status remains **INCOMPLETE — BLOCKERS REMAIN**.
 - **Next:** continue the still-open G5 independent-responsibility redesign and source/Ponytail audit. Preserve fork/AGPL lineage; do not call adaptations clean-room. Keep the untracked execution plan and generated CBR fixture out of commits.
+
+## 2026-10-24 — G5 updater parser schema hardening
+
+- **Source commit / HEAD:** `50b9d60023c284fdadc28b92c23f524733920b08` (`fix(updater): reject invalid release metadata`). `src/update_json.hpp` is no longer byte-identical to its pinned fork blob, but remains fork-derived/adapted by history and structure; Refael Avramashvili's attribution and AGPL-3.0 provenance remain required.
+- GitHub release JSON now rejects non-boolean `draft`/`prerelease` values. The parser caps the list at the configured API page size (`per_page=30`); exactly 30 entries pass, 31 fail closed.
+- **Build/CTest:** `docker compose run --rm desktop bash -lc 'cmake --build build-desktop --target PaperNX papernx_self_update_tests --parallel 4 && ctest --test-dir build-desktop --output-on-failure -R "^papernx_self_update_tests$|^papernx_self_update_network_tests$"'` — build **PASS**, updater unit + local HTTPS CTest **2/2 PASS** (2.02 seconds). This host run does not validate Switch TLS or link output at this source HEAD.
+- A first build attempt exposed that the test tried to reference the private parser header through the public updater test; the test was changed to exercise the public `selectUpdateRelease()` contract. The corrected test build and CTest passed.
+- **Next:** the larger G5 scanner/index architecture and source/Ponytail audit remain open; parser lineage is still adapted, not clean-room. Full CTest, sanitizers, current-HEAD Switch build and physical Switch remain open. Overall status **INCOMPLETE — BLOCKERS REMAIN**.

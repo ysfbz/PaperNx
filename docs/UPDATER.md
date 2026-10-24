@@ -2,6 +2,8 @@
 
 The updater checks releases only from `ysfbz/PaperNx` and accepts only the exact `PaperNX.nro` asset with a matching SHA-256 and valid PaperNX NRO/NACP identity and version. TLS peer and host verification stay enabled. A missing or unreadable RomFS trust bundle is an error; the updater never disables verification or uses an unverified fallback.
 
+The configured GitHub releases endpoint requests `per_page=30`; the bounded parser accepts up to 30 release objects and rejects larger responses. `draft` and `prerelease`, when present, must be JSON booleans. A schema/type violation fails the response closed rather than treating a mistyped draft flag as `false`.
+
 Automatic launch checks default to off and are stored in app settings. A manual check remains available. When enabled, the launch check starts only after the first rendered frame and performs network work on the updater worker. Release notes and the NRO are shown before download; the user must choose Update. Once verified, the UI shows the staged file path and manual replacement steps. There is no in-app restart/install action. Download cancellation removes the partial `.part` file. The updater stages only files adjacent to `PaperNX.nro`; progress, catalog, settings, books and Reading Journal are not written by the update flow.
 
 ## CA trust bundle

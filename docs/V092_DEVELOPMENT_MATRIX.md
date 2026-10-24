@@ -5,7 +5,7 @@
 
 **Baseline:** `main@8db85384a1b6c277c74766601ef46e9a672328df` (2026-10-23 audit)  
 **Feature branch:** `feature/v0.9.2-complete-reader-enhancements`  
-**Latest source-bearing HEAD:** `d3265ddda21fd2ba5a1ba6fca0d72d95d8420e6b` (G1 comic spread error visibility follow-up).
+**Latest source-bearing HEAD:** `50b9d60023c284fdadc28b92c23f524733920b08` (updater release metadata validation).
 **Fork reference:** `rtk19/PaperNx@d2b4bcfd10b1a66043c5b8cd36da08340cffec6d`  
 **Version remains:** v0.9.1; do not tag, release or merge to main.
 
@@ -285,3 +285,9 @@ The reader-input test uses real SDL `SDL_CONTROLLERBUTTONDOWN` events with `SDL_
 | `papernx_comic_app_tests` | **PASS, 1/1** | Added a partial-spread error test: first page fails while its facing page is still cold. The first grouped run exposed a test setup issue (worker identity was not configured before injecting the synthetic failure); after fixing the setup, the focused app CTest passed. |
 | Switch build | **PASS** | Re-ran `make all -j4` at `d3265dd`; ELF linked, NRO produced, RomFS CA/font validation passed. |
 | Full CTest, sanitizers, physical Switch | **NOT RUN / UNVERIFIED** | Not part of this focused follow-up. Overall decision remains **INCOMPLETE — BLOCKERS REMAIN**. |
+
+## G5 updater parser strict schema — `50b9d60`
+
+`src/update_json.hpp` now fails closed when `draft` or `prerelease` is present with a non-boolean type. It also enforces the configured GitHub endpoint page size of 30 releases, accepting 30 and rejecting 31. `tests/self_update_tests.cpp` covers both malformed flags and the exact count boundary.
+
+Desktop `PaperNX` and updater test targets built; `papernx_self_update_tests` plus local HTTPS `papernx_self_update_network_tests` passed **2/2** in **2.02 seconds**. The parser still retains fork-derived/adapted lineage and Refael Avramashvili / AGPL-3.0 attribution. No Switch build or full native/sanitizer run was performed at this HEAD; overall decision remains **INCOMPLETE — BLOCKERS REMAIN**.
