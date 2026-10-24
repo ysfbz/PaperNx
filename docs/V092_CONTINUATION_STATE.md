@@ -2,8 +2,8 @@
 
 **Updated:** 2026-10-24
 **Branch:** `feature/v0.9.2-complete-reader-enhancements`
-**Latest source commit:** `96d0d799eb834b9b13f860d23cd3d746df433b96` (visible-cover upload priority and synchronized placeholder state).
-**Latest test-only commit:** `e5111fc` (fixture-backed 100/500/1,000-document cover benchmark; the latest code+test commit is `96d0d79`).
+**Latest source commit:** `6f030a2a50918cca1301ce6fa6d7a8d708d77895` (malformed inventory schema markers rejected).
+**Latest separate test-only commit:** `e5111fc` (fixture-backed 100/500/1,000-document cover benchmark; the latest source+test commit is `6f030a2`).
 **Last source commit before the current hardening changes:** `bb9d8579db9ccf0d10b5843e1929c2e696565c59`
 **Hardening source commits:** `913fb8f` and `1cb06a1`.
 **Audit documentation:** committed on this feature branch; use `git log` for the final report commit SHA.
@@ -37,7 +37,7 @@
 
 ## Next session starting point
 
-At latest code-bearing HEAD `96d0d799eb834b9b13f860d23cd3d746df433b96`, the visible cover completion filter and placeholder-state locking are implemented and covered by `tests/modern_library_tests.cpp`; the targeted desktop test and Switch ELF/NRO plus artifact verifier passed. The fixture-backed benchmark and precise limits are in [`V092_COVER_BENCHMARK.md`](V092_COVER_BENCHMARK.md). Continue the larger G5 scanner/index/updater responsibility redesign and Ponytail audit, then close remaining relevant native gates without restarting completed broad chains unnecessarily. Physical acceptance remains unverified; use [`V092_DEVICE_ACCEPTANCE.md`](V092_DEVICE_ACCEPTANCE.md) as the device record. Keep the final decision `INCOMPLETE — BLOCKERS REMAIN` until all required gates have evidence.
+At latest source-bearing HEAD `6f030a2a50918cca1301ce6fa6d7a8d708d77895`, `loadLibraryInventory()` preserves markerless legacy cache reads and rejects every present marker other than `PAPERNX-LIBRARY-1`, including an empty marker. `PaperNX` and the focused `papernx_library_index_tests` passed at this source. The latest Switch artifact report remains from `96d0d79`; no Switch rebuild was run for `6f030a2`. Continue the larger G5 scanner/index/updater responsibility redesign and Ponytail audit, then close remaining relevant native gates without restarting completed broad chains unnecessarily. Physical acceptance remains unverified; use [`V092_DEVICE_ACCEPTANCE.md`](V092_DEVICE_ACCEPTANCE.md) as the device record. Keep the final decision `INCOMPLETE — BLOCKERS REMAIN` until all required gates have evidence.
 
 ## 2026-10-23 latest continuation checkpoint
 
@@ -315,3 +315,11 @@ The verified/pushed branch HEAD at the start of this note was `ed9e3b69c184de1b4
 - **Source commit:** `0fd94c7f6946c37a4afd47e39bbdd9e13e30d537` (`fix(library): reject stale metadata results`). Worker results carry the source book fingerprint; the UI drops metadata when the current inventory fingerprint differs.
 - **Verification:** desktop `PaperNX` and `papernx_modern_library_tests` build **PASS**, CTest **1/1 PASS** (15.13 sec). Regression covers failed metadata-open retry, stale result rejection after metadata revision change, and fresh result acceptance. Current-source Switch build/artifact verification **PASS**; AArch64 ELF, NRO 49,588,671 bytes, 118 CA certificates / 200,116 bytes, SHA-256 `c0dba28f71357541016216465479788f7af9be66e25c5f59248b0710cecf60db`.
 - **Limit / next:** scanner `Book.modified` is second-resolution; same-size changes that leave the filesystem timestamp unchanged remain indistinguishable. Full native CTest, ASan/UBSan, physical Switch and substantial scanner/index/updater/parser redesign remain open. No speedup or hardware pass is claimed. Continue from the current feature HEAD, preserve the user's untracked execution plan and CBR fixture, and keep the overall decision **INCOMPLETE — BLOCKERS REMAIN**.
+
+## 2026-10-24 — G5 malformed inventory marker guard
+
+- **Source commit:** `6f030a2a50918cca1301ce6fa6d7a8d708d77895` (`fix(library): reject malformed inventory schema markers`), on `feature/v0.9.2-complete-reader-enhancements`, based on `e51a898147deecc50dbdca66f974f6653e4bcfb9`.
+- `loadLibraryInventory()` now permits a markerless legacy snapshot but rejects any present schema record whose value is not exactly `PAPERNX-LIBRARY-1`, including an empty value. The cache remains disposable and isolated from the reading-progress file. `tests/library_index_tests.cpp` covers empty-marker rejection alongside existing legacy and future-version cases.
+- **Verification:** `docker compose run --rm desktop bash -lc 'cmake --build build-desktop --target PaperNX papernx_library_index_tests --parallel 4 && ctest --test-dir build-desktop --output-on-failure -R "^papernx_library_index_tests$"'` — build **PASS**, CTest **1/1 PASS** (2.21 sec). `git diff --check` passed before the source commit.
+- **Scope note:** Joy-Con `+` already calls the same `toggleQuickMenu()` and shares `quickMenu_` with the touch `+`; tests use SDL `SDL_CONTROLLERBUTTONDOWN`/`SDL_CONTROLLER_BUTTON_START` and verify cross-input toggle plus shortcut focus. No production change was needed for that clarified scope. Physical Joy-Con mapping/reconnect remains **UNVERIFIED**.
+- **Next:** continue the G5 scanner/index ownership audit and remaining source redesign only where behavior tests support it. Full native CTest, ASan/UBSan, this-source Switch build/artifact check, broader independent scanner/index/parser work and physical Switch acceptance remain open. User-owned untracked execution-plan and CBR fixture files remain untouched. Overall decision stays **INCOMPLETE — BLOCKERS REMAIN**.
