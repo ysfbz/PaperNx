@@ -489,3 +489,13 @@ The library-index file gained a PaperNX-specific single-open validation path: PO
 | `include/papernx/interface_theme.hpp` | Deleted | `be58dc293354a4e38e31eb9faa08284367845c53` | Palette was integrated into PaperNX theme tokens; deletion does not remove Refael Bar attribution. |
 
 The POSIX FIFO regression and existing inventory/scanner symlink cases passed in desktop CTest (**2/2**) and targeted ASan/UBSan (**2/2**); the Switch AArch64 ELF/NRO and RomFS artifact verifier passed at this source revision. These tests establish behavior, not independent authorship. The historical six-path byte identity remains limited to `a35aa7b0f51aee58f44d524616a2aa55477d670c`; attribution remains tied to code lineage, not current blob equality.
+
+## Recovery session 2026-10-24 (G4/G5/G6 code, UNVERIFIED)
+
+Files below were restructured **on top of** fork-derived code; none of this is a clean-room claim and a different blob or new type names do not change lineage.
+
+- `src/update_json.hpp` (Refael Avramashvili lineage): now layered as `JsonCursor` (syntax) / `ReleaseDecoder<Policy>` (schema) / `PaperNxAssetPolicy` (asset trust). Same limits and checks; still fork-derived/adapted.
+- `src/self_update.cpp` / `include/papernx/self_update.hpp` (Refael Avramashvili lineage): `Verifying` state, staged-candidate preservation, `LegacyMarkers` ownership. The fork's rename-swap `applyPending` was intentionally **not** adopted.
+- `include/papernx/library_index.hpp`, `src/library_index.cpp`, `src/library_scan.inc` (Refael Bar lineage): `ScanRequest`/`ScanStatus`/`InventoryRepository`/`scanLibrary` split and generation check. Still fork-derived/adapted.
+- New PaperNX-authored header `include/papernx/cover_pipeline.hpp` (`MetadataLedger`, `CoverTelemetry`); written for this repo, no fork content.
+- Refael Bar / Refael Avramashvili credits and AGPL-3.0 notices are unchanged.
