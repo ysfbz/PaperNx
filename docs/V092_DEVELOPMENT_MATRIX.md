@@ -350,6 +350,8 @@ The default disk cover cache is now 48 MiB, selected from a same-run 32/48 MiB h
 
 The cover repository and synthetic performance tests also rebuilt with ASan/UBSan and passed **2/2** CTest in **11.99 sec**.
 
+`papernx_modern_library_tests` rebuilt and passed **1/1** (13.83 sec), covering visible cover upload priority and stale queue cleanup in the app. It supplies no scroll latency or FPS evidence.
+
 With repeated EPUB/PDF/CBZ/CBR fixture contents, the 500-path sequential revisit changed from 136 hits / 364 reopens at 32 MiB to 500 hits / 0 reopens at 48 MiB; measured pass was 1,973 ms vs 411 ms in this run. For 1,000 paths, 48 MiB retained 512 entries / 43,654,912 bytes; the full same-order pass still had 0 hits / 1,000 reopens, while the cache-only synthetic test had 512 hits / 488 misses. These are host fixture workload results, not a general speedup or Switch SD/viewport measurement. Full CTest remains **NOT RUN**; current-source Switch ELF/NRO and RomFS verification passed with SHA-256 `ddf77b04cdd23c24f89b9c73ae0951d0d20a713209c26905a8c1c3cae56533ef` and 118 embedded CA certificates. `COVER-01` remains partial pending device/interactive evidence.
 
 ## G5 stale metadata result guard — `0fd94c7`

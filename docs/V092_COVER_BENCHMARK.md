@@ -75,3 +75,5 @@ The current-source `papernx_cover_performance_tests` synthetic pass separately r
 At `d7f3fd3`, `PaperNX` rebuilt and `papernx_cover_tests`, `papernx_cover_performance_tests`, and `papernx_cover_document_benchmark` passed **3/3** CTest in **48.32 sec**. The current-source Switch AArch64 ELF/NRO and RomFS verifier also passed; NRO SHA-256 `ddf77b04cdd23c24f89b9c73ae0951d0d20a713209c26905a8c1c3cae56533ef`, CA bundle 118 certificates / 200,116 bytes. Full native suite, UI frame timing and physical SD measurement were not run; `COVER-01` remains partial.
 
 The focused ASan/UBSan build of `papernx_cover_tests` and `papernx_cover_performance_tests` passed **2/2** (11.99 sec). This covers repository safety and synthetic eviction; it does not instrument the full application or Switch runtime.
+
+The app-level `papernx_modern_library_tests` rebuilt and passed **1/1** (13.83 sec) at the same source revision. It checks visible cover upload priority and stale queue cleanup after results arrive. It does not measure UI queue latency, scroll fill, FPS or Switch SD.
