@@ -115,7 +115,10 @@ def run_tests():
         nro_file.write_bytes(valid_nro)
 
         dist_dir = tmppath / "dist"
-        archive, digest = package(nro_file, dist_dir, version="v0.1.0-test", repo_root=Path.cwd())
+        staged_licenses = tmppath / "staged-licenses"
+        staged_licenses.mkdir()
+        (staged_licenses / "example-notice.txt").write_text("license test notice", encoding="utf-8")
+        archive, digest = package(nro_file, dist_dir, version="v0.1.0-test", repo_root=Path.cwd(), licenses_root=staged_licenses)
         
         assert archive.is_file()
         assert (dist_dir / f"{archive.name}.sha256").is_file()
@@ -132,7 +135,13 @@ def run_tests():
         assert manifest["verified_format"] == "NRO0"
         assert manifest["hardware_verified"] is False
         assert "switch/PaperNX/PaperNX.nro" in manifest["contents"]
-        assert (dist_dir / f"PaperNX-licenses-v0.1.0-test.zip").is_file()
+        license_archive = dist_dir / "PaperNX-licenses-v0.1.0-test.zip"
+        assert license_archive.is_file()
+        assert (dist_dir / "PaperNX.nro.sha256").is_file()
+        with ZipFile(license_archive) as lic_zip:
+            assert lic_zip.read("docs/LICENSES.md") == (Path.cwd() / "docs/LICENSES.md").read_bytes()
+            assert lic_zip.read("docs/SOURCE_ATTRIBUTION.md") == (Path.cwd() / "docs/SOURCE_ATTRIBUTION.md").read_bytes()
+            assert lic_zip.read("third-party-licenses/example-notice.txt") == b"license test notice"
 
         # Unpack archive and verify SD structure
         extract_dir = tmppath / "extracted_sd"

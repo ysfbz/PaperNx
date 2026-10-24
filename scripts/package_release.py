@@ -62,7 +62,7 @@ def validate_nro(image: bytes) -> dict:
         "segments": segments
     }
 
-def package(nro_path: Path, destination: Path, version: str, repo_root: Path = None, build_receipt: Path = None) -> tuple[Path, str]:
+def package(nro_path: Path, destination: Path, version: str, repo_root: Path = None, build_receipt: Path = None, licenses_root: Path = None) -> tuple[Path, str]:
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", version):
         raise ValueError("Invalid release version")
     if not nro_path.is_file():
@@ -126,7 +126,12 @@ def package(nro_path: Path, destination: Path, version: str, repo_root: Path = N
         license_file = repo_root / "LICENSE"
         if license_file.is_file():
             write_entry(lz, "LICENSE", license_file.read_bytes())
-        notices = repo_root / "third-party-licenses"
+        for relative in (Path("docs/LICENSES.md"), Path("docs/SOURCE_ATTRIBUTION.md")):
+            notice = repo_root / relative
+            if not notice.is_file():
+                raise FileNotFoundError(f"Required project attribution is missing: {notice}")
+            write_entry(lz, relative.as_posix(), notice.read_bytes())
+        notices = Path(licenses_root) if licenses_root is not None else repo_root / "third-party-licenses"
         if notices.is_dir():
             for notice in sorted(notices.rglob("*")):
                 if notice.is_file():
@@ -180,14 +185,15 @@ def package(nro_path: Path, destination: Path, version: str, repo_root: Path = N
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Package PaperNX release ZIP for Nintendo Switch")
     parser.add_argument("nro", type=Path, help="Path to compiled PaperNX.nro")
-    parser.add_argument("--destination", "--dist", type=Path, default=Path("dist/v0.9.1"), help="Output directory")
-    parser.add_argument("--version", default="v0.9.1", help="Release version tag")
+    parser.add_argument("--destination", "--dist", type=Path, default=Path("dist/v0.9.2"), help="Output directory")
+    parser.add_argument("--version", default="v0.9.2", help="Release version tag")
     parser.add_argument("--build-receipt", type=Path, help="Validate pre/post-build source and NRO hash against this receipt")
     parser.add_argument("--repo-root", type=Path, default=Path("."), help="Path to repository root")
+    parser.add_argument("--licenses-root", type=Path, help="Staged third-party notices directory")
 
     args = parser.parse_args()
     try:
-        archive, sha = package(args.nro, args.destination, args.version, args.repo_root, args.build_receipt)
+        archive, sha = package(args.nro, args.destination, args.version, args.repo_root, args.build_receipt, args.licenses_root)
         print(f"[OK] Release package created: {archive}")
         print(f"[OK] SHA256: {sha}")
     except Exception as ex:

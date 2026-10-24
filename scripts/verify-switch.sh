@@ -8,8 +8,9 @@ export PATH="${DEVKITPRO}/portlibs/switch/bin:${PATH}"
 BUILD_DIR="${PAPERNX_MUPDF_BUILD_ROOT:-build-mupdf-switch}" \
   bash scripts/build-mupdf-switch.sh "${PAPERNX_MUPDF_PREFIX:-/work/prefix-mupdf-switch}"
 export MUPDF_PREFIX="${PAPERNX_MUPDF_PREFIX:-/work/prefix-mupdf-switch}"
-version="${PAPERNX_RELEASE_VERSION:-v0.9.1}"
+version="${PAPERNX_RELEASE_VERSION:-v0.9.2}"
 release_dir="${PAPERNX_RELEASE_DIST:-dist/${version}}"
+licenses_root="${PAPERNX_LICENSES_ROOT:-third-party-licenses}"
 receipt="$verify_root/switch-build-receipt.json"
 target="$build_root/PaperNX"
 objects_root="${build_root//\//-}-objects"
@@ -23,13 +24,19 @@ if [[ "${PAPERNX_BUILD_ONLY:-0}" == "1" ]]; then
   echo "Build-only verification complete; release packaging was not requested."
   exit 0
 fi
-mkdir -p third-party-licenses
-cp -r "$MUPDF_PREFIX/licenses/." third-party-licenses/
-mkdir -p third-party-licenses/Switch-portlibs
-cp -r "${DEVKITPRO}/portlibs/switch/licenses/." third-party-licenses/Switch-portlibs/
-mkdir -p third-party-licenses/SDK-notices
-cp scripts/license-notices/* third-party-licenses/SDK-notices/
-mkdir -p third-party-licenses/unarr
-cp third_party/unarr/COPYING third_party/unarr/COPYING.GPLv3 third_party/unarr/AUTHORS third_party/unarr/SOURCE.md third-party-licenses/unarr/
-python3 scripts/package_release.py "$target.nro" --destination "$release_dir" --version "$version" --build-receipt "$receipt"
-python3 scripts/verify_distribution.py --dist "$release_dir" --version "$version"
+mkdir -p "$licenses_root"
+cp -r "$MUPDF_PREFIX/licenses/." "$licenses_root/"
+mkdir -p "$licenses_root/Switch-portlibs"
+cp -r "${DEVKITPRO}/portlibs/switch/licenses/." "$licenses_root/Switch-portlibs/"
+mkdir -p "$licenses_root/SDK-notices"
+cp scripts/license-notices/* "$licenses_root/SDK-notices/"
+mkdir -p "$licenses_root/unarr"
+cp third_party/unarr/COPYING third_party/unarr/COPYING.GPLv3 third_party/unarr/AUTHORS third_party/unarr/SOURCE.md "$licenses_root/unarr/"
+cat > "$licenses_root/SOURCE.txt" <<EOF
+PaperNX source for this release: https://github.com/ysfbz/PaperNx/tree/$version
+Project license: GNU AGPL-3.0; see LICENSE and docs/LICENSES.md in this archive.
+The source tag contains the corresponding application source and build instructions.
+Third-party notices below retain their individual license terms and attributions.
+EOF
+python3 scripts/package_release.py "$target.nro" --destination "$release_dir" --version "$version" --build-receipt "$receipt" --licenses-root "$licenses_root"
+python3 scripts/verify_distribution.py --dist "$release_dir" --version "$version" --licenses-root "$licenses_root" --nro "$target.nro" --elf "$target.elf" --evidence "$verify_root/package-integrity.json"
