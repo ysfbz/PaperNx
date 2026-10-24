@@ -2321,7 +2321,12 @@ private:
     }
     float segmentHeight(int page) {
         float w=0,h=0;
-        if(!readerPageSize(page,&w,&h))return 1.f;
+        if(!readerPageSize(page,&w,&h)) {
+            // Unknown CBR/CBZ geometry must never be treated as a one-pixel
+            // segment: the scroll loop could skip multiple unread pages.
+            if(comic()) {int vw,vh;getWindowSize(vw,vh);return float(comicViewportHeight(vh));}
+            return 1.f;
+        }
         if(comic()) {int width,height;getWindowSize(width,height);h*=std::max(1,width-currentMargin_*2)/std::max(1.f,w);}
         return std::max(1.f,h);
     }
