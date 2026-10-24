@@ -252,3 +252,10 @@ The verified/pushed branch HEAD at the start of this note was `ed9e3b69c184de1b4
 - Parser remains fork-derived/adapted; Refael Avramashvili and AGPL-3.0 provenance remain recorded. No Switch build, full native suite, sanitizer, physical Switch, or independent parser reimplementation was done here.
 - The six historical provenance paths were individually rechecked against both `a35aa7b` and the pinned fork: all six matched at the historical import; at current source `cb5eb7a`, five extant paths differ and `include/papernx/interface_theme.hpp` is deleted. Preserve the distinct Refael Bar and Refael Avramashvili attribution documented in the source audit.
 - **Next:** audit and reduce scanner/index responsibility duplication only where a behavior-preserving design and tests justify it; then continue Ponytail, remaining native/sanitizer/Switch gates. Do not describe the parser as clean-room. Overall status remains **INCOMPLETE — BLOCKERS REMAIN**.
+
+## 2026-10-24 — Current feature Switch compile and artifact check
+
+- **Source revision:** `4ba0aa039ac415dd8f736664d3766509039e5e12`; this commit changes provenance/report documentation only, so compiled implementation is the `cb5eb7a` source tree.
+- **Command:** `docker compose run --rm switch bash -lc 'export MUPDF_PREFIX=/work/prefix-mupdf-switch; make all -j4 && python3 scripts/verify_artifacts.py --version 0.9.1'` — build and artifact verifier **PASS**. `PaperNX.elf` linked as AArch64, NRO produced, and CA certificate source matched the embedded RomFS file (118 certs, 200,116 bytes). NRO size 49,588,671 bytes; SHA-256 `fe0ab1c12c9959527072673f96d96836fb004d2ed22daf2a4fc56943f9fecdb7`.
+- No release pipeline, version bump, tag, PR or device run occurred. The updater’s TLS behavior, Joy-Con mapping, brightness restore, SD interruption, full native CTest and sanitizers remain **UNVERIFIED / NOT RUN**.
+- **Next:** continue scanner/index responsibility and current-source Ponytail audit, then remaining bounded host verification. Keep the overall decision **INCOMPLETE — BLOCKERS REMAIN**.

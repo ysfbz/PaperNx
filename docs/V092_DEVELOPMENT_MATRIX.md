@@ -302,4 +302,8 @@ The library-index and modern-library targets built; CTest passed **2/2** in **15
 
 `src/update_json.hpp` now discards unrelated assets and retains at most one entry for each required updater asset. A duplicate target asset invalidates its URL. The JSON byte/node limits and strict metadata, repository origin, SHA-256 and NRO checks remain in place. This is a memory-bound hardening change to fork-derived/adapted parser code; attribution remains.
 
-Desktop `PaperNX` and `papernx_self_update_tests` built. The updater unit and local HTTPS integration tests passed **2/2** in **1.67 seconds**. A 10,000-unrelated-asset parser assertion confirms only the two install assets are retained. Switch/full CTest/sanitizers/hardware were not run at this source HEAD. Overall status remains **INCOMPLETE — BLOCKERS REMAIN**.
+Desktop `PaperNX` and `papernx_self_update_tests` built. The updater unit and local HTTPS integration tests passed **2/2** in **1.67 seconds**. A 10,000-unrelated-asset parser assertion confirms only the two install assets are retained. At that checkpoint Switch/full CTest/sanitizers/hardware had not run; the current Switch result is recorded below.
+
+## Current Switch source/link and RomFS check — `4ba0aa0`
+
+Command `docker compose run --rm switch bash -lc 'export MUPDF_PREFIX=/work/prefix-mupdf-switch; make all -j4 && python3 scripts/verify_artifacts.py --version 0.9.1'` completed successfully at source revision `4ba0aa039ac415dd8f736664d3766509039e5e12` (documentation-only commit over `cb5eb7a` source). It linked the AArch64 ELF and produced the NRO; successful linking includes the updater’s libcurl references. RomFS verification found the exact 118-certificate, 200,116-byte CA file. NRO size: 49,588,671 bytes; SHA-256 `fe0ab1c12c9959527072673f96d96836fb004d2ed22daf2a4fc56943f9fecdb7`. This is not release packaging or hardware evidence. Physical Switch and full native/sanitizer gates remain open.
