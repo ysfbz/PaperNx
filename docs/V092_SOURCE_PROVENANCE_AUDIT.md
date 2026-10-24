@@ -359,3 +359,11 @@ At `ebf6555`, the other five paths retain the blobs in the preceding six-file sn
 | `include/papernx/library_index.hpp` | `7ddb5b8a91fcc5d2306c9e4d766d74288e06b580` | `8a0ac82707cf5b402d0cbcebd790d751758b0003` | `cancel()` now ignores cancellation after a completed scan has published `ready_`, preventing a ready result from being discarded before `take()`. This is a PaperNX-specific lifecycle adaptation in the historically fork-derived API, not an independent implementation. Preserve Refael Bar credit and AGPL-3.0 provenance. |
 
 The original six paths remain byte-identical to the pinned fork only at historical feature HEAD `a35aa7b0f51aee58f44d524616a2aa55477d670c`. At `a9a014f`, the five extant paths have different blobs and `include/papernx/interface_theme.hpp` remains deleted. The cancellation test in `tests/library_index_tests.cpp` verifies behavior, not authorship. Existing Refael Bar and Refael Avramashvili attribution remains appropriate.
+
+## Current provenance snapshot — scan result merge allocation `761f9b910045d7485a6904d6b96b6bc9d7340257`
+
+| Path | Current feature blob | Pinned fork blob | Finding |
+|---|---|---|---|
+| `src/library_scan.inc` | `c6c950712c7b0d34431c8f3994bc4f960e136950` | `c8087dc4defa88af950bed947e6d50962bc7799f` | The SDL-thread result merge now stores pointers to existing `Book` records in its temporary lookup instead of copying complete records. This is a PaperNX-specific allocation/lifetime adjustment in the fork-derived application integration; it does not establish independent authorship. Preserve Refael Bar credit and AGPL-3.0 provenance. |
+
+The original six-path byte-identity statement remains historical at `a35aa7b0f51aee58f44d524616a2aa55477d670c`; no extant path is byte-identical at `761f9b9`, and the interface-theme header remains deleted. The scanner tests verify behavior and data preservation, not source independence.

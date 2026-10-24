@@ -274,3 +274,10 @@ The verified/pushed branch HEAD at the start of this note was `ed9e3b69c184de1b4
 - **Verification:** desktop `papernx_library_index_tests` build **PASS**; targeted CTest **1/1 PASS** in **2.34 sec**. Regression covers cancel after completion but before `take()`.
 - **Provenance:** `include/papernx/library_index.hpp` blob `7ddb5b8a91fcc5d2306c9e4d766d74288e06b580` is still fork-derived/adapted; Refael Bar / AGPL-3.0 attribution remains. No clean-room claim.
 - **Next:** continue the substantive G5 scanner/index responsibility review and Ponytail audit. The user-owned untracked execution plan and generated 43,484,977-byte CBR fixture remain unmodified and unstaged. Full current-source native CTest, sanitizers, current-source Switch build, 100/500/1000 cover benchmark and physical Switch remain open. Overall decision **INCOMPLETE — BLOCKERS REMAIN**.
+
+## 2026-10-24 — G5 scanner snapshot merge allocation
+
+- **Source commit / HEAD:** `761f9b910045d7485a6904d6b96b6bc9d7340257` (`perf(library): avoid copying scan snapshot records`). `processLibraryScan()` uses a temporary `id -> const Book*` map instead of deep-copying all existing `Book` values; the source vector is not mutated until reconciliation finishes.
+- **Verification:** desktop `PaperNX`, `papernx_modern_library_tests` and `papernx_library_index_tests` built; focused CTest **2/2 PASS** in **14.08 sec**. `git diff --check` passed.
+- **Limits:** allocation reduction is structural; no numeric memory or latency measurement was made. The source remains fork-derived/adapted. Full native CTest, sanitizer, Switch rebuild at this source, 100/500/1000 end-to-end cover benchmark and hardware acceptance remain open.
+- **Next:** continue G5 source responsibility review and updater recovery testing. Keep the execution plan and generated CBR fixture untracked. No release, merge, tag, PR or Actions run; overall **INCOMPLETE — BLOCKERS REMAIN**.

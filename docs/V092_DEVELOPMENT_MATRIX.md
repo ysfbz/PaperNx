@@ -317,3 +317,9 @@ Command `docker compose run --rm switch bash -lc 'export MUPDF_PREFIX=/work/pref
 `LibraryScanner::pending()` remains true until its completed worker is joined by `take()`. `cancel()` now leaves an already published `ready_` result intact, while cancellation during active traversal/persistence remains supported. This avoids discarding a finished scan when a rescan request arrives before the UI consumes it.
 
 The targeted desktop build of `papernx_library_index_tests` passed; CTest passed **1/1** in **2.34 seconds**. The test waits for `ready_`, calls `cancel()`, then verifies the complete result is still returned. Current header blob `7ddb5b8a91fcc5d2306c9e4d766d74288e06b580` remains fork-derived/adapted; no independent-origin claim is made. Broader G5 redesign, full current-source CTest, sanitizers, Switch rebuild and hardware checks remain open.
+
+## G5 scan result merge allocation — `761f9b9`
+
+`src/library_scan.inc::processLibraryScan()` now indexes existing `Book` objects by pointer for the duration of result reconciliation rather than copying every record (including path/title/author strings) into a temporary map. This retains the existing ID lookup and label precedence while reducing transient allocations; no real-device memory/time/FPS improvement is claimed.
+
+`PaperNX`, `papernx_modern_library_tests` and `papernx_library_index_tests` built; focused CTest passed **2/2** in **14.08 seconds**. The module remains fork-derived/adapted and Refael Bar / AGPL-3.0 provenance remains in force. Full suite, sanitizer, current-source Switch and 100/500/1000 cover measurements remain open.
