@@ -545,3 +545,11 @@ Bu tek koşu yazılım renderer’ı host ölçümüdür; hızlanma iddiası de�
 - **Açık:** G5’in kapsamlı scanner/index mimari yeniden tasarımı; full current-HEAD CTest, sanitizer, Switch build/artifact ve fiziksel Switch doğrulaması. Bu HEAD’de Switch build çalıştırılmadı.
 
 **Karar: INCOMPLETE — BLOCKERS REMAIN.**
+
+## 2026-10-24 — Updater release-asset memory bound
+
+- **Dal / kaynak commit:** `feature/v0.9.2-complete-reader-enhancements` / `cb5eb7ac51d6681eab43928f6a7687140656d6cf` (`fix(updater): bound retained release assets`). Başlangıç uzak HEAD’i `98213dacf80e365e0a603a52c3ddf57e7cc6dd3b` idi; bu çalışma dalı fast-forward durumunda, reset veya geçmiş değişikliği yapılmadı.
+- `src/update_json.hpp` release başına yalnızca `PaperNX.nro` ve `PaperNX.nro.sha256` kayıtlarını saklıyor. Diğer asset metadata’sı ayrıştırılıp bırakılıyor; aynı hedef asset’in tekrarı installable URL’yi geçersiz kılıyor. Boyut/düğüm sınırları, TLS, kaynak URL, SHA-256 ve NRO kimliği doğrulamaları değişmedi.
+- **Test:** desktop `PaperNX` ve `papernx_self_update_tests` build PASS. `papernx_self_update_tests` ve `papernx_self_update_network_tests` CTest **2/2 PASS**, toplam **1,67 sn**. 10.000 ilgisiz asset içeren parser fixture’ı yalnızca iki hedef kaydın tutulduğunu ve geçerli paketin seçildiğini doğruluyor; duplicate NRO install edilemiyor.
+- **Provenance:** parser fork-derived/adapted kalır; Refael Avramashvili / AGPL-3.0 atfı korunur. Bu değişiklik bağımsız kaynak iddiası değildir. Güncel blob ve bulgu [`docs/V092_SOURCE_PROVENANCE_AUDIT.md`](docs/V092_SOURCE_PROVENANCE_AUDIT.md) içinde.
+- **Kapsam dışı / açık:** Switch build ve donanım, full native CTest, ASan/UBSan, parser’ın clean-room yeniden tasarımı ve geniş library scanner/index mimari düzeni bu checkpoint’te yapılmadı. Kullanıcıya ait iki untracked dosya stage edilmedi. Genel karar **INCOMPLETE — BLOCKERS REMAIN**; merge/release/tag/PR/Actions yapılmadı.

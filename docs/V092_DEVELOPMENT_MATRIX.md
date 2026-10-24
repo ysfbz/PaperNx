@@ -297,3 +297,9 @@ Desktop `PaperNX` and updater test targets built; `papernx_self_update_tests` pl
 `src/library_index.cpp` writes the explicit `PAPERNX-LIBRARY-1` marker through the existing dedicated `ProgressStore` transport. It continues reading markerless legacy inventory snapshots; an unknown marked schema is rejected as a disposable cache miss. No parallel inventory codec was added, and the reading-progress file is never used as the cache.
 
 The library-index and modern-library targets built; CTest passed **2/2** in **15.16 seconds**. Tests cover marker persistence, legacy read, unsupported-schema rejection, restoration and progress isolation. The worker remains fork-derived/adapted; no independent-origin claim is made. Switch/full-suite/sanitizer checks were not run at this source HEAD; overall status remains **INCOMPLETE — BLOCKERS REMAIN**.
+
+## G5 updater asset retention bound — `cb5eb7a`
+
+`src/update_json.hpp` now discards unrelated assets and retains at most one entry for each required updater asset. A duplicate target asset invalidates its URL. The JSON byte/node limits and strict metadata, repository origin, SHA-256 and NRO checks remain in place. This is a memory-bound hardening change to fork-derived/adapted parser code; attribution remains.
+
+Desktop `PaperNX` and `papernx_self_update_tests` built. The updater unit and local HTTPS integration tests passed **2/2** in **1.67 seconds**. A 10,000-unrelated-asset parser assertion confirms only the two install assets are retained. Switch/full CTest/sanitizers/hardware were not run at this source HEAD. Overall status remains **INCOMPLETE — BLOCKERS REMAIN**.

@@ -243,3 +243,11 @@ The verified/pushed branch HEAD at the start of this note was `ed9e3b69c184de1b4
 - `tests/library_index_tests.cpp` verifies new marker persistence, legacy markerless read, unknown-schema rejection, inventory restore, corruption recovery and separate reading progress. `papernx_library_index_tests` and `papernx_modern_library_tests` built and passed **2/2** in **15.16 seconds**.
 - `src/library_index.cpp` remains fork-derived/adapted despite this PaperNX-specific storage boundary. Refael Bar attribution and AGPL-3.0 notices remain. No Switch build, full CTest or sanitizer was run at this HEAD.
 - **Next:** continue the remaining scanner/index architecture redesign and source/Ponytail audit; overall status **INCOMPLETE — BLOCKERS REMAIN**.
+
+## 2026-10-24 — G5 updater asset retention bound
+
+- **Source commit:** `cb5eb7ac51d6681eab43928f6a7687140656d6cf` (`fix(updater): bound retained release assets`). The release parser retains only `PaperNX.nro` and `PaperNX.nro.sha256`; unrelated assets are discarded. Duplicate target assets remain fail-closed by clearing the first entry's URL.
+- **Call sites / data safety:** the only parser consumer is `selectUpdateRelease()` in `src/self_update.cpp`; it still requires exact repository asset URLs, checksum, NRO identity and version before staging. No user-data path changed.
+- **Verification:** `docker compose run --rm desktop bash -lc 'cmake --build build-desktop --target PaperNX papernx_self_update_tests --parallel 4 && ctest --test-dir build-desktop --output-on-failure -R "^papernx_self_update_tests$"'` — build PASS, CTest **1/1 PASS**. Follow-up unit + HTTPS integration CTest passed **2/2** in **1.67 seconds**. Regression covers 10,000 irrelevant assets, retention of exactly two, valid install selection and duplicate NRO rejection.
+- Parser remains fork-derived/adapted; Refael Avramashvili and AGPL-3.0 provenance remain recorded. No Switch build, full native suite, sanitizer, physical Switch, or independent parser reimplementation was done here.
+- **Next:** audit and reduce scanner/index responsibility duplication only where a behavior-preserving design and tests justify it; then continue Ponytail, remaining native/sanitizer/Switch gates. Do not describe the parser as clean-room. Overall status remains **INCOMPLETE — BLOCKERS REMAIN**.

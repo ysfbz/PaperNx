@@ -4,6 +4,8 @@ The updater checks releases only from `ysfbz/PaperNx` and accepts only the exact
 
 The configured GitHub releases endpoint requests `per_page=30`; the bounded parser accepts up to 30 release objects and rejects larger responses. `draft` and `prerelease`, when present, must be JSON booleans. A schema/type violation fails the response closed rather than treating a mistyped draft flag as `false`.
 
+For each release, the parser retains at most the exact `PaperNX.nro` and `PaperNX.nro.sha256` assets used by installation. Other release assets are parsed for validity and discarded; a duplicate install asset is made unusable. This bounds retained asset metadata without weakening response-size, JSON-node, origin, digest or NRO validation.
+
 Automatic launch checks default to off and are stored in app settings. A manual check remains available. When enabled, the launch check starts only after the first rendered frame and performs network work on the updater worker. Release notes and the NRO are shown before download; the user must choose Update. Once verified, the UI shows the staged file path and manual replacement steps. There is no in-app restart/install action. Download cancellation removes the partial `.part` file. The updater stages only files adjacent to `PaperNX.nro`; progress, catalog, settings, books and Reading Journal are not written by the update flow.
 
 ## CA trust bundle
