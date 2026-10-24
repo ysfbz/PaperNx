@@ -1,7 +1,7 @@
 # PaperNX v0.9.2 comic worker measurements
 
-**Source:** `1daedb63246384a73afb979978230f75716c2165` (G10 scan fix; no comic source changed after it).  
-**Measured branch HEAD:** `b4e7e2794bf7c29be8b4dd9cfc6436cf98323bbe`.  
+**Source:** `1daedb63246384a73afb979978230f75716c2165` (G10 scan fix; no comic source changed after it).
+**Measured branch HEAD:** `b4e7e2794bf7c29be8b4dd9cfc6436cf98323bbe`.
 **Environment:** desktop Docker container, SDL software renderer. These are host observations, not Switch results.
 
 ## Large RAR5 reader path
