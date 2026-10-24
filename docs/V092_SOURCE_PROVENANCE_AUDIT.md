@@ -414,3 +414,18 @@ The original six-path byte-identity statement remains historical: it was true at
 | `include/papernx/interface_theme.hpp` | Deleted | `be58dc293354a4e38e31eb9faa08284367845c53` | Palette tokens were folded into PaperNX theme infrastructure; deletion does not remove Refael Bar / AGPL-3.0 provenance. |
 
 **Current wording:** “The six files matched the pinned fork byte-for-byte at historical feature HEAD `a35aa7b0f51aee58f44d524616a2aa55477d670c`. At current source HEAD `8636f648f03de617c9fc0bc04a60f3218efa089a`, five extant paths have different blobs and the interface-theme header is deleted. Their Git history and implementations remain fork-derived/adapted; preserve Refael Bar's scanner/index/theme attribution and Refael Avramashvili's updater/parser attribution alongside PaperNX authorship and AGPL-3.0 notices. Do not describe these implementations as independent based on edits or changed hashes.”
+
+## Current provenance snapshot — SemVer build metadata fix `0ecc2e3732c9ced80e95c09cf373fb549efa27d3`
+
+`src/self_update.cpp` changed to allow numeric build-metadata identifiers with leading zeroes while preserving SemVer restrictions for core/prerelease identifiers. This correctness fix does not change the module's fork-derived/adapted provenance. At current source HEAD `0ecc2e3`, five extant paths still differ from their pinned fork blobs; the interface-theme header remains deleted. The historical byte-identity claim is still limited to `a35aa7b`.
+
+| Path | Current feature blob at `0ecc2e3` | Pinned fork blob | Finding |
+|---|---|---|---|
+| `src/library_scan.inc` | `c6c950712c7b0d34431c8f3994bc4f960e136950` | `c8087dc4defa88af950bed947e6d50962bc7799f` | Fork-derived/adapted PaperNX scan integration; retain Refael Bar / AGPL-3.0 attribution. |
+| `src/library_index.cpp` | `e6335585607a0396791634c1e4491a8ed17aa959` | `e4b3e83e2ddadaa55913b56f7a0a0e31b3f5dd1a` | Fork-derived/adapted worker and inventory with PaperNX-specific boundaries; retain Refael Bar / AGPL-3.0 attribution. |
+| `include/papernx/library_index.hpp` | `7ddb5b8a91fcc5d2306c9e4d766d74288e06b580` | `8a0ac82707cf5b402d0cbcebd790d751758b0003` | Fork-derived/adapted scan API; retain Refael Bar / AGPL-3.0 attribution. |
+| `src/self_update.cpp` | `ec3f5b922e15029b291e85877cd54374b2dbade1` | `e7e5c52c1b4b2137d92d1c6902a011d1d3b71b6c` | Adapted verified-manual updater with PaperNX SemVer correctness fix and fork lineage; retain Refael Avramashvili / AGPL-3.0 attribution. |
+| `src/update_json.hpp` | `00fcf74acd987f29e1f2d35ec35778157f6d7d87` | `d4e3bb96dcb2d363e23d40a83775c02768fc5394` | Fork-derived/adapted release parser with bounded input, schema and UTF-8 validation; retain Refael Avramashvili / AGPL-3.0 attribution. |
+| `include/papernx/interface_theme.hpp` | Deleted | `be58dc293354a4e38e31eb9faa08284367845c53` | Palette tokens were folded into PaperNX theme infrastructure; deletion does not remove Refael Bar / AGPL-3.0 provenance. |
+
+**Current wording:** “The six files matched the pinned fork byte-for-byte at historical feature HEAD `a35aa7b0f51aee58f44d524616a2aa55477d670c`. At current source HEAD `0ecc2e3732c9ced80e95c09cf373fb549efa27d3`, five extant paths have different blobs and the interface-theme header is deleted. Their Git history and implementations remain fork-derived/adapted; preserve Refael Bar's scanner/index/theme attribution and Refael Avramashvili's updater/parser attribution alongside PaperNX authorship and AGPL-3.0 notices. Do not describe these implementations as independent based on edits or changed hashes.”

@@ -371,3 +371,9 @@ A test-only follow-up adds an incomplete multibyte UTF-8 sequence. The updater u
 A separate ASan/UBSan build compiled `papernx_library_index_tests` and the updater unit/network tests. Focused CTest passed **3/3** in **10.63 sec**. This is targeted coverage, not a sanitizer run of the full app/test suite.
 
 The current Switch command `docker compose run --rm switch bash -lc 'export MUPDF_PREFIX=/work/prefix-mupdf-switch; make all -j4 && python3 scripts/verify_artifacts.py --version 0.9.1'` passed. It linked AArch64 ELF, produced the NRO, and verified RomFS CA/fonts/icon. CA: 118 certificates / 200,116 bytes. NRO: 49,588,671 bytes; SHA-256 `d8799c45893dcf4329f6b479cc9e19c499e4c691eb902450bc22c46c0be6d66d`. Hardware remains **UNVERIFIED**. Full native CTest and device checks remain open; overall decision is **INCOMPLETE — BLOCKERS REMAIN**.
+
+## Updater SemVer build metadata — `0ecc2e3`
+
+The version parser now allows numeric identifiers with leading zeroes in `+build.metadata`, while still rejecting them in core and numeric prerelease identifiers. An assertion verifies `0.14.0+switch.001` is accepted as newer than `0.13.99`; existing invalid prerelease cases remain.
+
+Desktop updater unit/local HTTPS CTest passed **2/2** (2.50 sec); targeted ASan/UBSan updater unit/local HTTPS CTest passed **2/2** (4.17 sec). Current-source Switch AArch64 ELF/NRO and RomFS verifier passed: 118 CA certificates / 200,116 bytes, NRO 49,588,671 bytes, SHA-256 `8628c1b369400bb2939c3a6f23665165eb6bc228981ce4d72c5ffe5aabcd8215`. Hardware remains **UNVERIFIED**; full native tests remain open.
