@@ -520,16 +520,21 @@ bool SelfUpdater::busy() const {
 
 void SelfUpdater::publish(UpdateState state, const std::string &error) {
     std::lock_guard<std::mutex> lock(mutex_);
+    const bool operationActive=status_.state==UpdateState::Checking || status_.state==UpdateState::Downloading;
+    if(state==UpdateState::Error && operationActive && cancel_) {state=UpdateState::Cancelled;status_.error="Update cancelled";}
+    else status_.error=error;
     status_.state = state;
-    status_.error = error;
-    if (state == UpdateState::Downloading) status_.percent = 0;
+    if (state == UpdateState::Downloading || state == UpdateState::Cancelled) status_.percent = 0;
 }
 
 void SelfUpdater::reportError(std::string error) {
     publish(UpdateState::Error, error);
 }
 
-void SelfUpdater::cancel() { cancel_ = true; }
+void SelfUpdater::cancel() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if(status_.state==UpdateState::Checking || status_.state==UpdateState::Downloading) cancel_=true;
+}
 
 void SelfUpdater::stop() {
     cancel_ = true;
@@ -573,6 +578,10 @@ bool SelfUpdater::check() {
             return;
         }
         std::lock_guard<std::mutex> lock(mutex_);
+        if(cancel_) {
+            status_.release={};status_.state=UpdateState::Cancelled;status_.error="Update cancelled";status_.percent=0;
+            return;
+        }
         status_.release = std::move(release);
         status_.state = status_.release.version.empty() ? UpdateState::Current : UpdateState::Available;
         status_.error.clear();
@@ -617,6 +626,7 @@ bool SelfUpdater::download() {
                 return;
             }
         }
+        if(cancel_) {publish(UpdateState::Cancelled,"Update cancelled");return;}
 
         const auto part = executable_.string() + ".part";
         const auto pending = executable_.string() + ".new";
@@ -638,13 +648,16 @@ bool SelfUpdater::download() {
                 status_.percent = percent;
             }};
         bool ok = request(release.url, certificates_, transfer, error);
+        if(ok && cancel_) {ok=false;error="Update cancelled";}
         if (ok && !durable(file)) { ok = false; error = "Cannot save update to the SD card"; }
         if (std::fclose(file) != 0) { ok = false; error = "Cannot save update to the SD card"; }
         if (ok) ok = validateNro(part, release.sha256, release.bytes, release.version, error);
+        if(ok && cancel_) {ok=false;error="Update cancelled";}
         if (ok && std::rename(part.c_str(), pending.c_str()) != 0) {
             ok = false;
             error = "Cannot stage update on the SD card";
         }
+        if(ok && cancel_) {ok=false;error="Update cancelled";}
         if (ok) ok = writeAtomicText(ready, release.sha256 + "\n" + release.version + "\n" +
                                      std::to_string(release.bytes) + "\n", error);
         if (!ok) {
@@ -657,6 +670,11 @@ bool SelfUpdater::download() {
             return;
         }
         std::lock_guard<std::mutex> lock(mutex_);
+        if(cancel_) {
+            std::remove(part.c_str());std::remove(pending.c_str());std::remove(temporary.c_str());std::remove(ready.c_str());
+            status_.state=UpdateState::Cancelled;status_.error="Update cancelled";status_.percent=0;
+            return;
+        }
         status_.release = std::move(release);
         status_.percent = 100;
         status_.state = UpdateState::Ready;

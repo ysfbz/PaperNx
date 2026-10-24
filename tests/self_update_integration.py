@@ -90,6 +90,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     self.wfile.write(body[start:start + 128])
                     self.wfile.flush()
                     time.sleep(0.02)
+            elif scenario == "cancel-near-completion":
+                for start in range(0, len(body), 64 * 1024):
+                    self.wfile.write(body[start:start + 64 * 1024])
+                    self.wfile.flush()
+                    time.sleep(0.002)
             else:
                 self.wfile.write(body)
         except OSError:
@@ -120,12 +125,13 @@ def main():
         thread.start()
         base = f"https://localhost:{server.server_port}/"
         scenarios = ("current", "downgrade", "missing", "oversized", "success", "checksum-fallback",
-                     "corrupt", "badapp", "badversion", "truncated", "cancel", "write-error",
+                     "corrupt", "badapp", "badversion", "truncated", "cancel", "cancel-near-completion", "write-error",
                      "stale-part", "stale-part-error", "orphan-new", "resume-ready", "tampered", "missing-marker",
                      "malformed", "tls-reject", "http")
         try:
             for scenario in scenarios:
                 server.scenario = scenario
+                server.current_nro = make_nro() + (bytes(16 * 1024 * 1024) if scenario == "cancel-near-completion" else b"")
                 if scenario == "resume-ready":
                     executable = root / scenario / "custom folder" / "קורא.nro"
                     executable.parent.mkdir(parents=True)

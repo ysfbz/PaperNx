@@ -1,5 +1,6 @@
 #include "papernx/self_update.hpp"
 #include "../src/update_json.hpp"
+#include <atomic>
 #include <cassert>
 #include <chrono>
 #include <fstream>
@@ -114,10 +115,27 @@ static void network(int argc,char **argv){
     if(scenario=="write-error"){fs::create_directories(path.string()+".part");std::ofstream(path.string()+".part/sentinel")<<"keep";}
     assert(updater.download());assert(!updater.download());
     if(scenario=="cancel"){std::this_thread::sleep_for(std::chrono::milliseconds(70));updater.cancel();state=wait(updater);}
+    else if(scenario=="cancel-near-completion") {
+        std::atomic<bool> triggered{false};
+        std::thread canceller([&]{
+            const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(10);
+            while(std::chrono::steady_clock::now()<deadline) {
+                const auto current=updater.status();
+                if(current.state!=UpdateState::Downloading)return;
+                if(current.percent>=100){triggered=true;updater.cancel();return;}
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+        });
+        state=wait(updater);canceller.join();assert(triggered.load());
+    }
     else state=wait(updater);
     assert(read(path)==original); // No network outcome can overwrite the running app.
-    const bool failed=scenario=="corrupt"||scenario=="badapp"||scenario=="badversion"||scenario=="truncated"||scenario=="cancel"||scenario=="write-error";
+    const bool failed=scenario=="corrupt"||scenario=="badapp"||scenario=="badversion"||scenario=="truncated"||scenario=="cancel"||scenario=="cancel-near-completion"||scenario=="write-error";
     if(failed){assert((state.state==UpdateState::Error||state.state==UpdateState::Cancelled)&&!state.error.empty());
+        if(scenario=="cancel"||scenario=="cancel-near-completion") {
+            updater.reportError("Network services are unavailable");
+            const auto reported=updater.status();assert(reported.state==UpdateState::Error&&reported.error=="Network services are unavailable");
+        }
         if(scenario=="write-error")assert(fs::exists(path.string()+".part/sentinel"));else assert(!fs::exists(path.string()+".part"));
         assert(!fs::exists(path.string()+".new")&&!fs::exists(path.string()+".ready"));return;}
     if(state.state!=UpdateState::Ready)std::cerr<<"Update failed ("<<scenario<<"): "<<state.error<<'\n';
