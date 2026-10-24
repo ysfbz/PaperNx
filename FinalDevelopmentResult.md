@@ -388,3 +388,22 @@ Bu bölüm, ana v0.9.2 hardening görevinin devamıdır; release hazırlığı v
 - **Commitler:** kod `0923141c72d543c0c578da539337f5ec4ad6b1a4`; cihaz kabul planı/matrix/continuation docs `7eb4792f51b3f142f77782f6c68c0ec3b6542506`. Bu rapor eklentisi ayrı commit'te kaydedilecek.
 
 **Karar: INCOMPLETE — BLOCKERS REMAIN.** Gerçek Switch Joy-Con/backlight/SD kullanımı, end-to-end cover decode/latency, full current-HEAD suite/sanitizers ve kaynak modüllerin bağımsız yeniden tasarımı hâlâ doğrulanmış/tamamlanmış değil. Bu host/switch build sonuçları donanım PASS anlamına gelmez.
+
+## R. 2026-10-24 — G8 bounded scan snapshot safety
+
+- **Dal / kaynak commit:** `feature/v0.9.2-complete-reader-enhancements` / `c81145c9208455008db91bac56d9be4b920d8364` (`fix(library): reject truncated index scans`).
+- `scanRoots()` now distinguishes an exact final-root boundary from a truncated result: if entries remain in the current root or any later configured root remains when the aggregate cap is reached, `complete=false`. The async worker returns “Library scan incomplete”, so existing inventory and visible books remain untouched. `LibraryScanResult::complete` now means a full bounded snapshot; `cached` continues to report persistence separately.
+- Existing caps, root walker, cancellation callback, duplicate handling and `ProgressStore` inventory transport remain in place. This is a PaperNX safety extension to fork-derived library code; it is not an independent/clean-room rewrite. Latest source hashes and attribution are recorded in `docs/V092_SOURCE_PROVENANCE_AUDIT.md`.
+
+### Gerçek doğrulama
+
+| Kontrol | Sonuç | Kanıt |
+|---|---|---|
+| Desktop build | **PASS** | `docker compose run --rm desktop bash -lc 'cmake --build build-desktop --target PaperNX papernx_library_index_tests papernx_modern_library_tests papernx_core_tests papernx_localization_tests --parallel 4'`. |
+| Targeted CTest | **PASS, 4/4** | `papernx_library_index_tests`, `papernx_modern_library_tests`, `papernx_core_tests`, `papernx_localization_tests`; exact final root cap, single-root truncation, aggregate multi-root truncation and async library flows passed. |
+| Switch cross-build | **PASS** | `docker compose run --rm switch bash -lc 'export MUPDF_PREFIX=/work/prefix-mupdf-switch; make all -j4'`; current source linked ELF/NRO, CA and font RomFS checks ran. The separate artifact report verifier was not run. |
+| 10,001-item scan stress / full CTest / sanitizers / physical Switch | **NOT RUN / UNVERIFIED** | The boundary contract was tested at 300 entries; no 10,001 real filesystem-entry stress or hardware run occurred. |
+
+**Doküman commit'i:** `9d42fa2178498266eed2a02775cba0eb730c4d7e` (`docs(v0.9.2): update G8 provenance and matrix`); bu root rapor eklentisi ayrı commit'te kaydedilecek.
+
+**Karar: INCOMPLETE — BLOCKERS REMAIN.** The library scanner no longer persists a silently truncated index. Independent source redesign, full current-HEAD native/sanitizer gates, actual document performance and physical device acceptance remain open. No release, tag, PR, merge or GitHub Actions run was created.
