@@ -439,3 +439,11 @@ POSIX `regularBookFileSize()` now opens the path with `O_NOFOLLOW | O_NONBLOCK` 
 `PaperNX` and focused library/application tests built; desktop CTest passed **2/2**, and the same two tests passed under ASan/UBSan **2/2**. Switch AArch64 ELF/NRO linking passed using the committed source contents; post-commit artifact verification reports `426d0fb`, implementation SHA-256 `7ae2121bb177d89487a890f11082aa54dddeb3559c3c40d29062d970fb6ea4f5`, RomFS CA 118 certs / 200,116 bytes and NRO SHA-256 `aa677160cc8368ccbb443ed4b218f0cda82fa7634e94b56577c2401a3285d4a5`. Physical Switch remains **UNVERIFIED**.
 
 The `library_index.cpp` change remains fork-derived/adapted and keeps Refael Bar / AGPL-3.0 attribution. This does not resolve the independent scanner/index redesign. Full native CTest after `426d0fb`, whole-app sanitizer, Windows race behavior, Switch SD cost and physical device checks remain open. Overall status **INCOMPLETE — BLOCKERS REMAIN**.
+
+## Comic worker configuration identity — a486060
+
+ComicPages::configure() artık raster davranışını etkileyen Spec alanlarının tamamını karşılaştırıyor: identity, path, recolor, paper/ink ve textureLimit. Aynı kimlikle texture limit değişince eski belge kapanıyor ve yeni sınıra göre raster üretiliyor. Desktop CTest 1/1 PASS, hedefli ASan/UBSan CTest 1/1 PASS.
+
+37 sayfalı RAR5 fixture doğrudan çalıştırıldığında exit 0 verdi; SHA-256 EB9EF2C91FEF3AED592F4A14EBF4524BAC13548E94D1BB9C717ED2B8E79B0E5A öncesi/sonrası değişmedi. Worker 30 saniye idle süresince açık kaldı ve suspend/stop sonunda belge açma-kapama sayısı dengelendi. Software renderer üzerinde 30 curl frame 336 ms, 30 spread-pan frame 155 ms; ölçülen döngülerde UI rasterization 0. Kıyas tabanı olmadığından hızlanma iddiası yoktur.
+
+Aynı source revision a486060 ile Switch AArch64 ELF/NRO ve RomFS doğrulaması geçti: NRO 49.588.671 bayt, SHA-256 20b3e4d202bc15c3250c32dec2ad0ab300cfc7620fce2688a4ffa3f79f9050a0; CA 118 sertifika / 200.116 bayt. Fiziksel cihaz UNVERIFIED. Full native CTest ve tüm testleri kapsayan sanitizer açık; genel karar INCOMPLETE — BLOCKERS REMAIN.
