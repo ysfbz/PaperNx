@@ -154,7 +154,13 @@ class Parser {
             if (input_[pos_] == '{') {
                 Asset asset;
                 if (!assetObject(asset, depth + 1)) return false;
-                assets.push_back(std::move(asset));
+                if (asset.name == "PaperNX.nro" || asset.name == "PaperNX.nro.sha256") {
+                    auto existing = assets.end();
+                    for (auto it = assets.begin(); it != assets.end(); ++it)
+                        if (it->name == asset.name) { existing = it; break; }
+                    if (existing == assets.end()) assets.push_back(std::move(asset));
+                    else existing->url.clear();
+                }
             } else if (!skipValue(depth + 1)) return false;
             if (take(']')) return true;
         } while (take(','));

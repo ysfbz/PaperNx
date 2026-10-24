@@ -1,4 +1,5 @@
 #include "papernx/self_update.hpp"
+#include "../src/update_json.hpp"
 #include <cassert>
 #include <chrono>
 #include <fstream>
@@ -27,6 +28,14 @@ static void unit(){
     assert(selectUpdateRelease(json,"0.12.0-reader.4",source,r,error)&&r.installable());assert(r.notes==u8"שלום \"notes\" 😀");
     const auto spaced=std::string(" \n[ { \"tag_name\" : \"v0.12.0-reader.10\", \"name\" : \"Release\", \"draft\" : false, \"prerelease\" : false, \"body\" : null, \"extra\" : {\"nested\" : [true, null, 3]}, \"assets\" : [ { \"name\" : \"PaperNX.nro\", \"size\" : 20000, \"browser_download_url\" : \"")+asset+"PaperNX.nro\", \"digest\" : \"sha256:"+std::string(64,'a')+"\" } ] } ] \t";
     assert(selectUpdateRelease(spaced,"0.12.0-reader.4",source,r,error)&&r.installable()&&r.title=="Release"&&r.notes.empty()&&r.sha256==std::string(64,'a'));
+    std::string manyAssets="[{\"tag_name\":\"v0.12.0-reader.10\",\"assets\":[";
+    for(int i=0;i<10000;++i){if(i)manyAssets+=',';manyAssets+="{\"name\":\"page.png\"}";}
+    manyAssets+=",{\"name\":\"PaperNX.nro\",\"size\":20000,\"browser_download_url\":\""+asset+"PaperNX.nro\"},{\"name\":\"PaperNX.nro.sha256\",\"browser_download_url\":\""+asset+"PaperNX.nro.sha256\"}]}]";
+    std::vector<update_json::Release> parsed;
+    assert(update_json::Parser(manyAssets).parse(parsed)&&parsed.size()==1&&parsed[0].assets.size()==2);
+    assert(selectUpdateRelease(manyAssets,"0.12.0-reader.4",source,r,error)&&r.installable());
+    const auto duplicateAsset=std::string("[{\"tag_name\":\"v0.12.0-reader.10\",\"assets\":[{\"name\":\"PaperNX.nro\",\"size\":20000,\"browser_download_url\":\"")+asset+"PaperNX.nro\"},{\"name\":\"PaperNX.nro\",\"size\":20000,\"browser_download_url\":\""+asset+"PaperNX.nro\"}]}]";
+    assert(selectUpdateRelease(duplicateAsset,"0.12.0-reader.4",source,r,error)&&!r.installable());
     for(const auto &bad:{"{}","[{}]","[{\"tag_name\":\"1.0.0\",}]","[{\"tag_name\":\"1.0.0\",\"tag_name\":\"9.0.0\"}]","[", "[{\"body\":\"\\ud800\"}]"})assert(!selectUpdateRelease(bad,"0.12.0-reader.4",source,r,error));
     r.version="stale";r.title="stale";r.notes="stale";r.url="stale";r.checksumUrl="stale";r.sha256="stale";r.bytes=123;
     assert(!selectUpdateRelease("[{\"tag_name\":\"9.0.0\"},{}]","0.12.0-reader.4",source,r,error));
