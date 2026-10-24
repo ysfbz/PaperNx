@@ -21,8 +21,8 @@ struct AppPreferences {
     bool expandedViewport{true};
     bool bookLandscapeSpreads{false};
     bool comicLandscapeSpreads{false};
-    int interfaceStyle{0}; // dark, light, follow reading palette
-    int interfaceAccent{0}; // purple, blue, teal, green, orange, red, pink
+    int interfaceStyle{2}; // dark, light, follow reading palette (unified default)
+    int interfaceAccent{7}; // purple, blue, teal, green, orange, red, pink, or theme accent
     bool scanOnLaunch{true};
     bool automaticUpdateCheck{false};
     std::vector<std::string> libraryFolders;
