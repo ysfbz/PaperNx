@@ -13,7 +13,9 @@ struct UpdateRelease {
     std::uint64_t bytes{0};
     bool installable() const {return !url.empty() && (!sha256.empty() || !checksumUrl.empty());}
 };
-enum class UpdateState {Idle,Checking,Current,Available,Downloading,Ready,Cancelled,Error};
+// Ready means DOWNLOADED+VERIFIED+STAGED (PaperNX.nro.new); it never means installed.
+// Installation is manual, so no state here represents INSTALLED/BOOT_CONFIRMED.
+enum class UpdateState {Idle,Checking,Current,Available,Downloading,Verifying,Ready,Cancelled,Error};
 struct UpdateStatus {
     UpdateState state{UpdateState::Idle};
     UpdateRelease release;
@@ -63,7 +65,7 @@ private:
     std::thread worker_;
     void publish(UpdateState state,const std::string &error={});
     bool busy() const;
-    bool validatePending(std::string &error) const;
+    bool validatePending(UpdateRelease &staged,std::string &error) const;
     void configureSource(std::filesystem::path executable,std::string version,
                          std::string certificates,UpdateSource source);
 };

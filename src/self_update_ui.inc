@@ -57,7 +57,7 @@ void pollUpdates() {
 SDL_Rect updatePanel(int w,int h) const {const int width=std::min(660,w-48),height=std::min(540,h-112);return {(w-width)/2,(h-height)/2,width,height};}
 SDL_Rect updateButton(int index,int count,int w,int h) const {const auto r=updatePanel(w,h);const int step=(r.w-48)/count;return {r.x+24+index*step,r.y+r.h-80,step-8,56};}
 int updateButtonCount(const UpdateStatus &s) const {return updateBusy(s)||s.state==UpdateState::Cancelled?1:!updateNotes_&&s.state==UpdateState::Available&&s.release.installable()?3:1;}
-bool updateBusy(const UpdateStatus &s) const {return s.state==UpdateState::Checking||s.state==UpdateState::Downloading;}
+bool updateBusy(const UpdateStatus &s) const {return s.state==UpdateState::Checking||s.state==UpdateState::Downloading||s.state==UpdateState::Verifying;}
 void activateUpdate(int index) {
     const auto s=updater_->status();if(updateBusy(s)){updater_->cancel();return;}
     if(updateNotes_){updateNotes_=false;updateFocus_=1;std::fill(std::begin(updateAxes_),std::end(updateAxes_),0.f);dirty_=true;return;}
@@ -121,9 +121,13 @@ void renderUpdateDialog(int w,int h,const ThemePalette &pal) {
         else if(s.state==UpdateState::Downloading)text=ui::label("Downloading update...")+" "+std::to_string(s.percent)+"%";
         else if(s.state==UpdateState::Current)text=ui::label("You are on the latest version")+"\n\n"+APP_VERSION_FULL;
         else if(s.state==UpdateState::Error)text=ui::label("Could not update PaperNX")+"\n\n"+ui::label(s.error);
-        else if(s.state==UpdateState::Ready)text=ui::label("Update downloaded and verified as PaperNX.nro.new. Manual installation required; PaperNX has not been replaced.")+"\n\n"+
-            ui::label("Close PaperNX, then use a file manager to replace PaperNX.nro with PaperNX.nro.new.")+"\n\n"+
-            ui::label("Update folder")+": "+updater_->executable().parent_path().string();
+        else if(s.state==UpdateState::Verifying)text=ui::label("Verifying update...");
+        else if(s.state==UpdateState::Ready) {
+            // STAGED only: the running PaperNX.nro has not been replaced.
+            const auto folder=updater_->executable().parent_path().string();
+            text=ui::label("Downloaded and verified; NOT installed yet")+"\n\n"+ui::label("Version")+": "+s.release.version+"\n"+"SHA-256: "+s.release.sha256+"\n"+ui::label("Staged file")+": "+folder+"/PaperNX.nro.new\n\n"+
+                ui::label("Manual installation required: close PaperNX, back up PaperNX.nro, then replace it with PaperNX.nro.new using a file manager. Do not delete other files.");
+        }
         else if(s.state==UpdateState::Cancelled)text=ui::label("Update cancelled");
         else if(s.state==UpdateState::Available){
             text=ui::label("New version available")+"\n\n"+s.release.version+"\n"+s.release.title;
@@ -136,7 +140,7 @@ void renderUpdateDialog(int w,int h,const ThemePalette &pal) {
     const int count=updateButtonCount(s);
     for(int i=0;i<count;++i){
         const char *label=count==3?(i==0?"Later":i==1?"What's new":"Update"):
-            updateBusy(s)?s.state==UpdateState::Checking?"Cancel check":"Cancel download":
+            updateBusy(s)?s.state==UpdateState::Checking?"Cancel check":s.state==UpdateState::Verifying?"Cancel":"Cancel download":
             updateNotes_?"Back":"Close";
         auto r=updateButton(i,count,w,h);ui::button(renderer_,*typography_,r,ui::label(label),pal,i==std::clamp(updateFocus_,0,count-1));
     }

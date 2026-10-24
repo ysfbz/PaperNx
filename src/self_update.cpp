@@ -517,12 +517,12 @@ UpdateStatus SelfUpdater::status() const {
 
 bool SelfUpdater::busy() const {
     const auto state = status().state;
-    return state == UpdateState::Checking || state == UpdateState::Downloading;
+    return state == UpdateState::Checking || state == UpdateState::Downloading || state == UpdateState::Verifying;
 }
 
 void SelfUpdater::publish(UpdateState state, const std::string &error) {
     std::lock_guard<std::mutex> lock(mutex_);
-    const bool operationActive=status_.state==UpdateState::Checking || status_.state==UpdateState::Downloading;
+    const bool operationActive=status_.state==UpdateState::Checking || status_.state==UpdateState::Downloading || status_.state==UpdateState::Verifying;
     if(state==UpdateState::Error && operationActive && cancel_) {state=UpdateState::Cancelled;status_.error="Update cancelled";}
     else status_.error=error;
     status_.state = state;
@@ -535,7 +535,7 @@ void SelfUpdater::reportError(std::string error) {
 
 void SelfUpdater::cancel() {
     std::lock_guard<std::mutex> lock(mutex_);
-    if(status_.state==UpdateState::Checking || status_.state==UpdateState::Downloading) cancel_=true;
+    if(status_.state==UpdateState::Checking || status_.state==UpdateState::Downloading || status_.state==UpdateState::Verifying) cancel_=true;
 }
 
 void SelfUpdater::stop() {
@@ -560,8 +560,11 @@ bool SelfUpdater::check() {
     publish(UpdateState::Checking);
     worker_ = std::thread([this] {
         std::string error;
-        if (validatePending(error)) {
-            publish(UpdateState::Ready);
+        UpdateRelease staged;
+        if (validatePending(staged,error)) {
+            // Rediscovered after a restart: expose version/hash so the UI can describe the staged file.
+            std::lock_guard<std::mutex> lock(mutex_);
+            status_.release=std::move(staged);status_.percent=100;status_.error.clear();status_.state=UpdateState::Ready;
             return;
         }
         if (!removeUpdaterFile(executable_.string() + ".new") ||
@@ -636,9 +639,8 @@ bool SelfUpdater::download() {
         const auto pending = executable_.string() + ".new";
         const auto ready = executable_.string() + ".ready";
         const auto temporary = ready + ".tmp";
+        // A previous verified candidate (.new/.ready) stays intact until this one is fully validated.
         std::remove(part.c_str());
-        std::remove(pending.c_str());
-        std::remove(ready.c_str());
         std::remove(temporary.c_str());
 
         FILE *file = std::fopen(part.c_str(), "wb");
@@ -655,8 +657,12 @@ bool SelfUpdater::download() {
         if(ok && cancel_) {ok=false;error="Update cancelled";}
         if (ok && !durable(file)) { ok = false; error = "Cannot save update to the SD card"; }
         if (std::fclose(file) != 0) { ok = false; error = "Cannot save update to the SD card"; }
+        if (ok) publish(UpdateState::Verifying);
         if (ok) ok = validateNro(part, release.sha256, release.bytes, release.version, error);
         if(ok && cancel_) {ok=false;error="Update cancelled";}
+        // Invalidate the old record first, then replace the old payload with the verified one.
+        if (ok && (!removeUpdaterFile(ready) || !removeUpdaterFile(pending))) {ok=false;error="Cannot replace the previous staged update";}
+        const bool replaced = ok; // old candidate is gone from here on
         if (ok && std::rename(part.c_str(), pending.c_str()) != 0) {
             ok = false;
             error = "Cannot stage update on the SD card";
@@ -667,8 +673,9 @@ bool SelfUpdater::download() {
         if (!ok) {
             std::remove(part.c_str());
             std::remove(temporary.c_str());
-            std::remove(pending.c_str());
-            std::remove(ready.c_str());
+            // Failure before the swap leaves the earlier verified candidate untouched; after it,
+            // a half-written .new/.ready pair is never trusted (validatePending re-checks hash).
+            if (replaced) {std::remove(ready.c_str());std::remove(pending.c_str());}
             publish(cancel_ ? UpdateState::Cancelled : UpdateState::Error,
                     error.empty() ? "Update download failed" : error);
             return;
@@ -686,7 +693,7 @@ bool SelfUpdater::download() {
     return true;
 }
 
-bool SelfUpdater::validatePending(std::string &error) const {
+bool SelfUpdater::validatePending(UpdateRelease &staged,std::string &error) const {
     if (executable_.empty()) return false;
     std::ifstream ready(executable_.string() + ".ready");
     std::string hash, version, bytesText, extra;
@@ -694,7 +701,9 @@ bool SelfUpdater::validatePending(std::string &error) const {
     std::uint64_t bytes = 0;
     const auto parsed = std::from_chars(bytesText.data(), bytesText.data() + bytesText.size(), bytes);
     if (parsed.ec != std::errc{} || parsed.ptr != bytesText.data() + bytesText.size() || !updateVersionNewer(version, current_)) return false;
-    return validateNro(executable_.string() + ".new", hash, bytes, version, error);
+    if (!validateNro(executable_.string() + ".new", hash, bytes, version, error)) return false;
+    staged = UpdateRelease{};staged.version = version;staged.sha256 = hash;staged.bytes = bytes;
+    return true;
 }
 
 SelfUpdater::BootRecovery SelfUpdater::prepareBoot(std::string &error) {
