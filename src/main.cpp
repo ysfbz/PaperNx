@@ -1693,6 +1693,14 @@ private:
         progressStore_.put(b.id,opened);progressDirty_=true;
 
         screen_ = ScreenState::Reader;
+        if(comic()) {
+            // Warm the restored page before the first reader frame.
+            configureComicPages();
+            comicPages_.request(currentPage_,ComicPages::Priority::Visible);
+            if(currentPage_+1<pageCount_)
+                comicPages_.request(currentPage_+1,ComicPages::Priority::SpeculativeForward);
+            prefetchPage_=-1;
+        }
         toolbarVisible_ = false;
         readerToolbarFocusActive_=false;
         dirty_ = true;
@@ -1810,6 +1818,17 @@ private:
     }
 
     bool comic() const {return px_document_is_comic(doc_)!=0;}
+    // Decode/geometry discovery belongs to ComicPages' worker, not the UI.
+    bool readerPageSize(int page,float *width,float *height) {
+        if(!comic())return px_document_page_size(doc_,page,width,height);
+        if(px_document_known_comic_size(doc_,page,width,height))return true;
+        if(page>=0 && page<pageCount_) {
+            configureComicPages();
+            comicPages_.request(page,page==currentPage_?ComicPages::Priority::Visible:
+                                ComicPages::Priority::SpeculativeForward);
+        }
+        return false;
+    }
     bool comicReadingColors() const {return comic() && (extraStyle_.pdfColorMode&COMIC_READING_COLORS);}
     int readingDirection() const {
         if(doc_ && px_document_is_epub(doc_)) return epubReadingDirection_;
@@ -1818,12 +1837,12 @@ private:
     int fixedViewportWidth(int width) const {return std::max(1,width-(comic()?currentMargin_*2:80));}
     float documentScrollY(int page,float y) {
         if(!comic())return y;
-        float w=0,h=0;if(!px_document_page_size(doc_,page,&w,&h))return 0;
+        float w=0,h=0;if(!readerPageSize(page,&w,&h))return 0;
         return y*h/segmentHeight(page);
     }
     float screenScrollY(int page,float y) {
         if(!comic())return y;
-        float w=0,h=0;if(!px_document_page_size(doc_,page,&w,&h) || h<=0)return 0;
+        float w=0,h=0;if(!readerPageSize(page,&w,&h) || h<=0)return 0;
         return y*segmentHeight(page)/h;
     }
     bool syncComicScrollWidth() {
@@ -1842,7 +1861,7 @@ private:
             return;
         }
         float pw = 0, ph = 0;
-        if (!px_document_page_size(doc_, currentPage_, &pw, &ph)) return;
+        if (!readerPageSize( currentPage_, &pw, &ph)) return;
         int w, h; getWindowSize(w, h);
         const int vw = fixedViewportWidth(w), vh = comic()?comicViewportHeight(h):std::max(1,h-144);
         const float scale = std::min(vw / pw, vh / ph) * pdfZoom_;
@@ -1874,7 +1893,7 @@ private:
             const float fx=std::clamp(focalX*w-currentMargin_,0.f,vw),fy=std::clamp(focalY*h-72,0.f,vh);
             panX=(panX+fx-std::max(0.f,vw*(1-previous)/2))*ratio-fx+std::max(0.f,vw*(1-pdfZoom_)/2);
             panY=(panY+fy-std::max(0.f,vh*(1-previous)/2))*ratio-fy+std::max(0.f,vh*(1-pdfZoom_)/2);
-        } else if(comic() && px_document_page_size(doc_,currentPage_,&pw,&ph)) {
+        } else if(comic() && readerPageSize(currentPage_,&pw,&ph)) {
             const float vw=float(fixedViewportWidth(w)),vh=float(comicViewportHeight(h));
             const float fit=std::min(vw/pw,vh/ph),ratio=pdfZoom_/previous;
             const float fx=std::clamp(focalX*w-currentMargin_,0.f,vw),fy=std::clamp(focalY*h-72,0.f,vh);
@@ -1895,7 +1914,8 @@ private:
     void setPdfView(int mode) {
         syncComicScrollWidth();
         if (!doc_ || px_document_is_epub(doc_)) return;
-        float pw, ph; if (!px_document_page_size(doc_, currentPage_, &pw, &ph)) return;
+        extraStyle_.pdfViewMode=mode; // Keep the selection until async dimensions arrive.
+        float pw, ph; if (!readerPageSize( currentPage_, &pw, &ph)) return;
         int w, h; getWindowSize(w, h);
         const float fit = std::min(fixedViewportWidth(w) / pw, float(comic()?comicViewportHeight(h):h-144) / ph);
         zoomPdf(mode == 1 ? (fixedViewportWidth(w) / pw) / fit : mode == 2 ? 1.0f / fit : 1.0f);
@@ -1944,7 +1964,7 @@ private:
 
     SDL_Rect comicPageRect(int page,bool head=false) {
         int w,h;getWindowSize(w,h);float pw=0,ph=0;
-        if(!px_document_page_size(doc_,page,&pw,&ph) || pw<=0 || ph<=0)return {};
+        if(!readerPageSize(page,&pw,&ph) || pw<=0 || ph<=0)return {};
         const int vw=fixedViewportWidth(w),vh=comicViewportHeight(h);
         const float scale=std::min(vw/pw,vh/ph)*pdfZoom_;
         const int width=std::max(1,int(std::ceil(pw*scale))),height=std::max(1,int(std::ceil(ph*scale)));
@@ -2301,7 +2321,7 @@ private:
     }
     float segmentHeight(int page) {
         float w=0,h=0;
-        if(!px_document_page_size(doc_,page,&w,&h))return 1.f;
+        if(!readerPageSize(page,&w,&h))return 1.f;
         if(comic()) {int width,height;getWindowSize(width,height);h*=std::max(1,width-currentMargin_*2)/std::max(1.f,w);}
         return std::max(1.f,h);
     }
@@ -2429,7 +2449,7 @@ private:
     }
     void renderComicZoom(int w,int h) {
         auto texture=comicZoomTexture();if(!texture)return;
-        float pw=0,ph=0;if(!px_document_page_size(doc_,currentPage_,&pw,&ph))return;
+        float pw=0,ph=0;if(!readerPageSize(currentPage_,&pw,&ph))return;
         const SDL_Rect viewport{currentMargin_,72,fixedViewportWidth(w),comicViewportHeight(h)};
         const float scale=std::min(viewport.w/pw,viewport.h/ph)*pdfZoom_;
         const int width=std::max(1,int(std::ceil(pw*scale))),height=std::max(1,int(std::ceil(ph*scale)));
@@ -2532,7 +2552,7 @@ private:
             if(comicDetails_.count(page) ||
                (comicDetailRetry_.count(page) && Sint32(SDL_GetTicks()-comicDetailRetry_[page])<0))continue;
             float width=0,height=0;
-            if(!px_document_page_size(doc_,page,&width,&height) ||
+            if(!readerPageSize(page,&width,&height) ||
                ComicResolution::size(width,height,false,limit)==ComicResolution::size(width,height,true,limit))continue;
             comicPages_.request(page,true);
         }
@@ -2541,7 +2561,13 @@ private:
         const bool detailAllowed=activeFingers_.empty() && !pageTurnAnimation_.active && std::abs(panVelocityX_)+std::abs(panVelocityY_)<=2;
         for(auto &result:comicPages_.take()) {
             if(!comic() || result.identity!=comicTextureIdentity())continue;
-            px_document_remember_comic_size(doc_,result.page,result.nativeWidth,result.nativeHeight);
+            float knownWidth=0,knownHeight=0;
+            const bool alreadyKnown=px_document_known_comic_size(doc_,result.page,&knownWidth,&knownHeight);
+            if(px_document_remember_comic_size(doc_,result.page,result.nativeWidth,result.nativeHeight) && !alreadyKnown) {
+                comicGroups_.clear(); // Correct earlier conservative wide-page grouping.
+                if(result.page==currentPage_ && extraStyle_.pdfViewMode!=0 && !continuous())
+                    setPdfView(extraStyle_.pdfViewMode);
+            }
             if(result.detail && !detailAllowed){comicDetailRetry_[result.page]=SDL_GetTicks()+180;continue;}
             if(result.rgb.empty()){
                 if(result.detail)comicDetailRetry_[result.page]=SDL_GetTicks()+3000;
