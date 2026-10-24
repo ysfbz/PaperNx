@@ -17,6 +17,8 @@ static UpdateStatus wait(SelfUpdater &updater){
 }
 static void unit(){
     assert(updateVersionNewer("0.13.0","0.12.0-reader.4"));
+    assert(updateVersionNewer("0.9.3","0.9.2"));
+    assert(!updateVersionNewer("0.9.2","0.9.3"));
     assert(updateVersionNewer("0.13.1","0.13.0"));
     assert(updateVersionNewer("0.14.0","0.13.99"));
     assert(updateVersionNewer("0.14.0+switch.001","0.13.99"));
