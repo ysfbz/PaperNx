@@ -1,8 +1,8 @@
 # PaperNX v0.9.2 — Final Acceptance Matrix (work in progress)
 
-**Branch:** feature/v0.9.2-complete-reader-enhancements  
-**Verified code HEAD:** a486060edd10900f1686ddb84e17da04718cef4e  
-**Version in verification artifact:** 0.9.1 (development build only; no v0.9.2 release/package)  
+**Branch:** feature/v0.9.2-complete-reader-enhancements
+**Verified code HEAD:** a486060edd10900f1686ddb84e17da04718cef4e
+**Version in verification artifact:** 0.9.1 (development build only; no v0.9.2 release/package)
 **Decision:** INCOMPLETE — BLOCKERS REMAIN
 
 | Gate | Status | Current evidence / open condition |

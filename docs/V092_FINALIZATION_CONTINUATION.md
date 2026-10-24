@@ -1,8 +1,8 @@
 # PaperNX v0.9.2 Finalization Continuation
 
-**Updated:** 2026-10-24  
-**Branch:** feature/v0.9.2-complete-reader-enhancements  
-**Current code HEAD:** a486060edd10900f1686ddb84e17da04718cef4e  
+**Updated:** 2026-10-24
+**Branch:** feature/v0.9.2-complete-reader-enhancements
+**Current code HEAD:** a486060edd10900f1686ddb84e17da04718cef4e
 **Overall:** INCOMPLETE — BLOCKERS REMAIN
 
 ## Current checkpoint
