@@ -399,3 +399,9 @@ The focused native set `papernx_library_index_tests`, `papernx_core_tests`, `pap
 At branch source HEAD `e9b3482`, `tests/self_update_tests.cpp` was extended to cover an interrupted replacement where `PaperNX.nro` is absent while `.old` and `.swap` remain. The test confirms `prepareBoot()` restores the previous NRO and clears the stale marker; the existing candidate-present rollback case remains covered.
 
 The updater test target rebuilt and CTest passed **1/1**. This host filesystem unit test does not verify physical Switch storage, real power interruption or every rename/fsync boundary. No updater production code changed. Full native CTest and hardware acceptance remain open; the decision remains **INCOMPLETE — BLOCKERS REMAIN**.
+
+## Cached library inventory path validation — `89cb2b7`
+
+`loadLibraryInventory()` now rejects cached paths that are missing, non-regular, symlinks, or whose current file size no longer matches the cached identity. It refreshes the cached mtime when available. This closes the path where a stale inventory could bypass `scanRoots()`'s symlink policy when launch scanning is disabled; `ProgressStore` and user progress are unchanged. The change is a PaperNX safety adaptation in fork-derived `src/library_index.cpp`, not an independent implementation; Refael Bar / AGPL-3.0 provenance remains.
+
+`PaperNX` and focused library/application tests built; native CTest passed **2/2**, library-index ASan/UBSan passed **1/1**. The test exercises size change, missing source and symlink replacement. Switch AArch64 ELF/NRO and RomFS verification passed at `89cb2b7`; NRO SHA-256 `f35feab3d5138c2b4e08a7030cf9e0ebb033471ca924dc64136e3a36fc8d716a`, CA 118 certs / 200,116 bytes. Switch SD startup overhead and physical device remain **UNVERIFIED**. Full native CTest and independent scanner/index redesign remain open; status **INCOMPLETE — BLOCKERS REMAIN**.

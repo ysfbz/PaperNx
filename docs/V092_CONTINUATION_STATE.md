@@ -371,6 +371,15 @@ The verified/pushed branch HEAD at the start of this note was `ed9e3b69c184de1b4
 ## 2026-10-24 — Updater recovery when the canonical NRO is absent
 
 - **Branch / source HEAD before this test:** `feature/v0.9.2-complete-reader-enhancements` / `e9b3482b893822fe60490c80f9174afc18b31fe6`.
+- The preceding updater recovery test was committed and pushed as `c2a100c329fa7d0331acdb26ece132bbf9f73f91`; this source fix is commit `89cb2b75dad9dcbf98532264910cb7ea566ce9ae`.
 - Added a unit regression for an interrupted replacement where `PaperNX.nro` is absent while `.old` and `.swap` remain. `prepareBoot()` restores the previous NRO and clears the stale swap marker. Production code did not change.
 - Desktop build and `papernx_self_update_tests` CTest passed **1/1** (0.13 sec). Command: `docker compose run --rm desktop bash -lc 'cmake --build build-native --target papernx_self_update_tests --parallel 4 && ctest --test-dir build-native --output-on-failure -R "^papernx_self_update_tests$"'`.
 - Physical Switch power-loss testing, each rename/fsync boundary, full native CTest, and device acceptance remain **NOT RUN / UNVERIFIED**. Overall status remains **INCOMPLETE — BLOCKERS REMAIN**.
+
+## 2026-10-24 — Validate cached library inventory paths (`89cb2b7`)
+
+- `loadLibraryInventory()` now rejects missing, non-regular, symlink and changed-size entries instead of trusting an old cached path/size pair. When available it refreshes the cached mtime. Reading progress and catalog records remain separate and untouched.
+- `PaperNX`, `papernx_library_index_tests` and `papernx_modern_library_tests` built; focused CTest passed **2/2**. The test includes missing/changed/symlink replacement and async app integration.
+- Targeted ASan/UBSan library-index CTest passed **1/1**.
+- Switch `make all -j4` and `verify_artifacts.py --version 0.9.1` passed at source `89cb2b75dad9dcbf98532264910cb7ea566ce9ae`; AArch64 ELF/NRO and RomFS verified. NRO SHA-256 `f35feab3d5138c2b4e08a7030cf9e0ebb033471ca924dc64136e3a36fc8d716a`; CA bundle 118 certs / 200,116 bytes. Hardware **UNVERIFIED**.
+- Cache-load metadata I/O cost on Switch SD, full native CTest, whole-app sanitizer and broad independent scanner/index redesign remain open. Overall status stays **INCOMPLETE — BLOCKERS REMAIN**.
