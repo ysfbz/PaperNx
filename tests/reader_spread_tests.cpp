@@ -1,5 +1,6 @@
 #define main papernx_application_entry
 #include "../src/main.cpp"
+#include "test_evidence.hpp"
 #undef main
 #include <cassert>
 #include <iostream>
@@ -16,9 +17,9 @@ struct AppTest {
         SDL_SetRenderTarget(app.renderer_,target);return s;
     }
     static void save(const Shot &s,const std::string &name) {
-        fs::create_directories("verification/spreads");
+        const auto folder=test_evidence::path("spreads");fs::create_directories(folder);
         auto *surface=SDL_CreateRGBSurfaceWithFormatFrom(const_cast<Uint32*>(s.pixels.data()),s.w,s.h,32,s.w*4,SDL_PIXELFORMAT_ARGB8888);assert(surface);
-        assert(SDL_SaveBMP(surface,("verification/spreads/"+name+".bmp").c_str())==0);SDL_FreeSurface(surface);
+        assert(SDL_SaveBMP(surface,(folder/(name+".bmp")).string().c_str())==0);SDL_FreeSurface(surface);
     }
     static bool same(const Shot &a,const Shot &b,SDL_Rect area,int bx=0,int by=0) {
         for(int y=0;y<area.h;++y)for(int x=0;x<area.w;++x)

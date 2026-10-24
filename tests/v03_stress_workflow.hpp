@@ -148,7 +148,7 @@ static void v03StressWorkflow(const fs::path &parent) {
     }
     long processPeakKiB=0; std::ifstream status("/proc/self/status"); std::string line;
     while(std::getline(status,line)) if(line.rfind("VmHWM:",0)==0) { std::istringstream value(line.substr(6)); value>>processPeakKiB; }
-    std::ofstream out("verification/v03-stress-benchmark.json");
+    std::ofstream out(test_evidence::path("v03-stress-benchmark.json"));
     out<<"{\n  \"backend\": \"desktop SDL dummy; physical Switch UNVERIFIED\",\n"
        <<"  \"large_epub_chapters\": 24,\n  \"large_epub_open_ms\": "<<largeOpenMs
        <<",\n  \"illustrated_epub_chapters\": 8,\n  \"image_dimensions\": \"2048x1536\",\n  \"illustrated_epub_open_ms\": "<<imageOpenMs

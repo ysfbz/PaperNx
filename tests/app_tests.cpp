@@ -1,5 +1,6 @@
 #define main papernx_application_entry
 #include "../src/main.cpp"
+#include "test_evidence.hpp"
 #undef main
 #include "papernx/switch_compat.h"
 #include "papernx/focus.hpp"
@@ -92,8 +93,8 @@ struct AppTest {
         SDL_Surface *surface = SDL_CreateRGBSurfaceWithFormat(0, w, h, 32, SDL_PIXELFORMAT_ARGB8888);
         assert(surface);
         assert(SDL_RenderReadPixels(app.renderer_, nullptr, surface->format->format, surface->pixels, surface->pitch) == 0);
-        fs::create_directories("verification/screenshots");
-        assert(SDL_SaveBMP(surface, (std::string("verification/screenshots/") + name + ".bmp").c_str()) == 0);
+        const auto folder=test_evidence::path("screenshots");fs::create_directories(folder);
+        assert(SDL_SaveBMP(surface, (folder/(std::string(name)+".bmp")).string().c_str()) == 0);
         SDL_FreeSurface(surface);
     }
     static void captureV03Screens(const fs::path &root) {

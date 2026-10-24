@@ -25,6 +25,9 @@ def chunk(name,data):
 def main():
     ROOT.mkdir(exist_ok=True,parents=True)
     target=ROOT/'performance-37.cbr'
+    if target.exists():
+        print(f'Preserving existing performance fixture: {target.name}, {target.stat().st_size:,} bytes')
+        return
     with target.open('wb') as f:
         f.write(b'Rar!\x1a\x07\x01\x00');f.write(block(1,0,vint(0)))
         rng=random.Random(17202)

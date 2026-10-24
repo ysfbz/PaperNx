@@ -1,5 +1,6 @@
 #define main papernx_application_entry
 #include "../src/main.cpp"
+#include "test_evidence.hpp"
 #undef main
 #include <cassert>
 #include <iostream>
@@ -15,7 +16,7 @@ struct AppTest {
         app.render();int w,h;app.getWindowSize(w,h);
         auto *s=SDL_CreateRGBSurfaceWithFormat(0,w,h,32,SDL_PIXELFORMAT_ARGB8888);assert(s);
         assert(SDL_RenderReadPixels(app.renderer_,nullptr,s->format->format,s->pixels,s->pitch)==0);
-        fs::create_directories("verification/modern-ui");assert(SDL_SaveBMP(s,("verification/modern-ui/"+name+".bmp").c_str())==0);SDL_FreeSurface(s);
+        const auto folder=test_evidence::path("modern-ui");fs::create_directories(folder);assert(SDL_SaveBMP(s,(folder/(name+".bmp")).string().c_str())==0);SDL_FreeSurface(s);
     }
     static void setting(PaperNxApp &app,int row) {
         int w,h;app.getWindowSize(w,h);ui::SettingsLayout l(w,h);
@@ -103,6 +104,56 @@ struct AppTest {
         assert(found!=app.books_.end() && found->title==p.bookTitle && found->author==p.bookAuthor);
         assert(app.progressStore_.get(id).page==3 && app.progressStore_.get(id).pageCount==10);
     }
+    static void runStaleLibraryResult(const fs::path &root) {
+        fs::create_directories(root/"books");fs::create_directories(root/"data");fs::create_directories(root/"external");
+        const auto scanned=root/"external"/"stale.epub";fs::copy_file("tests/fixtures/sample_book.epub",scanned);
+        AppSettingsStore settings(root/"data"/"settings.txt");auto prefs=settings.get();prefs.scanOnLaunch=false;settings.put(prefs);assert(settings.save());
+        PaperNxApp app(root);assert(app.init()&&!app.libraryScanner_.pending());
+        Book retained;retained.id="retained-snapshot";retained.title="Current snapshot";retained.format=Format::Epub;
+        app.books_.push_back(retained);app.rebuildLibraryLookup();
+        const auto generation=app.libraryScanner_.begin(ScanRequest{{root/"external"},{},root/"data"/"library-index.txt"});
+        assert(generation>0);app.libraryScanGeneration_=generation+1;
+        const auto deadline=SDL_GetTicks()+10000;while(!app.libraryScanner_.ready()&&SDL_GetTicks()<deadline)SDL_Delay(1);
+        assert(app.libraryScanner_.ready());app.processLibraryScan();
+        assert(app.books_.size()==1&&app.books_.front().id==retained.id&&app.books_.front().title==retained.title);
+    }
+    static void runCoverTelemetryHandoff() {
+        PaperNxApp app(fs::temp_directory_path()/"papernx-cover-telemetry-handoff");
+        constexpr std::uint64_t total=20000;
+        std::atomic<std::uint64_t> queued{0},finished{0};
+        const std::string id="same-cover-id";
+        std::thread producer([&] {
+            while(queued.load(std::memory_order_relaxed)<total) {
+                bool added=false;
+                {
+                    std::lock_guard<std::mutex> lock(app.queueMutex_);
+                    if(app.activeCoverRequests_.find(id)==app.activeCoverRequests_.end()) {
+                        const auto token=app.coverTelemetry_.requested(id);
+                        app.activeCoverRequests_[id]={token,1};app.queuedThumbIds_.insert(id);
+                        queued.fetch_add(1,std::memory_order_relaxed);added=true;
+                    }
+                }
+                if(!added)std::this_thread::yield();
+            }
+        });
+        std::thread consumer([&] {
+            while(finished.load(std::memory_order_relaxed)<total) {
+                CoverRequestState request{};bool found=false;
+                {
+                    std::lock_guard<std::mutex> lock(app.queueMutex_);
+                    const auto active=app.activeCoverRequests_.find(id);
+                    if(active!=app.activeCoverRequests_.end()){request=active->second;found=true;}
+                }
+                if(found && app.finishCoverRequest(id,request,CoverState::Loaded,1))
+                    finished.fetch_add(1,std::memory_order_relaxed);
+                else std::this_thread::yield();
+            }
+        });
+        producer.join();consumer.join();
+        const auto stats=app.coverTelemetry_.snapshot();
+        assert(queued.load()==total&&finished.load()==total);
+        assert(stats.coverRequests==total&&stats.outstandingRequests==0&&stats.epochLoaded<=stats.epochRequested);
+    }
     static void runSymlinkHistoryRestore(const fs::path &root) {
         fs::create_directories(root/"books");fs::create_directories(root/"data");fs::create_directories(root/"external");
         const auto target=root/"outside.epub",path=root/"external"/"history.epub";
@@ -123,8 +174,16 @@ struct AppTest {
         for(int i=0;i<24;++i){Book book;book.id="cover-"+std::to_string(i);book.title=book.id;book.format=Format::Epub;app.visibleBooks_.push_back(std::move(book));}
         app.viewMode_=ViewMode::List;app.listScroll_=1120;
         const auto visible=app.visibleBooks_[10].id,stale=app.visibleBooks_[0].id;
-        {std::lock_guard<std::mutex> lock(app.queueMutex_);app.coverStates_[visible]=CoverState::Loading;app.coverStates_[stale]=CoverState::Loading;app.queuedThumbIds_.insert(visible);app.queuedThumbIds_.insert(stale);}
-        {std::lock_guard<std::mutex> lock(app.completedMutex_);app.completedThumbs_.push_back({visible,1,1,3,{1,2,3},CoverState::Loaded});app.completedThumbs_.push_back({stale,1,1,3,{4,5,6},CoverState::Loaded});}
+        std::uint64_t visibleToken{},staleToken{};
+        {std::lock_guard<std::mutex> lock(app.queueMutex_);
+            app.coverStates_[visible]=CoverState::Loading;app.coverStates_[stale]=CoverState::Loading;
+            app.queuedThumbIds_.insert(visible);app.queuedThumbIds_.insert(stale);
+            visibleToken=app.coverTelemetry_.requested(visible);staleToken=app.coverTelemetry_.requested(stale);
+            app.activeCoverRequests_[visible]={visibleToken,app.libraryScanGeneration_};
+            app.activeCoverRequests_[stale]={staleToken,app.libraryScanGeneration_};}
+        {std::lock_guard<std::mutex> lock(app.completedMutex_);
+            app.completedThumbs_.push_back({visible,1,1,3,{1,2,3},CoverState::Loaded,visibleToken,app.libraryScanGeneration_});
+            app.completedThumbs_.push_back({stale,1,1,3,{4,5,6},CoverState::Loaded,staleToken,app.libraryScanGeneration_});}
         app.processCompletedThumbnails();
         assert(app.thumbCache_.get("thumb_"+visible) && !app.thumbCache_.get("thumb_"+stale));
         {std::lock_guard<std::mutex> lock(app.queueMutex_);assert(app.coverStates_[stale]==CoverState::NotRequested && app.coverStates_[visible]==CoverState::Loaded);assert(!app.queuedThumbIds_.count(visible) && !app.queuedThumbIds_.count(stale));}
@@ -134,7 +193,14 @@ struct AppTest {
         app.rebuildLibraryLookup();app.sort_=Sort::Title;app.updateVisibleBooks();app.viewMode_=ViewMode::List;app.listScroll_=1120;
         const auto newlyVisible=app.books_.front().id;
         assert(app.visibleBooks_.front().id==newlyVisible);
-        {std::lock_guard<std::mutex> lock(app.completedMutex_);app.completedMetadata_.push_back({newlyVisible,"Book 12","","","",PaperNxApp::bookMetadataFingerprint(app.books_.front())});app.completedThumbs_.push_back({newlyVisible,1,1,3,{7,8,9},CoverState::Loaded});}
+        std::uint64_t newlyVisibleToken{};
+        {std::lock_guard<std::mutex> lock(app.queueMutex_);
+            newlyVisibleToken=app.coverTelemetry_.requested(newlyVisible);
+            app.queuedThumbIds_.insert(newlyVisible);
+            app.activeCoverRequests_[newlyVisible]={newlyVisibleToken,app.libraryScanGeneration_};}
+        {std::lock_guard<std::mutex> lock(app.completedMutex_);
+            app.completedMetadata_.push_back({newlyVisible,"Book 12","","","",PaperNxApp::bookMetadataFingerprint(app.books_.front())});
+            app.completedThumbs_.push_back({newlyVisible,1,1,3,{7,8,9},CoverState::Loaded,newlyVisibleToken,app.libraryScanGeneration_});}
         app.processCompletedThumbnails();
         const auto moved=std::find_if(app.visibleBooks_.begin(),app.visibleBooks_.end(),[&](const Book &book){return book.id==newlyVisible;});
         assert(moved!=app.visibleBooks_.end() && moved-app.visibleBooks_.begin()>=10);
@@ -197,6 +263,9 @@ int main() {
     fs::create_directory_symlink(fs::absolute("fonts"),root/"fonts");
     AppTest::run(root);const auto historyRoot=fs::temp_directory_path()/"papernx-history-restore";fs::remove_all(historyRoot);
     AppTest::runHistoryRestore(historyRoot);fs::remove_all(historyRoot);
+    const auto staleRoot=fs::temp_directory_path()/"papernx-stale-library-result";fs::remove_all(staleRoot);
+    AppTest::runStaleLibraryResult(staleRoot);fs::remove_all(staleRoot);
+    AppTest::runCoverTelemetryHandoff();
     const auto symlinkHistoryRoot=fs::temp_directory_path()/"papernx-symlink-history";fs::remove_all(symlinkHistoryRoot);
     AppTest::runSymlinkHistoryRestore(symlinkHistoryRoot);fs::remove_all(symlinkHistoryRoot);
     const auto coverRoot=fs::temp_directory_path()/"papernx-cover-queue-priority";fs::remove_all(coverRoot);

@@ -253,7 +253,7 @@ static void v03Workflow(const fs::path &parent) {
         assert(!app.doc_ && app.currentTheme_==2); v03CloseSettings(app);
     }
     auto p95=[](std::vector<double> values) { std::sort(values.begin(),values.end()); return values[std::min(values.size()-1,std::size_t(std::ceil(values.size()*.95)-1))]; };
-    fs::create_directories("verification"); std::ofstream perf("verification/v03-ui-benchmark.json");
+    const auto evidence=test_evidence::path("v03-ui-benchmark.json");fs::create_directories(evidence.parent_path());std::ofstream perf(evidence);
     perf<<"{\n  \"backend\": \"desktop SDL dummy software; CPU wall time, not physical Switch\",\n"
         <<"  \"menu_open_render_p95_ms\": "<<p95(menuMs)<<",\n  \"settings_tab_render_p95_ms\": "<<p95(tabMs)
         <<",\n  \"cold_page_render_p95_ms\": "<<p95(coldMs)<<",\n  \"cached_page_render_p95_ms\": "<<p95(cachedMs)

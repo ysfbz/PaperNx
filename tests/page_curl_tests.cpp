@@ -1,4 +1,5 @@
 #include "papernx/page_curl.hpp"
+#include "test_evidence.hpp"
 #include <cassert>
 #include <filesystem>
 #include <iostream>
@@ -27,7 +28,7 @@ int main() {
         SDL_GetRGB(row[x], surface->format, &r, &g, &b);
         return SDL_Color{r, g, b, 255};
     };
-    std::filesystem::create_directories("verification/page-curl");
+    const auto evidence=test_evidence::path("page-curl");std::filesystem::create_directories(evidence);
     for (int direction : {1, -1}) {
         int earlyRed = 0, lateRed = 0;
         for (float progress : {0.f, .0005f, .25f, .5f, .75f, .99f, 1.f}) {
@@ -68,9 +69,9 @@ int main() {
                                        (left.g > left.r && right.r > right.g));
             }
 #ifndef PAPERNX_CURL_FORCE_FALLBACK
-            auto name = std::string("verification/page-curl/") + (direction > 0 ? "forward-" : "backward-") +
-                        std::to_string(int(progress * 100)) + ".bmp";
-            assert(SDL_SaveBMP(surface, name.c_str()) == 0);
+            auto name = evidence / ((direction > 0 ? "forward-" : "backward-") +
+                        std::to_string(int(progress * 100)) + ".bmp");
+            assert(SDL_SaveBMP(surface, name.string().c_str()) == 0);
 #endif
         }
         assert(lateRed < earlyRed / 10);

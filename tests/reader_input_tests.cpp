@@ -1,5 +1,6 @@
 #define main papernx_application_entry
 #include "../src/main.cpp"
+#include "test_evidence.hpp"
 #undef main
 #include <cassert>
 #include <iostream>
@@ -34,10 +35,10 @@ struct AppTest {
         app.render();int w,h;app.getWindowSize(w,h);std::vector<Uint32> out(w*h);
         assert(SDL_RenderReadPixels(app.renderer_,nullptr,SDL_PIXELFORMAT_ARGB8888,out.data(),w*4)==0);return out;
     }
-    static void screenshot(PaperNxApp &app,const std::string &name,const std::string &directory="verification/reader-input") {
+    static void screenshot(PaperNxApp &app,const std::string &name,const fs::path &directory=test_evidence::path("reader-input")) {
         auto data=pixels(app);int w,h;app.getWindowSize(w,h);
         auto *image=SDL_CreateRGBSurfaceWithFormatFrom(data.data(),w,h,32,w*4,SDL_PIXELFORMAT_ARGB8888);assert(image);
-        fs::create_directories(directory);assert(SDL_SaveBMP(image,(directory+"/"+name+".bmp").c_str())==0);SDL_FreeSurface(image);
+        fs::create_directories(directory);assert(SDL_SaveBMP(image,(directory/(name+".bmp")).string().c_str())==0);SDL_FreeSurface(image);
     }
     static std::vector<Uint32> footerPixels(PaperNxApp &app) {
         const auto frame=pixels(app);int w,h;app.getWindowSize(w,h);
@@ -203,7 +204,7 @@ struct AppTest {
                 for(int y=0;y<6;++y)for(int x=0;x<1280;++x)assert((frame[y*1280+x]&0xffffff)==background);
                 const std::vector<Uint32> footer(frame.begin()+676*1280,frame.end());
                 if(progress==0)fixedFooter=footer;else assert(footer==fixedFooter);
-                if(zoom==1)screenshot(app,"comic-paired-"+std::to_string(int(progress*100)),"verification/v092/ui/comic-folio");
+                if(zoom==1)screenshot(app,"comic-paired-"+std::to_string(int(progress*100)),test_evidence::path("v092/ui/comic-folio"));
                 screenshot(app,std::string(zoom==1?"paper-":"zoom-paper-")+std::to_string(int(progress*100)));
             }
             turn.dragging=false;finish(app);

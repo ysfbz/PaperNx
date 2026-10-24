@@ -1,5 +1,6 @@
 #define main papernx_application_entry
 #include "../src/main.cpp"
+#include "test_evidence.hpp"
 #undef main
 #include <cassert>
 #include <iostream>
@@ -34,8 +35,8 @@ struct AppTest {
         app.render();int w,h;app.getWindowSize(w,h);
         auto *surface=SDL_CreateRGBSurfaceWithFormat(0,w,h,32,SDL_PIXELFORMAT_ARGB8888);assert(surface);
         assert(SDL_RenderReadPixels(app.renderer_,nullptr,surface->format->format,surface->pixels,surface->pitch)==0);
-        fs::create_directories("verification/library-controls");
-        assert(SDL_SaveBMP(surface,(std::string("verification/library-controls/")+name+".bmp").c_str())==0);SDL_FreeSurface(surface);
+        const auto folder=test_evidence::path("library-controls");fs::create_directories(folder);
+        assert(SDL_SaveBMP(surface,(folder/(std::string(name)+".bmp")).string().c_str())==0);SDL_FreeSurface(surface);
     }
     static void rotatedChoices(PaperNxApp &app) {
         const auto original=app.appSettings_.get();app.openChoice(7,3);

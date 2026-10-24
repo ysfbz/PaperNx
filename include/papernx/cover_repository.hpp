@@ -24,8 +24,10 @@ struct CoverCacheStats {
 // or changes progress. Cache failures are ordinary misses, never reader errors.
 class CoverRepository {
 public:
-    explicit CoverRepository(fs::path root, std::uintmax_t maxBytes = 48 * 1024 * 1024,
-                             std::size_t maxEntries = 512);
+    static constexpr std::uintmax_t defaultMaxBytes=48u*1024u*1024u;
+    static constexpr std::size_t defaultMaxEntries=512;
+    explicit CoverRepository(fs::path root, std::uintmax_t maxBytes = defaultMaxBytes,
+                             std::size_t maxEntries = defaultMaxEntries);
     std::optional<CoverImage> read(const Book &book);
     bool write(const Book &book, const CoverImage &image);
     void trim();

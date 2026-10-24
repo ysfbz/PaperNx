@@ -33,7 +33,7 @@ static void v04UiWorkflow(const fs::path &parent) {
             started=std::chrono::steady_clock::now();app.handleDirectional(0,i%2?1:-1);app.render();focusMs.push_back(elapsed(started));
         }
         auto percentile=[](std::vector<double> samples,double fraction){std::sort(samples.begin(),samples.end());return samples[std::min(samples.size()-1,std::size_t(fraction*samples.size()))];};
-        fs::create_directories("verification");std::ofstream bench("verification/v04-ui-latency.json");
+        const auto evidence=test_evidence::path("v04-ui-latency.json");fs::create_directories(evidence.parent_path());std::ofstream bench(evidence);
         bench<<"{\n  \"environment\": \"Docker SDL dummy software renderer; CPU event-to-present-return only; physical visible latency UNVERIFIED\",\n";
         auto metric=[&](const char *name,const std::vector<double>&samples,bool last){bench<<"  \""<<name<<"\": {\"p50_ms\":"<<percentile(samples,.5)<<",\"p95_ms\":"<<percentile(samples,.95)<<",\"worst_ms\":"<<*std::max_element(samples.begin(),samples.end())<<"}"<<(last?"\n":",\n");};
         metric("tap_to_pressed_present",pressedMs,false);metric("tap_to_action_present",actionMs,false);metric("focus_to_present",focusMs,true);bench<<"}\n";

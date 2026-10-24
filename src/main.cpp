@@ -27,6 +27,19 @@
 #include "papernx/cover_pipeline.hpp"
 #include <cstring>
 
+#ifndef PAPERNX_SOURCE_COMMIT
+#define PAPERNX_SOURCE_COMMIT "unknown"
+#endif
+#ifndef PAPERNX_SOURCE_DIRTY
+#define PAPERNX_SOURCE_DIRTY "unknown"
+#endif
+#ifndef PAPERNX_SOURCE_TREE_SHA256
+#define PAPERNX_SOURCE_TREE_SHA256 "unknown"
+#endif
+#ifndef PAPERNX_SOURCE_IDENTITY
+#define PAPERNX_SOURCE_IDENTITY "unknown"
+#endif
+
 #ifdef __SWITCH__
 #include <switch.h>
 #endif
@@ -116,7 +129,10 @@ struct LoadedThumb {
     int stride{0};
     std::vector<unsigned char> rgb;
     CoverState state{CoverState::Loaded};
+    std::uint64_t requestToken{}, libraryGeneration{};
+    std::chrono::steady_clock::time_point uploadReadyAt{};
 };
+struct CoverRequestState { std::uint64_t token{}, libraryGeneration{}; };
 struct LoadedMetadata {
     std::string id,title,author,series,seriesIndex;
     std::string fingerprint;
@@ -644,20 +660,19 @@ private:
     }
     CoverPipelineStats coverPipelineStats() {
         auto stats=coverTelemetry_.snapshot();
-        {std::lock_guard<std::mutex> lock(queueMutex_);stats.pendingQueue=thumbQueue_.size()+metadataQueue_.size();}
+        {std::lock_guard<std::mutex> lock(queueMutex_);stats.pendingQueue=thumbQueue_.size()+metadataQueue_.size()+metadataJobsInFlight_;}
         {std::lock_guard<std::mutex> lock(completedMutex_);stats.completedQueue=completedThumbs_.size();}
         stats.activeGeneration=libraryScanGeneration_;
+        stats.cacheBudgetBytes=CoverRepository::defaultMaxBytes;stats.cacheEntryBudget=CoverRepository::defaultMaxEntries;
         return stats;
     }
     void exportCoverPerf() {
         if(!coverTelemetry_.enabled())return;
-#ifndef PAPERNX_SOURCE_COMMIT
-#define PAPERNX_SOURCE_COMMIT "unknown"
-#endif
         SDL_RendererInfo info{};const char *renderer=renderer_&&SDL_GetRendererInfo(renderer_,&info)==0&&info.name?info.name:"unknown";
         std::error_code ec;fs::create_directories(root_/"logs",ec);
         std::ofstream out(root_/"logs"/"cover-performance.json");
-        out<<coverTelemetry_.toJson(coverPipelineStats(),APP_VERSION_FULL,PAPERNX_SOURCE_COMMIT,renderer);
+        out<<coverTelemetry_.toJson(coverPipelineStats(),APP_VERSION_FULL,PAPERNX_SOURCE_COMMIT,renderer,
+                                   PAPERNX_SOURCE_DIRTY,PAPERNX_SOURCE_TREE_SHA256,PAPERNX_SOURCE_IDENTITY);
     }
     void exportTimings() {
         if(!fs::exists(root_/"data"/"timing-debug.flag") || timingRing_.empty())return;
@@ -686,8 +701,10 @@ private:
     std::deque<Book> thumbQueue_;
     std::deque<Book> metadataQueue_;
     unsigned thumbnailJobsSinceMetadata_{};
+    std::size_t metadataJobsInFlight_{}; // guarded by queueMutex_
     std::set<std::string> metadataIndexedIds_;
     std::set<std::string> queuedThumbIds_;
+    std::unordered_map<std::string,CoverRequestState> activeCoverRequests_; // guarded by queueMutex_
     std::map<std::string, std::chrono::steady_clock::time_point> failedThumbIds_;
     std::map<std::string,CoverState> coverStates_;
     MetadataLedger metadataLedger_{4096}; // guarded by queueMutex_; bounded LRU of id:fingerprint already extracted
@@ -698,11 +715,29 @@ private:
     std::vector<LoadedThumb> completedThumbs_;
     std::vector<LoadedMetadata> completedMetadata_;
 
-    // Caller holds queueMutex_. Pending IDs include queued, processing and upload-ready work.
-    void failThumbnail(const std::string &id) {
-        queuedThumbIds_.erase(id);coverTelemetry_.dropped(id);
-        if (failedThumbIds_.size() >= 512) failedThumbIds_.erase(failedThumbIds_.begin());
-        failedThumbIds_[id] = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+    // Pending IDs cover the queued, processing and upload-ready stages.
+    bool finishCoverRequest(const std::string &id,CoverRequestState request,CoverState state,int outcome) {
+        std::lock_guard<std::mutex> lock(queueMutex_);
+        const auto active=activeCoverRequests_.find(id);
+        if(active==activeCoverRequests_.end() || active->second.token!=request.token ||
+           active->second.libraryGeneration!=request.libraryGeneration)return false;
+        // Keep queue -> telemetry lock ordering so a same-ID request cannot reuse this token
+        // between removing the active request and resolving its telemetry record.
+        if(outcome==1)coverTelemetry_.uploaded(id,request.token);
+        else if(outcome==2)coverTelemetry_.discarded(id,request.token,true);
+        else if(outcome==3)coverTelemetry_.discarded(id,request.token,false);
+        else if(outcome==4)coverTelemetry_.unavailable(id,request.token);
+        else coverTelemetry_.dropped(id,request.token);
+        activeCoverRequests_.erase(active);queuedThumbIds_.erase(id);coverStates_[id]=state;
+        if(state==CoverState::Failed) {
+            if(failedThumbIds_.size()>=512)failedThumbIds_.erase(failedThumbIds_.begin());
+            failedThumbIds_[id]=std::chrono::steady_clock::now()+std::chrono::seconds(30);
+        }
+        return true;
+    }
+    void failThumbnail(const std::string &id,CoverRequestState request,bool decodeFailure) {
+        if(decodeFailure)coverTelemetry_.count(CoverTelemetry::Counter::DecodeFail);
+        finishCoverRequest(id,request,CoverState::Failed,0);
     }
 
     static std::string bookMetadataFingerprint(const Book &book) {
@@ -727,6 +762,7 @@ private:
         if(owned)coverTelemetry_.count(CoverTelemetry::Counter::MetadataOpen);
         if(owned)document=px_document_open_metadata(book.path.c_str(),error,sizeof error,isComic(book.format)?96u*1024u*1024u:16u*1024u*1024u);
         if(!document)return false;
+        if(owned && isComic(book.format))coverTelemetry_.count(CoverTelemetry::Counter::ArchiveOpen);
         char title[512]{},author[512]{},series[512]{},index[64]{};
         px_document_metadata(document,"info:Title",title,sizeof title);
         px_document_metadata(document,"info:Author",author,sizeof author);
@@ -753,19 +789,22 @@ private:
         if (coverClearStatus_.load() == 1) return;
         {
             std::lock_guard<std::mutex> lock(queueMutex_);
-            thumbQueue_.clear();coverTelemetry_.abandonAll();
+            thumbQueue_.clear();
+            for(const auto &active:activeCoverRequests_)coverTelemetry_.discarded(active.first,active.second.token,false);
+            activeCoverRequests_.clear();coverTelemetry_.abandonAll();
             queuedThumbIds_.clear();
             failedThumbIds_.clear();
             coverClearRequested_ = true;
             coverClearStatus_ = 1;
         }
+        {std::lock_guard<std::mutex> lock(completedMutex_);completedThumbs_.clear();}
         queueCv_.notify_one();
         dirty_ = true;
     }
     void thumbWorkerLoop() {
         updateCoverCounters();
         while (workerRunning_) {
-            Book b;bool metadataOnly=false, clearNow=false;
+            Book b;bool metadataOnly=false, clearNow=false;CoverRequestState request{};
             {
                 std::unique_lock<std::mutex> lock(queueMutex_);
                 queueCv_.wait(lock, [this]() {
@@ -780,6 +819,8 @@ private:
                 } else {
                     metadataOnly=shouldProcessCoverMetadata(!thumbQueue_.empty(),!metadataQueue_.empty(),thumbnailJobsSinceMetadata_);
                     auto &queue=metadataOnly?metadataQueue_:thumbQueue_;b=queue.front();queue.pop_front();
+                    if(!metadataOnly){const auto found=activeCoverRequests_.find(b.id);if(found!=activeCoverRequests_.end())request=found->second;}
+                    else ++metadataJobsInFlight_;
                     if(metadataOnly)thumbnailJobsSinceMetadata_=0;
                     else thumbnailJobsSinceMetadata_=std::min(thumbnailJobsSinceMetadata_+1,thumbnailBurstBeforeMetadata);
                 }
@@ -791,12 +832,13 @@ private:
                 continue;
             }
             if(metadataOnly) {
-                if(!collectBookMetadata(b)) {
-                    std::lock_guard<std::mutex> lock(queueMutex_);
-                    metadataIndexedIds_.erase(b.id+":"+bookMetadataFingerprint(b));
-                }
+                const bool collected=collectBookMetadata(b);
+                std::lock_guard<std::mutex> lock(queueMutex_);
+                if(!collected)metadataIndexedIds_.erase(b.id+":"+bookMetadataFingerprint(b));
+                if(metadataJobsInFlight_)--metadataJobsInFlight_;
                 continue;
             }
+            if(request.token==0)continue;
 
             auto cached = coverRepository_.read(b);
             updateCoverCounters();
@@ -805,6 +847,8 @@ private:
                 LoadedThumb lt; lt.id=b.id; lt.w=cached->width; lt.h=cached->height;
                 lt.stride=cached->stride; lt.rgb=std::move(cached->rgb);
                 lt.state=CoverState::Cached;
+                lt.requestToken=request.token;lt.libraryGeneration=request.libraryGeneration;
+                lt.uploadReadyAt=std::chrono::steady_clock::now();
                 {std::lock_guard<std::mutex> lock(completedMutex_);completedThumbs_.push_back(std::move(lt));}
                 continue;
             }
@@ -812,43 +856,44 @@ private:
             char err[256] = {};
             PxDocument *thumbDoc = px_document_open_limited(b.path.c_str(),160,220,16.0f,"",err,sizeof err,isComic(b.format)?96u*1024u*1024u:16u*1024u*1024u);
             if (!thumbDoc) {
-                std::lock_guard<std::mutex> lock(queueMutex_);
-                coverStates_[b.id]=CoverState::Failed;
-                failThumbnail(b.id);
+                failThumbnail(b.id,request,false);
                 continue;
             }
             coverTelemetry_.count(CoverTelemetry::Counter::ThumbnailOpen);
+            if(isComic(b.format))coverTelemetry_.count(CoverTelemetry::Counter::ArchiveOpen);
             // Metadata extraction happens in the existing bounded cover worker,
             // not on the UI thread. A book without an illustration can still
             // have a real title and author in OPF/PDF metadata.
             collectBookMetadata(b,thumbDoc);
             if(b.format==Format::Epub && !px_document_has_embedded_cover(thumbDoc)) {
                 px_document_close(thumbDoc);
-                std::lock_guard<std::mutex> lock(queueMutex_);
-                coverStates_[b.id]=CoverState::NoEmbeddedCover; queuedThumbIds_.erase(b.id);coverTelemetry_.dropped(b.id);
+                finishCoverRequest(b.id,request,CoverState::NoEmbeddedCover,4);
                 continue;
             }
 
             PxImage img{};
-            if (px_document_render_thumbnail(thumbDoc, 150, 210, &img, err, sizeof(err)) && img.rgb && img.width > 0 && img.height > 0) {
+            const auto decodeStart=std::chrono::steady_clock::now();
+            const bool decoded=px_document_render_thumbnail(thumbDoc, 150, 210, &img, err, sizeof(err));
+            coverTelemetry_.decodeTime(std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-decodeStart).count());
+            if (decoded && img.rgb && img.width > 0 && img.height > 0) {
                 LoadedThumb lt;
                 lt.id = b.id;
                 lt.w = img.width;
                 lt.h = img.height;
                 lt.stride = img.stride;
                 lt.rgb.assign(img.rgb, img.rgb + (size_t)img.height * img.stride);
+                lt.requestToken=request.token;lt.libraryGeneration=request.libraryGeneration;
                 px_image_free(&img);
                 coverRepository_.write(b, CoverImage{lt.w,lt.h,lt.stride,lt.rgb});
                 updateCoverCounters();
+                lt.uploadReadyAt=std::chrono::steady_clock::now();
 
                 {
                     std::lock_guard<std::mutex> lock(completedMutex_);
                     completedThumbs_.push_back(std::move(lt));
                 }
             } else {
-                std::lock_guard<std::mutex> lock(queueMutex_);
-                coverStates_[b.id]=CoverState::Failed;
-                failThumbnail(b.id);
+                failThumbnail(b.id,request,true);
                 logMessage(std::string("Cover decode failed: ")+err);
             }
             px_image_free(&img);
@@ -911,11 +956,14 @@ private:
             std::lock_guard<std::mutex> lock(completedMutex_);
             for(auto it=completedThumbs_.begin();it!=completedThumbs_.end();) {
                 if(filterVisibleCovers && !visibleCovers.count(it->id)) {
-                    std::lock_guard<std::mutex> queueLock(queueMutex_);
-                    queuedThumbIds_.erase(it->id);
-                    if(coverStates_[it->id]==CoverState::Loading)coverStates_[it->id]=CoverState::NotRequested;
-                    coverTelemetry_.discarded(it->id,false);it=completedThumbs_.erase(it);continue;
+                    finishCoverRequest(it->id,{it->requestToken,it->libraryGeneration},CoverState::NotRequested,3);
+                    it=completedThumbs_.erase(it);continue;
                 }
+                bool current=false;
+                {std::lock_guard<std::mutex> queueLock(queueMutex_);const auto active=activeCoverRequests_.find(it->id);
+                 current=active!=activeCoverRequests_.end() && active->second.token==it->requestToken &&
+                         active->second.libraryGeneration==it->libraryGeneration && it->libraryGeneration==libraryScanGeneration_;}
+                if(!current){finishCoverRequest(it->id,{it->requestToken,it->libraryGeneration},CoverState::NotRequested,3);it=completedThumbs_.erase(it);continue;}
                 // Cap renderer-thread texture uploads to two covers per frame.
                 if(toUpload.size()<2) {
                     toUpload.push_back(std::move(*it));it=completedThumbs_.erase(it);continue;
@@ -925,12 +973,9 @@ private:
         }
         if(toUpload.empty())return;
         for (const auto &lt : toUpload) {
-            {
-                std::lock_guard<std::mutex> lock(queueMutex_);
-                queuedThumbIds_.erase(lt.id);
-                coverStates_[lt.id]=lt.state;
-            }
             std::string key = "thumb_" + lt.id;
+            if(lt.uploadReadyAt.time_since_epoch().count())
+                coverTelemetry_.uploadQueueWait(std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-lt.uploadReadyAt).count());
             coverTelemetry_.count(CoverTelemetry::Counter::UploadAttempt);
             SDL_Texture *tex = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STATIC, lt.w, lt.h);
             bool uploaded=false;
@@ -940,8 +985,8 @@ private:
                 } else SDL_DestroyTexture(tex);
                 dirty_ = true;
             }
-            if(uploaded){coverTelemetry_.count(CoverTelemetry::Counter::UploadOk);coverTelemetry_.uploaded(lt.id);}
-            else coverTelemetry_.discarded(lt.id,true);
+            if(uploaded){coverTelemetry_.count(CoverTelemetry::Counter::UploadOk);finishCoverRequest(lt.id,{lt.requestToken,lt.libraryGeneration},lt.state,1);}
+            else finishCoverRequest(lt.id,{lt.requestToken,lt.libraryGeneration},CoverState::Failed,2);
         }
     }
 
@@ -1535,7 +1580,9 @@ private:
         coversPaused_=true;
         { std::lock_guard<std::mutex> lock(queueMutex_);
           for(const auto &item:thumbQueue_) queuedThumbIds_.erase(item.id);
-          thumbQueue_.clear();coverTelemetry_.abandonAll(); }
+          thumbQueue_.clear();queuedThumbIds_.clear();
+          for(const auto &active:activeCoverRequests_)coverTelemetry_.discarded(active.first,active.second.token,false);
+          activeCoverRequests_.clear();coverTelemetry_.abandonAll(); }
         int w = 1280, h = 720;
         getWindowSize(w, h);
 
@@ -2628,7 +2675,8 @@ private:
             failedThumbIds_.erase(failed);
         if (failedThumbIds_.find(b.id) == failedThumbIds_.end() && queuedThumbIds_.size() < 32 &&
             queuedThumbIds_.find(b.id) == queuedThumbIds_.end()) {
-            queuedThumbIds_.insert(b.id);coverTelemetry_.requested(b.id);
+            queuedThumbIds_.insert(b.id);const auto token=coverTelemetry_.requested(b.id);
+            activeCoverRequests_[b.id]={token,libraryScanGeneration_};
             coverStates_[b.id]=CoverState::Loading;
             thumbQueue_.push_back(b);
             queueCv_.notify_one();
@@ -3773,7 +3821,15 @@ private:
         for(int i=first;i<std::min(int(visibleBooks_.size()),first+count);++i) wanted.insert(visibleBooks_[i].id);
         std::lock_guard<std::mutex> lock(queueMutex_);
         for(auto it=thumbQueue_.begin();it!=thumbQueue_.end();) {
-            if(!wanted.count(it->id)) { queuedThumbIds_.erase(it->id);coverTelemetry_.discarded(it->id,false); it=thumbQueue_.erase(it); } else ++it;
+            if(!wanted.count(it->id)) {
+                const auto active=activeCoverRequests_.find(it->id);
+                if(active!=activeCoverRequests_.end()) {
+                    const auto request=active->second;activeCoverRequests_.erase(active);
+                    queuedThumbIds_.erase(it->id);coverStates_[it->id]=CoverState::NotRequested;
+                    coverTelemetry_.discarded(it->id,request.token,false);
+                }
+                it=thumbQueue_.erase(it);
+            } else ++it;
         }
         return wanted;
     }

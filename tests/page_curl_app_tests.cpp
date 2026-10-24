@@ -1,5 +1,6 @@
 #define main papernx_application_entry
 #include "../src/main.cpp"
+#include "test_evidence.hpp"
 #undef main
 #include <cassert>
 #include <iostream>
@@ -15,8 +16,8 @@ struct AppTest {
         auto surface=SDL_CreateRGBSurfaceWithFormat(0,w,h,32,SDL_PIXELFORMAT_ARGB8888);
         assert(surface);
         assert(SDL_RenderReadPixels(app.renderer_,nullptr,surface->format->format,surface->pixels,surface->pitch)==0);
-        fs::create_directories("verification/page-curl");
-        assert(SDL_SaveBMP(surface,("verification/page-curl/"+name+".bmp").c_str())==0);
+        const auto folder=test_evidence::path("page-curl");fs::create_directories(folder);
+        assert(SDL_SaveBMP(surface,(folder/(name+".bmp")).string().c_str())==0);
         SDL_FreeSurface(surface);SDL_SetRenderTarget(app.renderer_,target);
     }
     static void touch(PaperNxApp &app,Uint32 type,float x,float y,SDL_FingerID id=17) {
@@ -114,7 +115,7 @@ struct AppTest {
         settings.displayOrientation=0;app.appSettings_.put(settings);app.reflowEpub(22,0);
     }
     static void preview(PaperNxApp &app, const char *direction) {
-        fs::create_directories("verification/page-curl");
+        const auto folder=test_evidence::path("page-curl");fs::create_directories(folder);
         for (int frame = 0; frame <= 10; ++frame) {
             app.pageTurnAnimation_.started = SDL_GetTicks() - frame * 40;
             app.render();
@@ -123,8 +124,8 @@ struct AppTest {
             assert(surface);
             assert(SDL_RenderReadPixels(app.renderer_, nullptr, surface->format->format,
                                         surface->pixels, surface->pitch) == 0);
-            auto path = std::string("verification/page-curl/epub-") + direction + "-" + std::to_string(frame) + ".bmp";
-            assert(SDL_SaveBMP(surface, path.c_str()) == 0);
+            auto path = folder/(std::string("epub-") + direction + "-" + std::to_string(frame) + ".bmp");
+            assert(SDL_SaveBMP(surface, path.string().c_str()) == 0);
             SDL_FreeSurface(surface);
         }
     }
