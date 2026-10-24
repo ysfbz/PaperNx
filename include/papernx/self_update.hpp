@@ -9,16 +9,17 @@
 namespace papernx {
 
 struct UpdateRelease {
-    std::string version,title,notes,url,checksumUrl,sha256;
+    std::string version,title,notes,url,checksumUrl,sha256,stagedFile;
     std::uint64_t bytes{0};
     bool installable() const {return !url.empty() && (!sha256.empty() || !checksumUrl.empty());}
 };
-// Ready means DOWNLOADED+VERIFIED+STAGED (PaperNX.nro.new); it never means installed.
+// Ready means DOWNLOADED+VERIFIED+STAGED; stagedFile identifies the selected manual-install candidate.
 // Installation is manual, so no state here represents INSTALLED/BOOT_CONFIRMED.
 enum class UpdateState {Idle,Checking,Current,Available,Downloading,Verifying,Ready,Cancelled,Error};
 struct UpdateStatus {
     UpdateState state{UpdateState::Idle};
     UpdateRelease release;
+    UpdateRelease staged;
     std::string error;
     int percent{0};
 };
@@ -40,8 +41,10 @@ public:
     void configure(std::filesystem::path executable,std::string version,
                    std::string certificates={});
 #ifdef PAPERNX_UPDATE_TESTING
+    enum class FaultPoint {None,NoSpace,CandidateRename,CandidateRecord,PayloadFsync,CandidateRecordFsync,CancelAfterVerify,CancelAfterStage};
     void configureForTesting(std::filesystem::path executable,std::string version,
                              std::string certificates,UpdateSource source);
+    static void failNextOperationForTesting(FaultPoint point);
 #endif
     bool check();
     bool download();

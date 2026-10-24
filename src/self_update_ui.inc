@@ -120,19 +120,21 @@ void renderUpdateDialog(int w,int h,const ThemePalette &pal) {
         if(s.state==UpdateState::Checking)text=ui::label("Checking for updates...");
         else if(s.state==UpdateState::Downloading)text=ui::label("Downloading update...")+" "+std::to_string(s.percent)+"%";
         else if(s.state==UpdateState::Current)text=ui::label("You are on the latest version")+"\n\n"+APP_VERSION_FULL;
-        else if(s.state==UpdateState::Error)text=ui::label("Could not update PaperNX")+"\n\n"+ui::label(s.error);
+        else if(s.state==UpdateState::Error)text=ui::label("Could not update PaperNX")+"\n\n"+ui::label(s.error)+
+            (s.staged.stagedFile.empty()?"":"\n\n"+ui::label("Verified update still available")+": "+s.staged.stagedFile);
         else if(s.state==UpdateState::Verifying)text=ui::label("Verifying update...");
         else if(s.state==UpdateState::Ready) {
             // STAGED only: the running PaperNX.nro has not been replaced.
-            const auto folder=updater_->executable().parent_path().string();
-            text=ui::label("Downloaded and verified; NOT installed yet")+"\n\n"+ui::label("Version")+": "+s.release.version+"\n"+"SHA-256: "+s.release.sha256+"\n"+ui::label("Staged file")+": "+folder+"/PaperNX.nro.new\n\n"+
-                ui::label("Manual installation required: close PaperNX, back up PaperNX.nro, then replace it with PaperNX.nro.new using a file manager. Do not delete other files.");
+            text=ui::label("Downloaded and verified; NOT installed yet")+"\n\n"+ui::label("Version")+": "+s.release.version+"\n"+"SHA-256: "+s.release.sha256+"\n"+ui::label("Staged file")+": "+s.release.stagedFile+"\n\n"+
+                ui::label("Manual installation required: close PaperNX, back up PaperNX.nro, then replace it with the staged file using a file manager. Do not delete other files.");
         }
-        else if(s.state==UpdateState::Cancelled)text=ui::label("Update cancelled");
+        else if(s.state==UpdateState::Cancelled)text=ui::label("Update cancelled")+
+            (s.staged.stagedFile.empty()?"":"\n\n"+ui::label("Verified update still available")+": "+s.staged.stagedFile);
         else if(s.state==UpdateState::Available){
             text=ui::label("New version available")+"\n\n"+s.release.version+"\n"+s.release.title;
             if(s.release.bytes)text+="\n"+std::to_string((s.release.bytes+1048575)/1048576)+" MB";
             if(!s.release.installable())text+="\n\n"+ui::label("This release has no installable NRO and checksum");
+            if(!s.staged.stagedFile.empty())text+="\n\n"+ui::label("Previously verified update retained")+": "+s.staged.stagedFile;
         }
         SDL_RenderSetClipRect(renderer_,&body);typography_->renderWrapped(renderer_,typography_->uiFont(),text,body,pal.fg);SDL_RenderSetClipRect(renderer_,nullptr);
         if(s.state==UpdateState::Downloading)typography_->drawProgressBar(renderer_,body.x,panel.y+panel.h-118,body.w,8,s.percent/100.f,pal.cardBorder,pal.accent);

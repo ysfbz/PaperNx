@@ -205,11 +205,10 @@ class ReleaseDecoder : JsonCursor {
         do {
             space();
             if (pos_ == input_.size()) return false;
-            if (input_[pos_] == '{') {
-                Asset asset;
-                if (!assetObject(asset, depth + 1)) return false;
-                Policy::accept(assets, std::move(asset));
-            } else if (!skipValue(depth + 1)) return false;
+            if (input_[pos_] != '{') return false;
+            Asset asset;
+            if (!assetObject(asset, depth + 1)) return false;
+            Policy::accept(assets, std::move(asset));
             if (take(']')) return true;
         } while (take(','));
         return false;

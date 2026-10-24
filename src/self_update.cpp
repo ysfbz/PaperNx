@@ -7,6 +7,7 @@
 #include <charconv>
 #include <cctype>
 #include <cerrno>
+#include <chrono>
 #include <cstdio>
 #include <cstring>
 #include <fstream>
@@ -231,18 +232,23 @@ bool fetch(const std::string &url, const std::string &certificates, std::atomic<
     return request(url, certificates, transfer, error);
 }
 
-bool durable(FILE *file) {
-    return std::fflush(file) == 0 && ::fsync(::fileno(file)) == 0;
+#ifdef PAPERNX_UPDATE_TESTING
+bool consumeFault(SelfUpdater::FaultPoint point);
+#endif
+
+bool durable(FILE *file, bool failSync = false) {
+    return std::fflush(file) == 0 && !failSync && ::fsync(::fileno(file)) == 0;
 }
 
-bool writeAtomicText(const std::filesystem::path &path, const std::string &text, std::string &error) {
+bool writeAtomicText(const std::filesystem::path &path, const std::string &text, std::string &error,
+                     bool failSync = false) {
     const auto temporary = path.string() + ".tmp";
     FILE *file = std::fopen(temporary.c_str(), "wb");
     if (!file) {
         error = "Cannot write update recovery data";
         return false;
     }
-    bool ok = std::fwrite(text.data(), 1, text.size(), file) == text.size() && durable(file);
+    bool ok = std::fwrite(text.data(), 1, text.size(), file) == text.size() && durable(file, failSync);
     if (std::fclose(file) != 0) ok = false;
     if (ok && std::rename(temporary.c_str(), path.string().c_str()) == 0) return true;
     std::remove(temporary.c_str());
@@ -367,6 +373,77 @@ bool validateNro(const std::filesystem::path &path, const std::string &expectedH
     return true;
 }
 
+struct CandidateSlot {
+    std::filesystem::path payload, record;
+    unsigned index{0};
+};
+
+CandidateSlot candidateSlot(const std::filesystem::path &executable, unsigned index) {
+    const auto suffix = index ? ".new.1" : ".new";
+    const auto recordSuffix = index ? ".ready.1" : ".ready";
+    return {executable.string() + suffix, executable.string() + recordSuffix, index};
+}
+
+struct StagedCandidate {
+    UpdateRelease release;
+    unsigned slot{0};
+};
+
+bool validateCandidate(const std::filesystem::path &executable, unsigned index,
+                       const std::string &current, StagedCandidate &candidate,
+                       std::string &error) {
+    const auto slot = candidateSlot(executable, index);
+    std::ifstream file(slot.record);
+    std::vector<std::string> fields;
+    std::string field;
+    while (file >> field && fields.size() <= 6) fields.push_back(field);
+    if (!file.eof() || (fields.size() != 3 && fields.size() != 6)) return false;
+    const auto hash = normalizedHash(fields[0]);
+    if (hash.empty() || hash != fields[0] || !updateVersionNewer(fields[1], current) ||
+        fields[2].empty() || fields[2].size() > 20 || !digits(fields[2])) return false;
+    std::uint64_t bytes = 0;
+    const auto parsed = std::from_chars(fields[2].data(), fields[2].data() + fields[2].size(), bytes);
+    if (parsed.ec != std::errc{} || parsed.ptr != fields[2].data() + fields[2].size() ||
+        bytes < 0x1000 || bytes > maxNro) return false;
+    if (fields.size() == 3) {
+        if (index != 0) return false; // The pre-slot .new/.ready format belongs to slot 0.
+    } else if (fields[3] != "slot=" + std::to_string(index) ||
+               fields[4].compare(0, 11, "generation=") != 0 || fields[4].size() <= 11 || fields[4].size() > 64 ||
+               fields[4].substr(11).find_first_not_of("0123456789abcdef-") != std::string::npos ||
+               fields[5] != "Ready") {
+        return false;
+    }
+    if (!validateNro(slot.payload, hash, bytes, fields[1], error)) return false;
+    candidate = {};
+    candidate.slot = index;
+    candidate.release.version = fields[1];
+    candidate.release.sha256 = hash;
+    candidate.release.bytes = bytes;
+    candidate.release.stagedFile = slot.payload.string();
+    return true;
+}
+
+bool betterCandidate(const StagedCandidate &left, const StagedCandidate &right) {
+    if (updateVersionNewer(left.release.version, right.release.version)) return true;
+    if (updateVersionNewer(right.release.version, left.release.version)) return false;
+    return left.slot < right.slot;
+}
+
+std::string candidateRecord(const UpdateRelease &release, unsigned slot) {
+    const auto generation = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) +
+                            "-" + release.sha256.substr(0, 12);
+    return release.sha256 + "\n" + release.version + "\n" + std::to_string(release.bytes) +
+           "\nslot=" + std::to_string(slot) + "\ngeneration=" + generation + "\nReady\n";
+}
+
+#ifdef PAPERNX_UPDATE_TESTING
+std::atomic<int> injectedFault{0};
+bool consumeFault(SelfUpdater::FaultPoint point) {
+    auto expected = static_cast<int>(point);
+    return injectedFault.compare_exchange_strong(expected, static_cast<int>(SelfUpdater::FaultPoint::None));
+}
+#endif
+
 struct BootRecord {
     std::string hash;
     std::string version;
@@ -391,6 +468,31 @@ bool pathExists(const std::filesystem::path &path) {
 
 bool removeUpdaterFile(const std::filesystem::path &path) {
     return std::remove(path.string().c_str()) == 0 || errno == ENOENT;
+}
+
+bool cleanupOrphanCandidates(const std::filesystem::path &executable) {
+    for (unsigned i = 0; i < 2; ++i) {
+        const auto slot = candidateSlot(executable, i);
+        const bool payload = pathExists(slot.payload), record = pathExists(slot.record);
+        if (payload != record && !removeUpdaterFile(payload ? slot.payload : slot.record)) return false;
+    }
+    return true;
+}
+
+bool cleanupInvalidCandidates(const std::filesystem::path &executable, const std::string &current,
+                              std::string &error) {
+    for (unsigned i = 0; i < 2; ++i) {
+        StagedCandidate candidate;
+        std::string reason;
+        if (validateCandidate(executable, i, current, candidate, reason)) continue;
+        if (reason == "Cannot read the update") continue;
+        const auto slot = candidateSlot(executable, i);
+        if (!removeUpdaterFile(slot.record) || !removeUpdaterFile(slot.payload)) {
+            error = "Cannot clean an invalid pending update";
+            return false;
+        }
+    }
+    return true;
 }
 
 // Ownership of update files next to PaperNX.nro:
@@ -509,6 +611,10 @@ void SelfUpdater::configureForTesting(std::filesystem::path executable, std::str
                                       std::string certificates, UpdateSource source) {
     configureSource(std::move(executable), std::move(version), std::move(certificates), std::move(source));
 }
+
+void SelfUpdater::failNextOperationForTesting(FaultPoint point) {
+    injectedFault = static_cast<int>(point);
+}
 #endif
 
 void SelfUpdater::configureSource(std::filesystem::path executable, std::string version,
@@ -566,42 +672,59 @@ bool SelfUpdater::check() {
         publish(UpdateState::Error, "Cannot determine the running NRO path");
         return false;
     }
-    if (!removeUpdaterFile(path + ".part") || !removeUpdaterFile(path + ".ready.tmp")) {
+    if (!removeUpdaterFile(path + ".part") || !removeUpdaterFile(path + ".ready.tmp") ||
+        !removeUpdaterFile(path + ".ready.1.tmp") || !cleanupOrphanCandidates(executable_)) {
         publish(UpdateState::Error, "Cannot clean incomplete update files");
         return false;
+    }
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        status_.release = {};
+        status_.staged = {};
+        status_.percent = 0;
     }
     publish(UpdateState::Checking);
     worker_ = std::thread([this] {
         std::string error;
         UpdateRelease staged;
-        if (validatePending(staged,error)) {
-            // Rediscovered after a restart: expose version/hash so the UI can describe the staged file.
+        const bool hasStaged = validatePending(staged,error);
+        if (!cleanupInvalidCandidates(executable_, current_, error)) {
             std::lock_guard<std::mutex> lock(mutex_);
-            status_.release=std::move(staged);status_.percent=100;status_.error.clear();status_.state=UpdateState::Ready;
-            return;
-        }
-        if (!removeUpdaterFile(executable_.string() + ".new") ||
-            !removeUpdaterFile(executable_.string() + ".ready")) {
-            publish(UpdateState::Error, "Cannot clean an invalid pending update");
+            status_.staged = hasStaged ? staged : UpdateRelease{};
+            status_.state = UpdateState::Error;
+            status_.error = error;
             return;
         }
         std::string response;
         if (!fetch(source_.api, certificates_, cancel_, response, error)) {
-            publish(cancel_ ? UpdateState::Cancelled : UpdateState::Error, error);
+            std::lock_guard<std::mutex> lock(mutex_);
+            status_.staged = hasStaged ? staged : UpdateRelease{};
+            status_.state = cancel_ ? UpdateState::Cancelled : UpdateState::Error;
+            status_.error = error;
             return;
         }
         UpdateRelease release;
         if (!selectUpdateRelease(response, current_, source_, release, error)) {
-            publish(UpdateState::Error, error);
+            std::lock_guard<std::mutex> lock(mutex_);
+            status_.staged = hasStaged ? staged : UpdateRelease{};
+            status_.state = UpdateState::Error;
+            status_.error = error;
             return;
         }
         std::lock_guard<std::mutex> lock(mutex_);
+        status_.staged = hasStaged ? staged : UpdateRelease{};
         if(cancel_) {
             status_.release={};status_.state=UpdateState::Cancelled;status_.error="Update cancelled";status_.percent=0;
             return;
         }
-        status_.release = std::move(release);
-        status_.state = status_.release.version.empty() ? UpdateState::Current : UpdateState::Available;
+        if (release.version.empty() || (hasStaged && !updateVersionNewer(release.version, staged.version))) {
+            status_.release = hasStaged ? std::move(staged) : UpdateRelease{};
+            status_.state = hasStaged ? UpdateState::Ready : UpdateState::Current;
+            status_.percent = hasStaged ? 100 : 0;
+        } else {
+            status_.release = std::move(release);
+            status_.state = UpdateState::Available;
+        }
         status_.error.clear();
     });
     return true;
@@ -617,6 +740,9 @@ bool SelfUpdater::download() {
         return false;
     }
     if (snapshot.release.bytes > maxNro || snapshot.release.bytes > std::numeric_limits<std::uint64_t>::max() - stagingReserve ||
+#ifdef PAPERNX_UPDATE_TESTING
+        consumeFault(FaultPoint::NoSpace) ||
+#endif
         !hasSpaceFor(executable_.parent_path(), snapshot.release.bytes + stagingReserve)) {
         publish(UpdateState::Error, "There is not enough free space on the SD card");
         return false;
@@ -647,15 +773,10 @@ bool SelfUpdater::download() {
         }
         if(cancel_) {publish(UpdateState::Cancelled,"Update cancelled");return;}
 
-        const auto part = executable_.string() + ".part";
-        const auto pending = executable_.string() + ".new";
-        const auto ready = executable_.string() + ".ready";
-        const auto temporary = ready + ".tmp";
-        // A previous verified candidate (.new/.ready) stays intact until this one is fully validated.
-        std::remove(part.c_str());
-        std::remove(temporary.c_str());
+        const auto part = std::filesystem::path(executable_.string() + ".part");
+        std::remove(part.string().c_str());
 
-        FILE *file = std::fopen(part.c_str(), "wb");
+        FILE *file = std::fopen(part.string().c_str(), "wb");
         if (!file) {
             publish(UpdateState::Error, "Cannot write update to the SD card");
             return;
@@ -667,38 +788,79 @@ bool SelfUpdater::download() {
             }};
         bool ok = request(release.url, certificates_, transfer, error);
         if(ok && cancel_) {ok=false;error="Update cancelled";}
-        if (ok && !durable(file)) { ok = false; error = "Cannot save update to the SD card"; }
+        bool failPayloadSync=false;
+#ifdef PAPERNX_UPDATE_TESTING
+        if(ok)failPayloadSync=consumeFault(FaultPoint::PayloadFsync);
+#endif
+        if (ok && !durable(file,failPayloadSync)) { ok = false; error = "Cannot save update to the SD card"; }
         if (std::fclose(file) != 0) { ok = false; error = "Cannot save update to the SD card"; }
         if (ok) publish(UpdateState::Verifying);
         if (ok) ok = validateNro(part, release.sha256, release.bytes, release.version, error);
+#ifdef PAPERNX_UPDATE_TESTING
+        if (ok && consumeFault(FaultPoint::CancelAfterVerify)) {cancel_ = true;ok = false;error = "Update cancelled";}
+#endif
         if(ok && cancel_) {ok=false;error="Update cancelled";}
-        // Invalidate the old record first, then replace the old payload with the verified one.
-        if (ok && (!removeUpdaterFile(ready) || !removeUpdaterFile(pending))) {ok=false;error="Cannot replace the previous staged update";}
-        const bool replaced = ok; // old candidate is gone from here on
-        if (ok && std::rename(part.c_str(), pending.c_str()) != 0) {
-            ok = false;
-            error = "Cannot stage update on the SD card";
+        StagedCandidate candidates[2];
+        bool valid[2] = {false, false};
+        for (unsigned i = 0; i < 2; ++i) {
+            std::string candidateError;
+            valid[i] = validateCandidate(executable_, i, current_, candidates[i], candidateError);
         }
-        if(ok && cancel_) {ok=false;error="Update cancelled";}
-        if (ok) ok = writeAtomicText(ready, release.sha256 + "\n" + release.version + "\n" +
-                                     std::to_string(release.bytes) + "\n", error);
+        int selected = -1;
+        for (int i = 0; i < 2; ++i) if (valid[i] && (selected < 0 || betterCandidate(candidates[i], candidates[selected]))) selected = i;
+        const int target = selected < 0 ? 0 : 1 - selected;
+        const auto destination = candidateSlot(executable_, static_cast<unsigned>(target));
+        if (ok && selected >= 0 && !updateVersionNewer(release.version, candidates[selected].release.version)) {
+            ok = false;error = "A newer verified update is already staged";
+        }
+        if (ok && (!removeUpdaterFile(destination.record) || !removeUpdaterFile(destination.payload))) {
+            ok = false;error = "Cannot prepare the inactive update slot";
+        }
+#ifdef PAPERNX_UPDATE_TESTING
+        if (ok && consumeFault(FaultPoint::CandidateRename)) {ok = false;error = "Cannot stage update on the SD card";}
+        else
+#endif
+        if (ok && std::rename(part.string().c_str(), destination.payload.string().c_str()) != 0) {
+            ok = false;error = "Cannot stage update on the SD card";
+        }
+        if (ok && cancel_) {ok = false;error = "Update cancelled";}
+#ifdef PAPERNX_UPDATE_TESTING
+        if (ok && consumeFault(FaultPoint::CandidateRecord)) {ok = false;error = "Cannot save update recovery data";}
+        else
+#endif
+        if (ok) {
+            bool failRecordSync=false;
+#ifdef PAPERNX_UPDATE_TESTING
+            failRecordSync=consumeFault(FaultPoint::CandidateRecordFsync);
+#endif
+            ok = writeAtomicText(destination.record, candidateRecord(release, static_cast<unsigned>(target)), error,failRecordSync);
+        }
         if (!ok) {
-            std::remove(part.c_str());
-            std::remove(temporary.c_str());
-            // Failure before the swap leaves the earlier verified candidate untouched; after it,
-            // a half-written .new/.ready pair is never trusted (validatePending re-checks hash).
-            if (replaced) {std::remove(ready.c_str());std::remove(pending.c_str());}
-            publish(cancel_ ? UpdateState::Cancelled : UpdateState::Error,
-                    error.empty() ? "Update download failed" : error);
+            std::remove(part.string().c_str());
+            if (pathExists(destination.record) && !validateNro(destination.payload, release.sha256, release.bytes, release.version, error))
+                std::remove(destination.record.string().c_str());
+            if (!cancel_ || !pathExists(destination.record)) std::remove(destination.payload.string().c_str());
+            std::remove((destination.record.string() + ".tmp").c_str());
+            std::lock_guard<std::mutex> lock(mutex_);
+            status_.staged = selected >= 0 ? candidates[selected].release : UpdateRelease{};
+            status_.state = cancel_ ? UpdateState::Cancelled : UpdateState::Error;
+            status_.error = error.empty() ? "Update download failed" : error;
+            status_.percent = 0;
             return;
         }
+#ifdef PAPERNX_UPDATE_TESTING
+        if (consumeFault(FaultPoint::CancelAfterStage)) cancel_ = true;
+#endif
         std::lock_guard<std::mutex> lock(mutex_);
         if(cancel_) {
-            std::remove(part.c_str());std::remove(pending.c_str());std::remove(temporary.c_str());std::remove(ready.c_str());
+            std::remove(destination.payload.string().c_str());std::remove(destination.record.string().c_str());
             status_.state=UpdateState::Cancelled;status_.error="Update cancelled";status_.percent=0;
+            status_.staged = selected >= 0 ? candidates[selected].release : UpdateRelease{};
             return;
         }
         status_.release = std::move(release);
+        status_.release.stagedFile = destination.payload.string();
+        status_.staged = status_.release;
         status_.percent = 100;
         status_.state = UpdateState::Ready;
     });
@@ -706,15 +868,21 @@ bool SelfUpdater::download() {
 }
 
 bool SelfUpdater::validatePending(UpdateRelease &staged,std::string &error) const {
+    error.clear();
     if (executable_.empty()) return false;
-    std::ifstream ready(executable_.string() + ".ready");
-    std::string hash, version, bytesText, extra;
-    if (!(ready >> hash >> version >> bytesText) || (ready >> extra) || normalizedHash(hash) != hash || !digits(bytesText)) return false;
-    std::uint64_t bytes = 0;
-    const auto parsed = std::from_chars(bytesText.data(), bytesText.data() + bytesText.size(), bytes);
-    if (parsed.ec != std::errc{} || parsed.ptr != bytesText.data() + bytesText.size() || !updateVersionNewer(version, current_)) return false;
-    if (!validateNro(executable_.string() + ".new", hash, bytes, version, error)) return false;
-    staged = UpdateRelease{};staged.version = version;staged.sha256 = hash;staged.bytes = bytes;
+    StagedCandidate best;
+    bool found = false;
+    for (unsigned i = 0; i < 2; ++i) {
+        StagedCandidate candidate;
+        std::string candidateError;
+        if (validateCandidate(executable_, i, current_, candidate, candidateError) &&
+            (!found || betterCandidate(candidate, best))) {
+            best = std::move(candidate);
+            found = true;
+        }
+    }
+    if (!found) return false;
+    staged = std::move(best.release);
     return true;
 }
 
@@ -724,9 +892,11 @@ SelfUpdater::BootRecovery SelfUpdater::prepareBoot(std::string &error) {
     const auto started = std::filesystem::path(executable_.string() + ".boot.started");
     const auto confirmed = std::filesystem::path(executable_.string() + ".boot.ok");
     if (pathExists(confirmed)) {
-        // Never drop the only known-good backup while the canonical NRO is absent.
-        if (!pathExists(executable_) && pathExists(executable_.string() + ".old")) {
-            error = "PaperNX.nro is missing; restore the retained .old backup manually";
+        // A confirmed marker cannot make recovery files disposable while the app NRO is absent.
+        if (!pathExists(executable_)) {
+            error = pathExists(executable_.string() + ".old")
+                ? "PaperNX.nro is missing; restore the retained .old backup manually"
+                : "PaperNX.nro is missing; restore a retained backup manually";
             return BootRecovery::Error;
         }
         if (pathExists(executable_.string() + ".old") && std::remove((executable_.string() + ".old").c_str()) != 0) {
@@ -750,8 +920,10 @@ SelfUpdater::BootRecovery SelfUpdater::prepareBoot(std::string &error) {
             error = "Update recovery data is incomplete; preserve the NRO files and restore PaperNX.nro manually";
             return BootRecovery::Error;
         }
-        if (pathExists(backup) && !pathExists(executable_)) {
-            error = "PaperNX.nro is missing; restore the retained .old backup manually";
+        if (!pathExists(executable_)) {
+            error = pathExists(backup)
+                ? "PaperNX.nro is missing; restore the retained .old backup manually"
+                : "PaperNX.nro is missing; restore a retained backup manually";
             return BootRecovery::Error;
         }
         return BootRecovery::Normal;
@@ -786,6 +958,10 @@ bool SelfUpdater::confirmBoot(std::string &error) {
     error.clear();
     const auto marker = std::filesystem::path(executable_.string() + ".boot");
     if (!pathExists(marker)) return true;
+    if (!pathExists(executable_)) {
+        error = "Cannot confirm update startup because PaperNX.nro is missing; recovery files were preserved";
+        return false;
+    }
     const auto confirmed = std::filesystem::path(executable_.string() + ".boot.ok");
     if (!writeAtomicText(confirmed, "PaperNX startup confirmed\n", error)) return false;
     if (pathExists(executable_.string() + ".old") && std::remove((executable_.string() + ".old").c_str()) != 0) {

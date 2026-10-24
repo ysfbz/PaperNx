@@ -12,7 +12,7 @@ namespace fs=std::filesystem;
 static std::string read(const fs::path &p){std::ifstream f(p,std::ios::binary);return {std::istreambuf_iterator<char>(f),{}};}
 static UpdateStatus wait(SelfUpdater &updater){
     const auto end=std::chrono::steady_clock::now()+std::chrono::seconds(15);
-    while(std::chrono::steady_clock::now()<end){auto s=updater.status();if(s.state!=UpdateState::Checking&&s.state!=UpdateState::Downloading)return s;std::this_thread::sleep_for(std::chrono::milliseconds(2));}
+    while(std::chrono::steady_clock::now()<end){auto s=updater.status();if(s.state!=UpdateState::Checking&&s.state!=UpdateState::Downloading&&s.state!=UpdateState::Verifying)return s;std::this_thread::sleep_for(std::chrono::milliseconds(2));}
     assert(false && "Updater timed out");return {};
 }
 static void unit(){
@@ -59,9 +59,12 @@ static void unit(){
         "[{\"tag_name\":\"9.0.0\",\"name\":12}]",
         "[{\"tag_name\":\"9.0.0\",\"body\":{}}]",
         "[{\"tag_name\":\"9.0.0\",\"assets\":{}}]",
+        "[{\"tag_name\":\"9.0.0\",\"assets\":[\"not-an-object\"]}]",
+        "[{\"tag_name\":\"9.0.0\",\"assets\":[null]}]",
         "[{\"tag_name\":\"9.0.0\",\"assets\":[{\"name\":12}]}]",
         "[{\"tag_name\":\"9.0.0\",\"assets\":[{\"size\":-1}]}]",
-        "[{\"tag_name\":\"9.0.0\",\"assets\":[{\"size\":1.5}]}]"
+        "[{\"tag_name\":\"9.0.0\",\"assets\":[{\"size\":1.5}]}]",
+        "[{\"tag_name\":\"9.0.0\",\"assets\":[{\"size\":18446744073709551616}]}]"
     })assert(!selectUpdateRelease(bad,"0.12.0-reader.4",source,r,error));
     assert(!selectUpdateRelease("[{\"tag_name\":\"1.0.0\",\"assets\":[{\"name\":\"a\",\"name\":\"b\"}]}]","0.12.0-reader.4",source,r,error));
     std::string tooDeep="[{\"tag_name\":\"1.0.0\",\"extra\":";tooDeep.append(26,'[');tooDeep+="0";tooDeep.append(26,']');tooDeep+="}]";
@@ -105,6 +108,24 @@ static void unit(){
      std::ofstream(executable.string()+".boot.started");}
     assert(recovery.prepareBoot(error)==SelfUpdater::BootRecovery::RolledBack);
     assert(read(executable)=="previous"&&!fs::exists(executable.string()+".old")&&!fs::exists(executable.string()+".boot.started"));
+    const auto missingRoot=recoveryRoot/"missing";fs::create_directories(missingRoot);
+    const auto missingExe=missingRoot/"PaperNX.nro";
+    std::ofstream(missingExe.string()+".new")<<"candidate retained";
+    std::ofstream(missingExe.string()+".ready")<<"recovery record retained";
+    SelfUpdater missing;missing.configure(missingExe,"0.12.0-reader.4");
+    assert(missing.prepareBoot(error)==SelfUpdater::BootRecovery::Error&&!error.empty());
+    assert(read(missingExe.string()+".new")=="candidate retained"&&read(missingExe.string()+".ready")=="recovery record retained");
+    {std::ofstream(missingExe.string()+".old")<<"previous version";
+     std::ofstream(missingExe.string()+".boot")<<"legacy boot record";
+     std::ofstream(missingExe.string()+".boot.started")<<"started";
+     std::ofstream(missingExe.string()+".boot.ok")<<"confirmed";}
+    assert(missing.prepareBoot(error)==SelfUpdater::BootRecovery::Error&&!error.empty());
+    assert(read(missingExe.string()+".old")=="previous version"&&read(missingExe.string()+".boot") == "legacy boot record" &&
+           read(missingExe.string()+".boot.started")=="started"&&read(missingExe.string()+".boot.ok")=="confirmed" &&
+           read(missingExe.string()+".new")=="candidate retained"&&read(missingExe.string()+".ready")=="recovery record retained");
+    assert(!missing.confirmBoot(error)&&!error.empty());
+    assert(read(missingExe.string()+".old")=="previous version"&&fs::exists(missingExe.string()+".boot")&&
+           fs::exists(missingExe.string()+".boot.started")&&fs::exists(missingExe.string()+".boot.ok"));
     fs::remove_all(recoveryRoot);
     std::cout<<"PASS: prerelease/stable version ordering, scoped bounded JSON, Unicode notes, malformed responses, draft filtering and asset origin\n";
 }
@@ -120,7 +141,7 @@ static void network(int argc,char **argv){
     if(scenario=="orphan-old") std::ofstream(path.string()+".old")<<"user backup";
     if(scenario=="legacy-state") std::ofstream(path.string()+".swap")<<"legacy transaction";
     if(scenario=="stale-part-error") {fs::create_directories(path.string()+".part");std::ofstream(path.string()+".part/sentinel")<<"preserve";}
-    const auto original=read(path);UpdateSource source{base+"api",base+"download/"};
+    const auto original=read(path),priorCandidate=read(path.string()+".new"),priorSecond=read(path.string()+".new.1");UpdateSource source{base+"api",base+"download/"};
     SelfUpdater updater;updater.configureForTesting(path,"0.12.0-reader.4",ca,source);
     if(scenario=="stale-part-error") {
         assert(!updater.check()&&updater.status().state==UpdateState::Error&&read(path)==original);
@@ -138,10 +159,41 @@ static void network(int argc,char **argv){
     if(scenario=="current"||scenario=="downgrade"){assert(state.state==UpdateState::Current);return;}
     assert(state.state==UpdateState::Available&&state.release.version=="0.13.0");
     if(scenario=="missing"||scenario=="oversized"){assert(!state.release.installable()&&!updater.download());return;}
+    if(scenario=="space-error") {
+        fs::remove(path);assert(fs::remove(path.parent_path()));
+        assert(!updater.download()&&updater.status().state==UpdateState::Error);
+        assert(!fs::exists(path)&&!fs::exists(path.string()+".part"));userDataUnchanged();return;
+    }
+    if(scenario=="preserve-nospace") {
+        const auto prior=read(path.string()+".new");assert(!prior.empty()&&state.staged.version=="0.12.5");
+        SelfUpdater::failNextOperationForTesting(SelfUpdater::FaultPoint::NoSpace);
+        assert(!updater.download()&&updater.status().state==UpdateState::Error);
+        assert(read(path.string()+".new")==prior&&fs::exists(path.string()+".ready"));userDataUnchanged();return;
+    }
     if(scenario=="legacy-state") {
         assert(!updater.download()&&updater.status().state==UpdateState::Error);
-        assert(read(path)==original&&fs::exists(path.string()+".swap"));userDataUnchanged();return;
+        assert(read(path)==original&&fs::exists(path.string()+".swap"));
+        if(!priorCandidate.empty())assert(read(path.string()+".new")==priorCandidate&&fs::exists(path.string()+".ready"));
+        userDataUnchanged();return;
     }
+    if(scenario=="preserve-rename"||scenario=="preserve-record"||scenario=="preserve-payload-fsync"||scenario=="preserve-record-fsync"||scenario=="preserve-verify-cancel"||scenario=="preserve-cancel"||scenario=="preserve-stage-cancel") {
+        const auto prior=read(path.string()+".new");assert(!prior.empty()&&state.staged.version=="0.12.5");
+        const auto fault=scenario=="preserve-rename"?SelfUpdater::FaultPoint::CandidateRename:
+            scenario=="preserve-record"?SelfUpdater::FaultPoint::CandidateRecord:
+            scenario=="preserve-payload-fsync"?SelfUpdater::FaultPoint::PayloadFsync:
+            scenario=="preserve-record-fsync"?SelfUpdater::FaultPoint::CandidateRecordFsync:
+            scenario=="preserve-verify-cancel"?SelfUpdater::FaultPoint::CancelAfterVerify:
+            scenario=="preserve-stage-cancel"?SelfUpdater::FaultPoint::CancelAfterStage:SelfUpdater::FaultPoint::None;
+        if(fault!=SelfUpdater::FaultPoint::None)SelfUpdater::failNextOperationForTesting(fault);
+        assert(updater.download());assert(!updater.download());
+        if(scenario=="preserve-cancel") {std::this_thread::sleep_for(std::chrono::milliseconds(70));updater.cancel();}
+        state=wait(updater);
+        assert(state.state==(scenario=="preserve-cancel"||scenario=="preserve-verify-cancel"||scenario=="preserve-stage-cancel"?UpdateState::Cancelled:UpdateState::Error));
+        assert(read(path)==original&&read(path.string()+".new")==prior&&fs::exists(path.string()+".ready"));
+        if(scenario=="preserve-stage-cancel")assert(!fs::exists(path.string()+".new.1")&&!fs::exists(path.string()+".ready.1"));
+        assert(state.staged.stagedFile==path.string()+".new"&&state.staged.version=="0.12.5");userDataUnchanged();return;
+    }
+    const bool preserveInvalid=scenario=="preserve-corrupt"||scenario=="preserve-badapp"||scenario=="preserve-badversion"||scenario=="preserve-truncated";
     if(scenario=="write-error"){fs::create_directories(path.string()+".part");std::ofstream(path.string()+".part/sentinel")<<"keep";}
     assert(updater.download());assert(!updater.download());
     if(scenario=="cancel"){std::this_thread::sleep_for(std::chrono::milliseconds(70));updater.cancel();state=wait(updater);}
@@ -160,18 +212,26 @@ static void network(int argc,char **argv){
     }
     else state=wait(updater);
     assert(read(path)==original); // No network outcome can overwrite the running app.
-    const bool failed=scenario=="corrupt"||scenario=="badapp"||scenario=="badversion"||scenario=="truncated"||scenario=="cancel"||scenario=="cancel-near-completion"||scenario=="write-error";
+    const bool failed=scenario=="corrupt"||scenario=="badapp"||scenario=="badversion"||scenario=="truncated"||preserveInvalid||scenario=="cancel"||scenario=="cancel-near-completion"||scenario=="write-error";
     if(failed){assert((state.state==UpdateState::Error||state.state==UpdateState::Cancelled)&&!state.error.empty());
         if(scenario=="cancel"||scenario=="cancel-near-completion") {
             updater.reportError("Network services are unavailable");
             const auto reported=updater.status();assert(reported.state==UpdateState::Error&&reported.error=="Network services are unavailable");
         }
         if(scenario=="write-error")assert(fs::exists(path.string()+".part/sentinel"));else assert(!fs::exists(path.string()+".part"));
-        assert(!fs::exists(path.string()+".new")&&!fs::exists(path.string()+".ready"));return;}
+        if(preserveInvalid) {
+            assert(read(path.string()+".new")==priorCandidate&&fs::exists(path.string()+".ready"));
+            assert(!fs::exists(path.string()+".new.1")&&!fs::exists(path.string()+".ready.1"));
+            assert(state.staged.version=="0.12.5");
+        } else assert(!fs::exists(path.string()+".new")&&!fs::exists(path.string()+".ready"));
+        return;}
     if(state.state!=UpdateState::Ready)std::cerr<<"Update failed ("<<scenario<<"): "<<state.error<<'\n';
-    assert(state.state==UpdateState::Ready);const auto downloaded=read(path.string()+".new");assert(downloaded.size()==state.release.bytes);
+    assert(state.state==UpdateState::Ready);const fs::path stagedPath=state.release.stagedFile;const auto downloaded=read(stagedPath);assert(downloaded.size()==state.release.bytes);
     assert(read(path)==original&&downloaded.size()==state.release.bytes);
-    assert(fs::exists(path.string()+".new")&&fs::exists(path.string()+".ready"));
+    assert(fs::exists(stagedPath)&&fs::exists(stagedPath.string()==path.string()+".new"?path.string()+".ready":path.string()+".ready.1"));
+    if(scenario=="two-valid-candidates")assert(read(path.string()+".new.1")==priorSecond&&state.staged.version=="0.13.0");
+    if(scenario=="two-valid-tie")assert(stagedPath==path.string()+".new.1"&&read(path.string()+".new")==priorCandidate);
+    if(scenario=="invalid-new-fallback")assert(read(path.string()+".new")==priorCandidate&&stagedPath==path.string()+".new.1");
     assert((scenario=="orphan-old" ? read(path.string()+".old")=="user backup" : !fs::exists(path.string()+".old")) &&
            !fs::exists(path.string()+".swap")&&!fs::exists(path.string()+".boot"));
     if(scenario=="tampered"){

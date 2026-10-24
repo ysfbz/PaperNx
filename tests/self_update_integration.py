@@ -50,9 +50,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
             tag = "v0.11.0"
 
         payload = self.server.current_nro
-        if scenario == "badapp":
+        if scenario in ("badapp", "preserve-badapp"):
             payload = make_nro("Not PaperNX")
-        elif scenario == "badversion":
+        elif scenario in ("badversion", "preserve-badversion"):
             payload = make_nro(version="0.12.0")
 
         if self.path == "/api":
@@ -63,7 +63,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 assets = [{"name": "PaperNX.nro", "size": 256 * 1024 * 1024 + 1 if scenario == "oversized" else len(payload),
                            "browser_download_url": asset_url}]
                 if scenario != "missing":
-                    assets[0]["digest"] = "sha256:" + ("0" * 64 if scenario == "corrupt" else hashlib.sha256(payload).hexdigest())
+                    assets[0]["digest"] = "sha256:" + ("0" * 64 if scenario in ("corrupt", "preserve-corrupt") else hashlib.sha256(payload).hexdigest())
                     checksum_url = f"https://localhost:{self.server.server_port}/download/{tag}/PaperNX.nro.sha256"
                     assets.append({"name": "PaperNX.nro.sha256", "browser_download_url": checksum_url})
                 body = json.dumps([{"tag_name": tag, "name": "PaperNX test", "body": "Test notes",
@@ -77,7 +77,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if self.path.endswith("PaperNX.nro.sha256"):
             body = (hashlib.sha256(payload).hexdigest() + "  PaperNX.nro\n").encode()
         elif self.path.endswith("PaperNX.nro"):
-            body = payload[:-64] if scenario == "truncated" else payload
+            body = payload[:-64] if scenario in ("truncated", "preserve-truncated") else payload
         else:
             self.send_error(404)
             return
@@ -85,7 +85,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         try:
-            if scenario == "cancel":
+            if scenario in ("cancel", "preserve-cancel"):
                 for start in range(0, len(body), 128):
                     self.wfile.write(body[start:start + 128])
                     self.wfile.flush()
@@ -124,14 +124,37 @@ def main():
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         base = f"https://localhost:{server.server_port}/"
-        scenarios = ("current", "downgrade", "missing", "oversized", "success", "checksum-fallback", "orphan-old", "legacy-state",
-                     "corrupt", "badapp", "badversion", "truncated", "cancel", "cancel-near-completion", "write-error",
+        scenarios = ("current", "downgrade", "missing", "oversized", "space-error", "success", "checksum-fallback", "orphan-old", "legacy-state",
+                     "preserve-nospace", "preserve-rename", "preserve-record", "preserve-payload-fsync", "preserve-record-fsync", "preserve-verify-cancel", "preserve-cancel", "preserve-stage-cancel",
+                     "two-valid-candidates", "two-valid-tie", "invalid-new-fallback",
+                     "corrupt", "badapp", "badversion", "truncated", "preserve-corrupt", "preserve-badapp", "preserve-badversion", "preserve-truncated",
+                     "cancel", "cancel-near-completion", "write-error",
                      "stale-part", "stale-part-error", "orphan-new", "resume-ready", "tampered", "missing-marker",
                      "malformed", "tls-reject", "http")
         try:
             for scenario in scenarios:
                 server.scenario = scenario
                 server.current_nro = make_nro() + (bytes(16 * 1024 * 1024) if scenario == "cancel-near-completion" else b"")
+                if scenario.startswith("preserve-") or scenario in ("legacy-state", "two-valid-candidates", "two-valid-tie", "invalid-new-fallback"):
+                    executable = root / scenario / "custom folder" / "קורא.nro"
+                    executable.parent.mkdir(parents=True)
+                    old_payload = make_nro(version="0.12.5")
+                    pathlib.Path(str(executable) + ".new").write_bytes(old_payload)
+                    pathlib.Path(str(executable) + ".ready").write_text(
+                        hashlib.sha256(old_payload).hexdigest() + "\n0.12.5\n" + str(len(old_payload)) + "\n",
+                        encoding="ascii")
+                    if scenario in ("two-valid-candidates", "two-valid-tie"):
+                        second = make_nro(version="0.12.7" if scenario == "two-valid-candidates" else "0.12.5")
+                        pathlib.Path(str(executable) + ".new.1").write_bytes(second)
+                        pathlib.Path(str(executable) + ".ready.1").write_text(
+                            hashlib.sha256(second).hexdigest() + "\n0.12.7\n" + str(len(second)) +
+                            "\nslot=1\ngeneration=123456789-0123456789ab\nReady\n", encoding="ascii")
+                    elif scenario == "invalid-new-fallback":
+                        second = make_nro(version="0.12.7")
+                        pathlib.Path(str(executable) + ".new.1").write_bytes(second)
+                        pathlib.Path(str(executable) + ".ready.1").write_text(
+                            "0" * 64 + "\n0.12.7\n" + str(len(second)) +
+                            "\nslot=1\ngeneration=123456789-0123456789ab\nReady\n", encoding="ascii")
                 if scenario == "resume-ready":
                     executable = root / scenario / "custom folder" / "קורא.nro"
                     executable.parent.mkdir(parents=True)
