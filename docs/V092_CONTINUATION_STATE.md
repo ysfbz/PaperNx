@@ -195,3 +195,10 @@ The verified/pushed branch HEAD at the start of this note was `ed9e3b69c184de1b4
 - The test injects SDL events; physical Joy-Con mapping, button edge behavior on-device and Switch controller reconnect remain **UNVERIFIED**. No production code change was needed.
 - Read-only updater documentation audit found no stale current-behavior claim in `docs/UPDATER.md`.
 - **Next:** resume G5 scanner/index architecture/Ponytail review, then the remaining current-source test gates. Full native CTest, ASan/UBSan, physical Switch and independent reimplementation remain open. Overall status is **INCOMPLETE — BLOCKERS REMAIN**.
+
+## 2026-10-24 updater HTTPS current-source retest
+
+- Production source is unchanged: updater output-clearing fix `ee429ec197a06a3287652985789e53abfcab178c`; latest core scan fix `1daedb63246384a73afb979978230f75716c2165`.
+- `docker compose run --rm desktop bash -lc 'cmake --build build-desktop --target PaperNX papernx_self_update_tests --parallel 4 && ctest --test-dir build-desktop --output-on-failure -R "^papernx_self_update_tests$|^papernx_self_update_network_tests$"'` — desktop build PASS; CTest **2/2 PASS**, 2.25 seconds.
+- An initial command treated the network CTest record name as a Ninja build target and stopped before running tests. CTest listing confirmed that `papernx_self_update_network_tests` is a test record driven by the `papernx_self_update_tests` executable; the corrected invocation above passed.
+- Host HTTPS integration is current-source evidence for desktop only. Switch TLS/NIFM and SD interruption are still **UNVERIFIED**; full native CTest/sanitizers remain open. Overall decision remains **INCOMPLETE — BLOCKERS REMAIN**.

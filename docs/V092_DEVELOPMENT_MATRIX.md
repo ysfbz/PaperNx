@@ -77,6 +77,13 @@
 
 **Decision remains INCOMPLETE — BLOCKERS REMAIN.** Full current-HEAD native/sanitizer gates, independent scanner/index/parser redesign and physical Switch acceptance remain open.
 
+## 2026-10-24 — G9 updater current-source HTTPS retest
+
+- Production source is unchanged from updater fix `ee429ec197a06a3287652985789e53abfcab178c` and core scan fix `1daedb63246384a73afb979978230f75716c2165`.
+- Desktop build of `PaperNX` and `papernx_self_update_tests` passed; CTest `papernx_self_update_tests` plus `papernx_self_update_network_tests` **2/2 PASS**, 2.25 seconds. The network test is a CTest record, not a Ninja target; the corrected command builds the executable and selects both CTest records.
+- A mistaken first invocation stopped at target resolution before any tests ran. It is not counted as test evidence.
+- Switch TLS/NIFM, SD interruption, full native CTest and sanitizers remain **UNVERIFIED / NOT RUN**. Overall decision stays **INCOMPLETE — BLOCKERS REMAIN**.
+
 ---
 
 ## G. 2026-10-23 final hardening audit — current source of truth

@@ -482,3 +482,12 @@ Bu tek koşu yazılım renderer’ı host ölçümüdür; hızlanma iddiası de�
 - Updater dokümanı ayrıca kontrol edildi; mevcut TLS, verified-manual staging ve harici değiştirme/geri-kurtarma açıklamalarında güncel koda aykırı ifade bulunmadı.
 
 **Karar değişmedi: INCOMPLETE — BLOCKERS REMAIN.** Tam güncel native CTest, sanitizers, bağımsız scanner/index/parser tasarımı ve fiziksel Switch kabulü açık.
+
+## Y. 2026-10-24 — G9 updater HTTPS regresyonunun güncel kaynakta tekrarı
+
+- **Kaynak durumu:** updater kaynak değişikliği `ee429ec197a06a3287652985789e53abfcab178c`; son kaynaklı kütüphane değişikliği `1daedb63246384a73afb979978230f75716c2165`. Bu QA turunda üretim kodu değişmedi.
+- **Geçerli komut:** `docker compose run --rm desktop bash -lc 'cmake --build build-desktop --target PaperNX papernx_self_update_tests --parallel 4 && ctest --test-dir build-desktop --output-on-failure -R "^papernx_self_update_tests$|^papernx_self_update_network_tests$"'` — build PASS; CTest **2/2 PASS** (`papernx_self_update_tests`, `papernx_self_update_network_tests`), toplam 2,25 saniye.
+- İlk denemede network CTest kayıt adı yanlışlıkla Ninja build target’ı olarak verildi; Ninja test başlamadan `unknown target` döndürdü. CTest kayıt listesi incelendi, doğru executable target ile testler tekrar çalıştırıldı. İlk komut bir test sonucu değildir.
+- Yerel HTTPS fault-integration sonucu updater’ın TLS ve staging hata yollarını masaüstünde doğrular; Switch TLS/NIFM, SD kesintisi ve fiziksel manuel NRO değiştirme **UNVERIFIED** kalır. Tam native CTest ve sanitizer koşulmadı.
+
+**Karar: INCOMPLETE — BLOCKERS REMAIN.** Bağımsız scanner/index/parser tasarımı, tam current-source test/sanitizer kapıları ve fiziksel Switch doğrulaması açık.
