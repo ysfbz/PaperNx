@@ -407,3 +407,17 @@ Bu bölüm, ana v0.9.2 hardening görevinin devamıdır; release hazırlığı v
 **Doküman commit'i:** `9d42fa2178498266eed2a02775cba0eb730c4d7e` (`docs(v0.9.2): update G8 provenance and matrix`); bu root rapor eklentisi ayrı commit'te kaydedilecek.
 
 **Karar: INCOMPLETE — BLOCKERS REMAIN.** The library scanner no longer persists a silently truncated index. Independent source redesign, full current-HEAD native/sanitizer gates, actual document performance and physical device acceptance remain open. No release, tag, PR, merge or GitHub Actions run was created.
+
+## S. 2026-10-24 — G9 updater hata çıktısının temizlenmesi
+
+- **Dal / kaynak commit:** `feature/v0.9.2-complete-reader-enhancements` / `ee429ec197a06a3287652985789e53abfcab178c` (`fix(updater): clear stale release output on errors`).
+- `selectUpdateRelease()` artık parse veya kurulu sürüm doğrulamasından önce çıktı `UpdateRelease` nesnesini sıfırlıyor. Hatalı JSON ve geçersiz kurulu sürüm önceki denemeden kalmış aday sürüm/URL/hash bilgisini bırakamıyor.
+- **Test değişikliği:** `tests/self_update_tests.cpp` önce stale alanlarla dolu çıktı verir; hatalı ama kısmen geçerli JSON ve geçersiz sürüm durumlarında bütün çıktı alanlarının temiz kaldığını doğrular.
+
+| Kontrol | Sonuç | Kanıt |
+|---|---|---|
+| Desktop build | **PASS** | `docker compose run --rm desktop bash -lc 'cmake --build build-desktop --target PaperNX papernx_self_update_tests --parallel 4'`. |
+| Odaklı CTest | **PASS, 1/1** | Aynı komut zincirindeki `ctest --test-dir build-desktop --output-on-failure -R "^papernx_self_update_tests$"`. |
+| HTTPS entegrasyonu, Switch build, tam CTest, ASan/UBSan ve fiziksel Switch | **NOT RUN / UNVERIFIED** | Bu küçük API hata-sözleşmesi değişikliği için tekrar edilmedi; önceki kanıtlar bu HEAD için güncel sayılmaz. |
+
+Provenance eki ve lisans özeti G9 commit/hash ile güncellendi. `src/self_update.cpp` fork kökenli updater’ın PaperNX uyarlaması olarak kalıyor; Refael Avramashvili atfı ve AGPL-3.0 bildirimi korundu. Genel release kararı değişmedi: **INCOMPLETE — BLOCKERS REMAIN**. Bir sonraki iş scanner/index mimari sorumluluklarını ve kalan Ponytail denetimini sürdürmek.

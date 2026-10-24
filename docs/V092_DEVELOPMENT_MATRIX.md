@@ -37,6 +37,12 @@
 - UTF-8 and packaging results above are historical checks from prior snapshots, not a verification claim for the current source HEAD.
 - `APP_VERSION` remains v0.9.1. Main branch untouched. No tags, releases, or PRs created.
 
+## 2026-10-24 — G9 updater failure-output contract
+
+- **Source commit:** `ee429ec197a06a3287652985789e53abfcab178c`. `selectUpdateRelease()` clears the output before validation, so malformed release JSON or an invalid installed version cannot leave a stale candidate available to the caller.
+- **Verification:** `PaperNX` and `papernx_self_update_tests` built in the desktop container; focused CTest **1/1 PASS**. The test seeds stale output and checks both error paths clear it.
+- **Not rerun:** HTTPS integration, Switch cross-build, full CTest, sanitizers, and physical Switch. This checkpoint does not close updater hardware or power-loss acceptance and does not change the overall **INCOMPLETE — BLOCKERS REMAIN** decision.
+
 ---
 
 ## G. 2026-10-23 final hardening audit — current source of truth

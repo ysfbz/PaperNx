@@ -2,7 +2,7 @@
 
 **Updated:** 2026-10-24
 **Branch:** `feature/v0.9.2-complete-reader-enhancements`
-**Latest source commit:** `c81145c9208455008db91bac56d9be4b920d8364` (G8 bounded scan completion checkpoint).
+**Latest source commit:** `ee429ec197a06a3287652985789e53abfcab178c` (G9 updater error-output contract).
 **Last source commit before the current hardening changes:** `bb9d8579db9ccf0d10b5843e1929c2e696565c59`
 **Hardening source commits:** `913fb8f` and `1cb06a1`.
 **Audit documentation:** committed on this feature branch; use `git log` for the final report commit SHA.
@@ -148,3 +148,12 @@ The verified/pushed branch HEAD at the start of this note was `ed9e3b69c184de1b4
 - **Provenance:** current blob snapshot appended to [`V092_SOURCE_PROVENANCE_AUDIT.md`](V092_SOURCE_PROVENANCE_AUDIT.md). The library scanner/index still retains fork-derived/adapted history; Refael Bar and AGPL-3.0 attribution remain.
 - **Not run / still open:** 10,001-item end-to-end scanner stress, full CTest, ASan/UBSan, source clean-room redesign, updater parser redesign, physical Switch and real cover performance. No independent-origin claim is made.
 - **Next:** continue source-boundary cleanup and Ponytail audit; keep overall status `INCOMPLETE — BLOCKERS REMAIN`.
+
+## 2026-10-24 G9 updater error-output checkpoint
+
+- **Source commit:** `ee429ec197a06a3287652985789e53abfcab178c` (`fix(updater): clear stale release output on errors`).
+- `selectUpdateRelease()` now clears its output before parsing or validating the installed version, so either failure cannot expose a previous release result.
+- **Targeted desktop verification:** `docker compose run --rm desktop bash -lc 'cmake --build build-desktop --target PaperNX papernx_self_update_tests --parallel 4 && ctest --test-dir build-desktop --output-on-failure -R "^papernx_self_update_tests$"'` — build PASS; CTest **1/1 PASS**.
+- The test covers malformed JSON after an earlier valid release and invalid installed version. HTTPS integration, Switch build, full native CTest and physical Switch were not rerun for this change.
+- Provenance snapshot is recorded in [`V092_SOURCE_PROVENANCE_AUDIT.md`](V092_SOURCE_PROVENANCE_AUDIT.md). Updater lineage remains fork-derived/adapted; Refael Avramashvili attribution and AGPL-3.0 notices remain appropriate.
+- **Next:** continue scanner/index responsibility audit and Ponytail review, then run only remaining feasible focused gates. Keep overall status `INCOMPLETE — BLOCKERS REMAIN`.

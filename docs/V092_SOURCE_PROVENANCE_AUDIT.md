@@ -249,3 +249,14 @@ G8 also changed pre-existing `src/core.cpp` and `include/papernx/core.hpp`; this
 The original six-path byte-identity statement remains true only at historical feature HEAD `a35aa7b0f51aee58f44d524616a2aa55477d670c`; it must not be worded as current identity. Refael Bar's scanner/index/theme credit, Refael Avramashvili's updater/parser credit, existing PaperNX authorship and AGPL-3.0 notices remain appropriate. No clean-room claim is made.
 
 **Correct current wording:** “At feature HEAD `c81145c9208455008db91bac56d9be4b920d8364`, none of the five extant paths among the six originally listed is byte-identical to the pinned fork; `src/self_update.cpp` and `src/update_json.hpp` retain their G4/G5 project blobs, which already differ from the fork, and `include/papernx/interface_theme.hpp` is deleted. The original all-six identity statement applies only to historical feature HEAD `a35aa7b0f51aee58f44d524616a2aa55477d670c`. The scanner/index/theme and updater/parser lineage remains fork-derived/adapted; preserve Refael Bar and Refael Avramashvili attribution with AGPL-3.0 notices. `page_cache.cpp` and `page_curl.hpp` are prior v0.9.1 shared code, not v0.9.2 imports.”
+
+## Current provenance snapshot — G9 updater error-output contract `ee429ec197a06a3287652985789e53abfcab178c`
+
+G9 changes only the failure contract of `selectUpdateRelease()`: the caller-provided `UpdateRelease` is cleared before JSON or installed-version validation, so a failed call cannot leave a previous candidate in the output. This is a PaperNX hardening change within the existing updater; it does not change the updater's fork-derived ancestry or establish independent authorship.
+
+| Path | Feature blob at G9 | Pinned fork blob | Finding |
+|---|---|---|---|
+| `src/self_update.cpp` | `1e5068f0d518e57c804e862c5ef5c91c39af6345` | `e7e5c52c1b4b2137d92d1c6902a011d1d3b71b6c` | New PaperNX failure-output fix; the wider updater remains fork-derived/adapted. Retain Refael Avramashvili / AGPL-3.0 attribution. |
+| `src/update_json.hpp` | `677a6931a6fbbf583ba8388fff217dcaef5b091b` | `d4e3bb96dcb2d363e23d40a83775c02768fc5394` | Unchanged from G8; its release-specific bounded parser is a material redesign that retains fork lineage. Retain Refael Avramashvili / AGPL-3.0 attribution. |
+
+The new assertions in `tests/self_update_tests.cpp` seed a prior release result, then verify that malformed JSON and an invalid installed version both leave the output empty. The focused `papernx_self_update_tests` CTest passed 1/1 after rebuilding `PaperNX` and the test target. The HTTPS integration target was not rerun for this small output-contract change. The historical six-path byte-identity statement still applies only to `a35aa7b0f51aee58f44d524616a2aa55477d670c`; none of the five extant paths is byte-identical to the pinned fork at G9, and `include/papernx/interface_theme.hpp` remains deleted. Preserve both fork contributor credits and AGPL-3.0 provenance.
