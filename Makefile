@@ -64,9 +64,10 @@ APP_VERSION	:=	0.9.1
 # options for code generation
 #---------------------------------------------------------------------------------
 ARCH	:=	-march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
+SOURCE_IDENTITY_DEFS := $(shell python3 "$(TOPDIR)/scripts/source_identity.py" --format make --root "$(TOPDIR)")
 
 CFLAGS	:=	-g -Wall -O2 -ffunction-sections -fdata-sections \
-			$(ARCH) $(DEFINES)
+			$(ARCH) $(DEFINES) $(SOURCE_IDENTITY_DEFS)
 
 CFLAGS	+=	-D__SWITCH__ -D_POSIX_C_SOURCE=200809L -DUSE_CUSTOM_ALLOCATOR $(INCLUDE) `sdl2-config --cflags`
 

@@ -1,6 +1,7 @@
 """Structural Switch artifact checks; these do not establish hardware compatibility."""
 import struct
 import hashlib
+import re
 import subprocess
 from pathlib import Path
 
@@ -8,20 +9,32 @@ from pathlib import Path
 def source_identity(root):
     root = Path(root)
     entries = []
-    for folder in ("src", "include", "third_party"):
+    for folder in ("src", "include", "third_party", "assets", "fonts", "romfs"):
         for path in sorted((root / folder).rglob("*")):
             if path.is_file():
                 entries.append((path.relative_to(root).as_posix(), hashlib.sha256(path.read_bytes()).hexdigest()))
-    for name in ("Makefile", "CMakeLists.txt", "Dockerfile", "scripts/build-mupdf-switch.sh"):
+    for name in ("Makefile", "CMakeLists.txt", "Dockerfile", "scripts/build-mupdf-switch.sh",
+                 "scripts/artifact_validation.py", "scripts/build_receipt.py", "scripts/source_identity.py"):
         path = root / name
-        entries.append((name, hashlib.sha256(path.read_bytes()).hexdigest()))
+        if path.is_file():
+            entries.append((name, hashlib.sha256(path.read_bytes()).hexdigest()))
     digest = hashlib.sha256("".join(f"{name}\t{sha}\n" for name, sha in sorted(entries)).encode()).hexdigest()
-    revision = "UNVERIFIED"
+    revision = "unknown"
+    dirty = "unknown"
+    safe_root = root.resolve().as_posix()
     try:
-        revision = subprocess.check_output(["git", "-c", f"safe.directory={root.resolve().as_posix()}", "rev-parse", "HEAD"], cwd=root, stderr=subprocess.DEVNULL, text=True).strip()
+        git = ["git", "-c", f"safe.directory={safe_root}"]
+        revision = subprocess.check_output(git + ["rev-parse", "--verify", "HEAD"], cwd=root, stderr=subprocess.DEVNULL, text=True).strip()
+        if not re.fullmatch(r"[0-9a-fA-F]{40}|[0-9a-fA-F]{64}", revision):
+            revision = "unknown"
+            raise subprocess.CalledProcessError(1, git + ["rev-parse", "--verify", "HEAD"])
+        status = subprocess.check_output(git + ["status", "--porcelain=v1", "--untracked-files=normal"], cwd=root, stderr=subprocess.DEVNULL, text=True)
+        dirty = bool(status.strip())
     except (OSError, subprocess.CalledProcessError):
         pass
-    return {"git_revision": revision, "implementation_sha256": digest}
+    identity = f"git:{revision}:dirty:{str(dirty).lower()}:tree:{digest}" if revision != "unknown" else f"archive-sha256:{digest}"
+    return {"git_revision": revision, "dirty": dirty, "implementation_sha256": digest,
+            "source_tree_sha256": digest, "source_identity": identity}
 
 
 def validate_assets(image, declared_size):

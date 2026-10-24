@@ -9,10 +9,13 @@ from package_release import validate_nro
 
 parser = argparse.ArgumentParser(description="Validate the real Switch ELF/NRO and embedded assets")
 parser.add_argument("--version", default="0.9.1")
+parser.add_argument("--elf", type=Path, default=Path("PaperNX.elf"))
+parser.add_argument("--nro", type=Path, default=Path("PaperNX.nro"))
+parser.add_argument("--output", type=Path, default=Path("verification/artifacts.json"))
 args = parser.parse_args()
 assert __debug__, "Artifact checks require enabled assertions"
-elf = Path("PaperNX.elf").read_bytes()
-nro = Path("PaperNX.nro").read_bytes()
+elf = args.elf.read_bytes()
+nro = args.nro.read_bytes()
 meta = validate_nro(nro)
 assets = validate_assets(nro, meta["declared_size"])
 icon_meta = validate_icon("assets/branding/PaperNX-icon-switch.jpg")
@@ -33,6 +36,6 @@ result = {"source": source_identity(Path.cwd()), "elf": validate_elf(elf), "nro"
           "romfs_files": sorted(files), "ca_bundle_bytes": len(ca_bundle), "ca_certificates": len(ca_bundle.split(b"-----BEGIN CERTIFICATE-----")) - 1,
           "nro_sha256": hashlib.sha256(nro).hexdigest(),
           "hardware": "UNVERIFIED"}
-Path("verification").mkdir(exist_ok=True)
-Path("verification/artifacts.json").write_text(json.dumps(result, indent=2) + "\n")
+args.output.parent.mkdir(parents=True, exist_ok=True)
+args.output.write_text(json.dumps(result, indent=2) + "\n")
 print(json.dumps(result, indent=2))
