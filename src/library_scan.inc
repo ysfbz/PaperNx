@@ -57,12 +57,12 @@ void processLibraryScan() {
     }
     std::string selected;
     if(selectedBookIdx_>=0 && selectedBookIdx_<int(visibleBooks_.size()))selected=visibleBooks_[selectedBookIdx_].id;
-    std::unordered_map<std::string,Book> current;current.reserve(books_.size());
-    for(const auto &book:books_)current.emplace(book.id,book);
+    std::unordered_map<std::string,const Book*> current;current.reserve(books_.size());
+    for(const auto &book:books_)current.emplace(book.id,&book);
     std::unordered_set<std::string> seen;
     for(auto &book:result->books) {
         seen.insert(book.id);const auto found=current.find(book.id);
-        if(found!=current.end()){book.title=found->second.title;book.author=found->second.author;}
+        if(found!=current.end()){book.title=found->second->title;book.author=found->second->author;}
     }
     // A file opened while the worker was running must survive its older batch.
     for(const auto &book:books_)if(!scanKnownIds_.count(book.id) && !seen.count(book.id) && result->books.size()<10000)result->books.push_back(book);
