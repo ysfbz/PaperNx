@@ -367,3 +367,10 @@ The verified/pushed branch HEAD at the start of this note was `ed9e3b69c184de1b4
 - **App integration:** `papernx_modern_library_tests` rebuilt and passed **1/1** (13.83 sec), including visible cover upload priority and stale queue cleanup. This is not a scroll/FPS measurement.
 - **Measured 32 MiB / 48 MiB:** 100 real fixture paths had 100/100 hits at either budget. At 500 paths, 32 MiB retained 393 entries and sequential revisit had 136 hits / 364 reopens (1,973 ms); 48 MiB retained 500 entries and had 500 hits / 0 reopens (411 ms). At 1,000 paths, 48 MiB retained 512 entries / 43,654,912 bytes but same-order full walk still had 0 hits / 1,000 reopens (4,062 ms); separate synthetic cache-only test recorded 512 hits / 488 misses.
 - **Interpretation / limits:** 48 MiB is a measured disk bound for the tested 500-entry working set, not a general speedup claim. Fixtures repeat four sources and do not measure interactive viewport queue, Switch SD, or physical memory. Larger budgets/entry caps remain unverified; full CTest and physical hardware were not run at `d7f3fd3`. Overall status remains **INCOMPLETE — BLOCKERS REMAIN**.
+
+## 2026-10-24 — Updater recovery when the canonical NRO is absent
+
+- **Branch / source HEAD before this test:** `feature/v0.9.2-complete-reader-enhancements` / `e9b3482b893822fe60490c80f9174afc18b31fe6`.
+- Added a unit regression for an interrupted replacement where `PaperNX.nro` is absent while `.old` and `.swap` remain. `prepareBoot()` restores the previous NRO and clears the stale swap marker. Production code did not change.
+- Desktop build and `papernx_self_update_tests` CTest passed **1/1** (0.13 sec). Command: `docker compose run --rm desktop bash -lc 'cmake --build build-native --target papernx_self_update_tests --parallel 4 && ctest --test-dir build-native --output-on-failure -R "^papernx_self_update_tests$"'`.
+- Physical Switch power-loss testing, each rename/fsync boundary, full native CTest, and device acceptance remain **NOT RUN / UNVERIFIED**. Overall status remains **INCOMPLETE — BLOCKERS REMAIN**.

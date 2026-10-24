@@ -75,6 +75,11 @@ static void unit(){
     SelfUpdater recovery;recovery.configure(executable,"0.12.0-reader.4");
     assert(recovery.prepareBoot(error)==SelfUpdater::BootRecovery::RolledBack);
     assert(read(executable)=="previous"&&!fs::exists(executable.string()+".old")&&!fs::exists(executable.string()+".swap"));
+    {std::ofstream(executable.string()+".old")<<"previous after interrupted rename";
+     std::ofstream(executable.string()+".swap")<<"staged";}
+    fs::remove(executable);
+    assert(recovery.prepareBoot(error)==SelfUpdater::BootRecovery::RolledBack);
+    assert(read(executable)=="previous after interrupted rename"&&!fs::exists(executable.string()+".old")&&!fs::exists(executable.string()+".swap"));
     {std::ofstream(executable.string()+".swap")<<"staged";}
     assert(recovery.prepareBoot(error)==SelfUpdater::BootRecovery::Error&&!error.empty());
     fs::remove(executable.string()+".swap");

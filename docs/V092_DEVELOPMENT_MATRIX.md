@@ -393,3 +393,9 @@ Desktop updater unit/local HTTPS CTest passed **2/2** (2.50 sec); targeted ASan/
 The focused comic performance test rebuilt and passed **1/1** in **33.06 sec**. It verifies the worker retains its open document while idle, releases it on suspend, reopens after resume, and closes it on stop.
 
 The focused native set `papernx_library_index_tests`, `papernx_core_tests`, `papernx_reader_input_tests`, and `papernx_reader_spread_tests` rebuilt and passed **4/4** in **55.94 sec**. SDL `SDL_CONTROLLER_BUTTON_START` and touch `+` use the same quick menu state in library and reader; settings defaults/migration and spread behavior were covered by this selected set. This is not a full native CTest or physical Switch result. Hardware remains **UNVERIFIED** and the overall status remains **INCOMPLETE — BLOCKERS REMAIN**.
+
+## Updater boot recovery when the canonical NRO is absent
+
+At branch source HEAD `e9b3482`, `tests/self_update_tests.cpp` was extended to cover an interrupted replacement where `PaperNX.nro` is absent while `.old` and `.swap` remain. The test confirms `prepareBoot()` restores the previous NRO and clears the stale marker; the existing candidate-present rollback case remains covered.
+
+The updater test target rebuilt and CTest passed **1/1**. This host filesystem unit test does not verify physical Switch storage, real power interruption or every rename/fsync boundary. No updater production code changed. Full native CTest and hardware acceptance remain open; the decision remains **INCOMPLETE — BLOCKERS REMAIN**.
