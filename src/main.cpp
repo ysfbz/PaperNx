@@ -664,6 +664,9 @@ private:
     std::set<std::string> queuedThumbIds_;
     std::map<std::string, std::chrono::steady_clock::time_point> failedThumbIds_;
     std::map<std::string,CoverState> coverStates_;
+    std::set<std::string> metadataCollectedKeys_; // guarded by queueMutex_; thumbnail pass already read this fingerprint
+    // Low-overhead perf counters for the later benchmark owner; no I/O, relaxed atomics.
+    std::atomic<std::uint64_t> perfMetadataReopens_{0}, perfMetadataSkipped_{0}, perfArchiveOpens_{0}, perfDiskHits_{0}, perfTextureUploads_{0}, perfStaleDiscards_{0};
 
     std::mutex completedMutex_;
     std::vector<LoadedThumb> completedThumbs_;
@@ -755,6 +758,10 @@ private:
                 continue;
             }
             if(metadataOnly) {
+                bool already=false;
+                {std::lock_guard<std::mutex> lock(queueMutex_);already=metadataCollectedKeys_.count(b.id+":"+bookMetadataFingerprint(b))>0;}
+                if(already){++perfMetadataSkipped_;continue;}
+                ++perfMetadataReopens_;
                 if(!collectBookMetadata(b)) {
                     std::lock_guard<std::mutex> lock(queueMutex_);
                     metadataIndexedIds_.erase(b.id+":"+bookMetadataFingerprint(b));
@@ -765,6 +772,7 @@ private:
             auto cached = coverRepository_.read(b);
             updateCoverCounters();
             if(cached) {
+                ++perfDiskHits_;
                 LoadedThumb lt; lt.id=b.id; lt.w=cached->width; lt.h=cached->height;
                 lt.stride=cached->stride; lt.rgb=std::move(cached->rgb);
                 lt.state=CoverState::Cached;
@@ -779,10 +787,11 @@ private:
                 failThumbnail(b.id);
                 continue;
             }
+            ++perfArchiveOpens_;
             // Metadata extraction happens in the existing bounded cover worker,
             // not on the UI thread. A book without an illustration can still
             // have a real title and author in OPF/PDF metadata.
-            collectBookMetadata(b,thumbDoc);
+            if(collectBookMetadata(b,thumbDoc)){std::lock_guard<std::mutex> lock(queueMutex_);if(metadataCollectedKeys_.size()>=4096)metadataCollectedKeys_.clear();metadataCollectedKeys_.insert(b.id+":"+bookMetadataFingerprint(b));}
             if(b.format==Format::Epub && !px_document_has_embedded_cover(thumbDoc)) {
                 px_document_close(thumbDoc);
                 std::lock_guard<std::mutex> lock(queueMutex_);
@@ -875,7 +884,7 @@ private:
                     std::lock_guard<std::mutex> queueLock(queueMutex_);
                     queuedThumbIds_.erase(it->id);
                     if(coverStates_[it->id]==CoverState::Loading)coverStates_[it->id]=CoverState::NotRequested;
-                    it=completedThumbs_.erase(it);continue;
+                    it=completedThumbs_.erase(it);++perfStaleDiscards_;continue;
                 }
                 // Cap renderer-thread texture uploads to two covers per frame.
                 if(toUpload.size()<2) {
@@ -892,6 +901,7 @@ private:
                 coverStates_[lt.id]=lt.state;
             }
             std::string key = "thumb_" + lt.id;
+            ++perfTextureUploads_;
             SDL_Texture *tex = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STATIC, lt.w, lt.h);
             if (tex) {
                 if (SDL_UpdateTexture(tex, nullptr, lt.rgb.data(), lt.stride) == 0)

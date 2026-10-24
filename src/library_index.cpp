@@ -105,6 +105,8 @@ bool LibraryScanner::start(std::vector<fs::path> roots,std::vector<Book> known,f
         } catch(const std::exception &error) {result.error=error.what();}
 #endif
         result.cancelled=cancel_.load();
+        // A cancelled scan must never publish as a complete (possibly partial) inventory.
+        if(result.cancelled)result.complete=false;
         result_=std::move(result);ready_.store(true);
     });
     return true;
