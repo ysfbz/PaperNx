@@ -115,6 +115,17 @@ struct AppTest {
         app.processCompletedThumbnails();
         assert(app.thumbCache_.get("thumb_"+visible) && !app.thumbCache_.get("thumb_"+stale));
         {std::lock_guard<std::mutex> lock(app.queueMutex_);assert(app.coverStates_[stale]==CoverState::NotRequested && app.coverStates_[visible]==CoverState::Loaded);assert(!app.queuedThumbIds_.count(visible) && !app.queuedThumbIds_.count(stale));}
+
+        app.books_.clear();
+        for(int i=0;i<24;++i){const auto number=std::to_string(i);Book book;book.id="cover"+std::string(11-number.size(),'0')+number;book.path=(root/("book_"+number+".epub")).u8string();book.title="Book "+std::string(2-number.size(),'0')+number;book.format=Format::Epub;book.bytes=100;book.modified=1;app.books_.push_back(std::move(book));}
+        app.rebuildLibraryLookup();app.sort_=Sort::Title;app.updateVisibleBooks();app.viewMode_=ViewMode::List;app.listScroll_=1120;
+        const auto newlyVisible=app.books_.front().id;
+        assert(app.visibleBooks_.front().id==newlyVisible);
+        {std::lock_guard<std::mutex> lock(app.completedMutex_);app.completedMetadata_.push_back({newlyVisible,"Book 12","","",""});app.completedThumbs_.push_back({newlyVisible,1,1,3,{7,8,9},CoverState::Loaded});}
+        app.processCompletedThumbnails();
+        const auto moved=std::find_if(app.visibleBooks_.begin(),app.visibleBooks_.end(),[&](const Book &book){return book.id==newlyVisible;});
+        assert(moved!=app.visibleBooks_.end() && moved-app.visibleBooks_.begin()>=10);
+        assert(app.thumbCache_.get("thumb_"+newlyVisible));
     }
 };
 }

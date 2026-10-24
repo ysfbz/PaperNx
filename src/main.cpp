@@ -813,13 +813,6 @@ private:
         // A reader opening has priority over background library cover uploads.
         // Never regroup the card under a finger between press and release.
         if(coversPaused_ || !activeFingers_.empty() || pointerActive_)return;
-        std::set<std::string> visibleCovers;
-        bool filterVisibleCovers=false;
-        if(screen_==ScreenState::Library) {
-            bool haveCompleted=false;
-            {std::lock_guard<std::mutex> lock(completedMutex_);haveCompleted=!completedThumbs_.empty();}
-            if(haveCompleted){int w,h;getWindowSize(w,h);visibleCovers=prioritizeCovers(w,h);filterVisibleCovers=true;}
-        }
         std::vector<LoadedMetadata> metadata;
         {
             std::lock_guard<std::mutex> lock(completedMutex_);
@@ -857,6 +850,13 @@ private:
             if(focusedBook && screen_==ScreenState::Library && !quickMenu_ && catalogPanel_==CatalogPanel::None) {
                 rebuildFocus();navigationFocus_.select("book."+std::to_string(selectedBookIdx_));
             }
+        }
+        std::set<std::string> visibleCovers;
+        bool filterVisibleCovers=false;
+        if(screen_==ScreenState::Library) {
+            bool haveCompleted=false;
+            {std::lock_guard<std::mutex> lock(completedMutex_);haveCompleted=!completedThumbs_.empty();}
+            if(haveCompleted){int w,h;getWindowSize(w,h);visibleCovers=prioritizeCovers(w,h);filterVisibleCovers=true;}
         }
         std::vector<LoadedThumb> toUpload;
         {
