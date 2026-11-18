@@ -20,7 +20,7 @@
 ---
 
 > [!IMPORTANT]
-> v0.9.4 kaynak kodu ana makinedeki C++/CTest paketini geçti (34/34); sanitizer, Switch AArch64 derlemesi ve NRO metadata doğrulaması da başarılı. Fiziksel Switch davranışı doğrulanmadı; teknik ayrıntılar için [docs/HOTFIX_v0.9.4.md](docs/HOTFIX_v0.9.4.md) belgesine bakın.
+> v0.9.4 kaynak kodu ana makinedeki C++/CTest paketini geçti (34/34); sanitizer, Switch AArch64 derlemesi ve NRO metadata doğrulaması da başarılı. Fiziksel Switch davranışı doğrulanmadı; ayrıntılar için [CHANGELOG.md](CHANGELOG.md) ve [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md) belgelerine bakın.
 
 ## Genel Bakış
 

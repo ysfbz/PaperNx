@@ -20,7 +20,7 @@
 ---
 
 > [!IMPORTANT]
-> The v0.9.4 source passes the host C++/CTest suite (34/34), sanitizer checks, and Switch AArch64/NRO metadata validation. Physical Switch behavior remains unverified; see [docs/HOTFIX_v0.9.4.md](docs/HOTFIX_v0.9.4.md) for details.
+> The v0.9.4 source passes the host C++/CTest suite (34/34), sanitizer checks, and Switch AArch64/NRO metadata validation. Physical Switch behavior remains unverified; see [CHANGELOG.md](CHANGELOG.md) and [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md) for details.
 
 ## Overview
 
