@@ -98,6 +98,10 @@ int main() {
            "Dikey çıktı kullanılamıyor; yatay görünüme dönüldü");
     assert(localizeUiText("Reading journal not saved: disk full",0)=="Okuma günlüğü kaydedilemedi: disk full");
     assert(localizeUiText("Catalog could not be saved: write error",0)=="Katalog kaydedilemedi: write error");
+    assert(localizeUiText("Scan status & log",0)=="Tarama durumu ve günlük");
+    assert(localizeUiText("Tarama durumu ve günlük",1)=="Scan status & log");
+    assert(localizeUiText("Rescan library",0)=="Kitaplığı yeniden tara");
+    assert(localizeUiText("Kitaplığı yeniden tara",1)=="Rescan library");
 
     // Prefixes
     assert(localizeUiText("Son okuma: 2026-10-19",1)=="Last read: 2026-10-19");

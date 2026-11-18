@@ -1044,7 +1044,11 @@ void ReadingJournalUI::render(SDL_Renderer *r, Typography &font, const ThemePale
             SDL_RenderDrawRect(r, &box);
 
             if (k == selectedDay_ || (selectedDay_ == 0 && k == now.tm_mday && monthDelta_ == 0)) {
-                ui::focusRing(r, box, pal);
+                SDL_SetRenderDrawColor(r, pal.accent.r, pal.accent.g, pal.accent.b, 255);
+                for (int b = 0; b < 2; ++b) {
+                    SDL_Rect sel{box.x + b, box.y + b, box.w - 2 * b, box.h - 2 * b};
+                    if (sel.w > 0 && sel.h > 0) SDL_RenderDrawRect(r, &sel);
+                }
             }
             SDL_Color tC = (intensity > 60) ? pal.bg : pal.fg;
             text(r, font, std::to_string(k), box.x + 8, box.y + 4, tC, box.w - 12);

@@ -278,7 +278,13 @@ void renderContents(int w,int h,const ThemePalette &pal) {
             typography_->renderText(renderer_,typography_->smallFont(),label,tocTab_==2?cell.x+10:cell.x+(cell.w-tw)/2,cell.y+cell.h-30,selected?pal.accent:pal.fg,tocTab_==2?cell.w-20:0);
             if(tocBookmarkPages_.count(item.page))ui::surface(renderer_,{cell.x+cell.w-24,cell.y+12,10,10},pal.accent,5);
         }
-        if(selected)ui::focusRing(renderer_,cell,pal);
+        if(selected) {
+            SDL_SetRenderDrawColor(renderer_,pal.accent.r,pal.accent.g,pal.accent.b,255);
+            SDL_Rect mark{cell.x,cell.y,cell.w,cell.h};
+            SDL_RenderDrawRect(renderer_,&mark);
+            SDL_Rect inner{cell.x+1,cell.y+1,cell.w-2,cell.h-2};
+            SDL_RenderDrawRect(renderer_,&inner);
+        }
     }
     SDL_RenderSetClipRect(renderer_,nullptr);
 }

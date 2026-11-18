@@ -59,6 +59,8 @@
         choiceTouchActive_=false;
         int w,h;getWindowSize(w,h);
         ensureChoiceVisible(w,h);
+        rebuildFocus();
+        navigationFocus_.select("choice."+std::to_string(choiceFocusedIndex_));
         dirty_=true;
     }
     void commitChoice() {
@@ -115,6 +117,8 @@
                     --choiceFocusedIndex_;
                     choiceIndex_=choiceFocusedIndex_; // v0.9.1: navigation and highlight move together.
                     ensureChoiceVisible(w,h);
+                    rebuildFocus();
+                    navigationFocus_.select("choice."+std::to_string(choiceFocusedIndex_));
                     dirty_=true;
                 }
             }
@@ -123,6 +127,8 @@
                     ++choiceFocusedIndex_;
                     choiceIndex_=choiceFocusedIndex_;
                     ensureChoiceVisible(w,h);
+                    rebuildFocus();
+                    navigationFocus_.select("choice."+std::to_string(choiceFocusedIndex_));
                     dirty_=true;
                 }
             }
@@ -211,8 +217,7 @@
             int itemY=cr.y+i*56-int(choiceScroll_);
             if(itemY+56>=cr.y && itemY<=cr.y+cr.h){
                 bool isSelected=(i==choiceIndex_);
-                bool isFocused=(i==choiceFocusedIndex_);
-                ui::button(renderer_,*typography_,{cr.x,itemY,cr.w,56},options[i],pal,isSelected,false,false,isFocused);
+                ui::button(renderer_,*typography_,{cr.x,itemY,cr.w,56},options[i],pal,isSelected,false,false,false);
             }
         }
         SDL_RenderSetClipRect(renderer_,nullptr);
