@@ -24,8 +24,8 @@ struct CoverCacheStats {
 // or changes progress. Cache failures are ordinary misses, never reader errors.
 class CoverRepository {
 public:
-    static constexpr std::uintmax_t defaultMaxBytes=48u*1024u*1024u;
-    static constexpr std::size_t defaultMaxEntries=512;
+    static constexpr std::uintmax_t defaultMaxBytes=192u*1024u*1024u;
+    static constexpr std::size_t defaultMaxEntries=2048;
     explicit CoverRepository(fs::path root, std::uintmax_t maxBytes = defaultMaxBytes,
                              std::size_t maxEntries = defaultMaxEntries);
     std::optional<CoverImage> read(const Book &book);
@@ -42,12 +42,14 @@ private:
     fs::path root_;
     std::uintmax_t maxBytes_;
     std::size_t maxEntries_;
+    std::uintmax_t totalBytes_{};
     std::uint64_t clock_{};
     std::uint64_t hits_{}, misses_{};
     bool initialized_{};
     bool available_{};
     std::map<std::string, Entry> entries_;
     void initialize();
+    void evictOldestIfNeeded(std::uintmax_t extraBytes);
     std::optional<CoverImage> readFile(const fs::path &, const std::string &) const;
 };
 } // namespace papernx

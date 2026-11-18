@@ -43,9 +43,15 @@ void clearHeldControls() {
     controllerRemainderX_=controllerRemainderY_=0;controllerInputTick_=SDL_GetTicks();
     controllerNav_=ControllerNavigator{};rightControllerNav_=ControllerNavigator{};
     zoomFractionX_=zoomFractionY_=0;zoomLastPage_=-1;
+    clearLibraryUpHold();
 }
 void navigateStick(int axis,int value) {
     const bool right=axis>=SDL_CONTROLLER_AXIS_RIGHTX;
+    if(right && screen_==ScreenState::Library && !quickMenu_ && catalogPanel_==CatalogPanel::None &&
+       choiceKind_<0 && colorEditing_<0 && !exitConfirmOpen_) {
+        // Right stick on the Library screen is dedicated to continuous smooth scrolling.
+        return;
+    }
     auto &navigator=right?rightControllerNav_:controllerNav_;
     int dx=0,dy=0;
     if(!navigator.processAxis(right?axis-SDL_CONTROLLER_AXIS_RIGHTX:axis,value,dx,dy))return;
@@ -122,5 +128,32 @@ void tickControllerInput() {
         return;
     }
     heldKeyboardPan_=heldPadPan_=0;
+    const bool libraryActive=screen_==ScreenState::Library && !quickMenu_ && catalogPanel_==CatalogPanel::None &&
+                             choiceKind_<0 && colorEditing_<0 && !exitConfirmOpen_ && !visibleBooks_.empty();
+    if(libraryActive) {
+        auto rightStickCurve=[](int value) -> float {
+            constexpr int dead=7500; // ~23% deadzone prevents analog drift
+            if(std::abs(value)<=dead) return 0.f;
+            const float mag=std::min(1.f,(std::abs(value)-dead)/float(32767-dead));
+            const float curved=mag*mag*(0.45f+0.55f*mag);
+            return (value<0?-1.f:1.f)*curved;
+        };
+        const auto scrollDir=controlDirection(rightStickCurve(stickAxes_[SDL_CONTROLLER_AXIS_RIGHTX]),
+                                              rightStickCurve(stickAxes_[SDL_CONTROLLER_AXIS_RIGHTY]));
+        const float scrollInput=scrollDir.second;
+        if(std::abs(scrollInput)>0.0001f) {
+            listVelocity_=0.f;
+            const float maxScroll=maxUiScroll();
+            const float nextScroll=std::clamp(listScroll_+scrollInput*2100.f*dt,0.f,maxScroll);
+            if(std::abs(nextScroll-listScroll_)>0.05f) {
+                listScroll_=nextScroll;
+                syncLibraryFocusToViewport();
+                dirty_=true;
+            }
+        }
+        tickLibraryUpHold(now);
+    } else {
+        clearLibraryUpHold();
+    }
     for(int axis=0;axis<=SDL_CONTROLLER_AXIS_RIGHTY;++axis)navigateStick(axis,stickAxes_[axis]);
 }

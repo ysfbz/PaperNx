@@ -72,8 +72,8 @@ using namespace papernx;
 
 namespace {
 
-constexpr unsigned thumbnailBurstBeforeMetadata = 3;
-bool shouldProcessCoverMetadata(bool hasThumbnails, bool hasMetadata, unsigned thumbnailBurst) {
+[[maybe_unused]] constexpr unsigned thumbnailBurstBeforeMetadata = 3;
+[[maybe_unused]] inline bool shouldProcessCoverMetadata(bool hasThumbnails, bool hasMetadata, unsigned thumbnailBurst) {
     return hasMetadata && (!hasThumbnails || thumbnailBurst >= thumbnailBurstBeforeMetadata);
 }
 
@@ -163,11 +163,15 @@ public:
         if(catalogSavePending_)catalog_.save();
         if(layoutWorker_.joinable()) layoutWorker_.join();
         if(preparedDoc_) { px_document_close(preparedDoc_); preparedDoc_=nullptr; }
-        // 1. Stop background thumbnail worker thread safely
+        // 1. Stop background thumbnail & metadata/persist worker threads safely
         workerRunning_ = false;
         queueCv_.notify_all();
+        persistCv_.notify_all();
         if (thumbWorker_.joinable()) {
             thumbWorker_.join();
+        }
+        if (persistMetaWorker_.joinable()) {
+            persistMetaWorker_.join();
         }
 
         // 2. Close active document
@@ -277,11 +281,14 @@ public:
         }
 
         initCoverTelemetry();
-        // Start background thumbnail worker thread
+        // Start fast thumbnail worker + separate background disk-persist & metadata worker
         scheduleMetadataIndex();
         workerRunning_ = true;
         thumbWorker_ = std::thread([this]() {
             thumbWorkerLoop();
+        });
+        persistMetaWorker_ = std::thread([this]() {
+            persistMetaWorkerLoop();
         });
 
         updateVisibleBooks();
@@ -371,8 +378,19 @@ public:
                 if(dirty_ && (event.type==SDL_FINGERDOWN || event.type==SDL_MOUSEBUTTONDOWN ||
                    (!wasTurning && pageTurnAnimation_.active && !pageTurnAnimation_.dragging))) {render();dirty_=false;confirmBootAfterFirstRender();}
             };
+            bool pendingCoverWork = false;
+            if (screen_ == ScreenState::Library && !coversPaused_) {
+                {
+                    std::lock_guard<std::mutex> lock(queueMutex_);
+                    pendingCoverWork = !thumbQueue_.empty() || !activeCoverRequests_.empty();
+                }
+                if (!pendingCoverWork) {
+                    std::lock_guard<std::mutex> lock(completedMutex_);
+                    pendingCoverWork = !completedThumbs_.empty();
+                }
+            }
             // Event-driven loop: wait up to 100ms for events, then flush and draw if dirty
-            bool receivedEvent=SDL_WaitEventTimeout(&e, (continuous() && std::abs(scrollVelocity_) > 1) || pageTurnAnimation_.active || std::abs(panVelocityX_)+std::abs(panVelocityY_)>2 || std::abs(listVelocity_)>1 || layoutPending_ || layoutWorker_.joinable() ? 8 : controller_ || controllerMotionActive() || pagePreviews_.pending() || comicPages_.pending() ? 16 : 100);
+            bool receivedEvent=SDL_WaitEventTimeout(&e, (continuous() && std::abs(scrollVelocity_) > 1) || pageTurnAnimation_.active || std::abs(panVelocityX_)+std::abs(panVelocityY_)>2 || std::abs(listVelocity_)>1 || layoutPending_ || layoutWorker_.joinable() || pendingCoverWork ? 8 : controller_ || controllerMotionActive() || pagePreviews_.pending() || comicPages_.pending() ? 16 : 100);
             if (receivedEvent) {
                 dispatch(e);
                 int events=0;
@@ -688,12 +706,31 @@ private:
     std::string colorInput_;
     std::chrono::steady_clock::time_point lastProgressSave_{std::chrono::steady_clock::now()};
 
-    // Background thumbnail worker
+    // Background thumbnail worker (decode/cache read) & separate persist/metadata worker
+    struct PersistThumbJob {
+        Book book;
+        CoverImage image;
+    };
+    enum class LibraryZone { Books, Header };
+    LibraryZone libraryZone_{LibraryZone::Books};
+    std::string lastLibraryBookId_;
+    bool exitConfirmOpen_{false};
+    bool scrollbarDragging_{false};
+    SDL_FingerID scrollbarFinger_{0};
+    float scrollbarGrabOffset_{0.f};
+    bool libraryUpHeld_{false}, libraryUpHoldConsumed_{false};
+    Uint32 libraryUpHoldStart_{0};
+
     std::thread thumbWorker_;
+    std::thread persistMetaWorker_;
     std::atomic<bool> workerRunning_{false};
     std::atomic<bool> coversPaused_{false};
     std::mutex queueMutex_;
     std::condition_variable queueCv_;
+    std::mutex persistMutex_;
+    std::condition_variable persistCv_;
+    std::deque<PersistThumbJob> persistQueue_;
+    std::mutex coverRepoMutex_;
     std::atomic<std::size_t> coverDiskEntries_{0};
     std::atomic<std::uintmax_t> coverDiskBytes_{0};
     std::atomic<std::uint64_t> coverDiskHits_{0}, coverDiskMisses_{0};
@@ -706,6 +743,7 @@ private:
     std::size_t metadataJobsInFlight_{}; // guarded by queueMutex_
     std::set<std::string> metadataIndexedIds_;
     std::set<std::string> queuedThumbIds_;
+    std::set<std::string> noCoverFingerprints_; // guarded by queueMutex_
     std::unordered_map<std::string,CoverRequestState> activeCoverRequests_; // guarded by queueMutex_
     std::map<std::string, std::chrono::steady_clock::time_point> failedThumbIds_;
     std::map<std::string,CoverState> coverStates_;
@@ -733,7 +771,7 @@ private:
         activeCoverRequests_.erase(active);queuedThumbIds_.erase(id);coverStates_[id]=state;
         if(state==CoverState::Failed) {
             if(failedThumbIds_.size()>=512)failedThumbIds_.erase(failedThumbIds_.begin());
-            failedThumbIds_[id]=std::chrono::steady_clock::now()+std::chrono::seconds(30);
+            failedThumbIds_[id]=std::chrono::steady_clock::now()+std::chrono::seconds(5);
         }
         return true;
     }
@@ -747,14 +785,16 @@ private:
     }
     void scheduleMetadataIndex() {
         std::lock_guard<std::mutex> lock(queueMutex_);
-        for(const auto &book:books_) {
+        auto enqueueBook = [&](const Book &book) {
             const auto fingerprint=bookMetadataFingerprint(book);
             const auto key=book.id+":"+fingerprint;
-            if(catalog_.get(book.id).metadataFingerprint==fingerprint)continue; // catalog already current
-            if(metadataLedger_.contains(key)){coverTelemetry_.count(CoverTelemetry::Counter::MetadataAvoided);continue;} // extracted, UI not applied yet
+            if(catalog_.get(book.id).metadataFingerprint==fingerprint)return;
+            if(metadataLedger_.contains(key)){coverTelemetry_.count(CoverTelemetry::Counter::MetadataAvoided);return;}
             if(metadataIndexedIds_.insert(key).second)metadataQueue_.push_back(book);
-        }
-        queueCv_.notify_one();
+        };
+        for(const auto &book:visibleBooks_) enqueueBook(book);
+        for(const auto &book:books_) enqueueBook(book);
+        persistCv_.notify_one();
     }
     bool collectBookMetadata(const Book &book,PxDocument *document=nullptr) {
         const auto key=book.id+":"+bookMetadataFingerprint(book);
@@ -781,6 +821,7 @@ private:
         return std::to_string(bytes) + " B";
     }
     void updateCoverCounters() {
+        std::lock_guard<std::mutex> repoLock(coverRepoMutex_);
         const auto values = coverRepository_.stats();
         coverDiskEntries_ = values.entries;
         coverDiskBytes_ = values.bytes;
@@ -796,53 +837,101 @@ private:
             activeCoverRequests_.clear();coverTelemetry_.abandonAll();
             queuedThumbIds_.clear();
             failedThumbIds_.clear();
+            noCoverFingerprints_.clear();
             coverClearRequested_ = true;
             coverClearStatus_ = 1;
         }
+        {std::lock_guard<std::mutex> pLock(persistMutex_);persistQueue_.clear();}
         {std::lock_guard<std::mutex> lock(completedMutex_);completedThumbs_.clear();}
         queueCv_.notify_one();
+        persistCv_.notify_one();
         dirty_ = true;
+    }
+    void persistMetaWorkerLoop() {
+        while (workerRunning_) {
+            PersistThumbJob persistJob;
+            bool hasPersist = false;
+            Book metaBook;
+            bool hasMeta = false;
+            {
+                std::unique_lock<std::mutex> pLock(persistMutex_);
+                persistCv_.wait(pLock, [this]() {
+                    if (!workerRunning_) return true;
+                    if (!persistQueue_.empty()) return true;
+                    std::lock_guard<std::mutex> qLock(queueMutex_);
+                    return !coversPaused_ && thumbQueue_.empty() && !metadataQueue_.empty();
+                });
+                if (!workerRunning_) break;
+                if (!persistQueue_.empty()) {
+                    persistJob = std::move(persistQueue_.front());
+                    persistQueue_.pop_front();
+                    hasPersist = true;
+                }
+            }
+            if (hasPersist) {
+                {
+                    std::lock_guard<std::mutex> repoLock(coverRepoMutex_);
+                    coverRepository_.write(persistJob.book, persistJob.image);
+                }
+                updateCoverCounters();
+                continue;
+            }
+            {
+                std::lock_guard<std::mutex> qLock(queueMutex_);
+                if (!coversPaused_ && thumbQueue_.empty() && !metadataQueue_.empty()) {
+                    metaBook = std::move(metadataQueue_.front());
+                    metadataQueue_.pop_front();
+                    ++metadataJobsInFlight_;
+                    hasMeta = true;
+                }
+            }
+            if (hasMeta) {
+                const bool collected = collectBookMetadata(metaBook);
+                std::lock_guard<std::mutex> qLock(queueMutex_);
+                if (!collected) metadataIndexedIds_.erase(metaBook.id + ":" + bookMetadataFingerprint(metaBook));
+                if (metadataJobsInFlight_) --metadataJobsInFlight_;
+                persistCv_.notify_one();
+            }
+        }
     }
     void thumbWorkerLoop() {
         updateCoverCounters();
         while (workerRunning_) {
-            Book b;bool metadataOnly=false, clearNow=false;CoverRequestState request{};
+            Book b;bool clearNow=false;CoverRequestState request{};
             {
                 std::unique_lock<std::mutex> lock(queueMutex_);
                 queueCv_.wait(lock, [this]() {
                     return !workerRunning_ || coverClearRequested_ ||
-                        (coverClearStatus_.load()!=1 && !coversPaused_ &&
-                         (!thumbQueue_.empty() || !metadataQueue_.empty()));
+                        (coverClearStatus_.load()!=1 && !coversPaused_ && !thumbQueue_.empty());
                 });
                 if (!workerRunning_) break;
                 if (coverClearRequested_) {
                     coverClearRequested_ = false;
                     clearNow = true;
                 } else {
-                    metadataOnly=shouldProcessCoverMetadata(!thumbQueue_.empty(),!metadataQueue_.empty(),thumbnailJobsSinceMetadata_);
-                    auto &queue=metadataOnly?metadataQueue_:thumbQueue_;b=queue.front();queue.pop_front();
-                    if(!metadataOnly){const auto found=activeCoverRequests_.find(b.id);if(found!=activeCoverRequests_.end())request=found->second;}
-                    else ++metadataJobsInFlight_;
-                    if(metadataOnly)thumbnailJobsSinceMetadata_=0;
-                    else thumbnailJobsSinceMetadata_=std::min(thumbnailJobsSinceMetadata_+1,thumbnailBurstBeforeMetadata);
+                    b = std::move(thumbQueue_.front());
+                    thumbQueue_.pop_front();
+                    const auto found=activeCoverRequests_.find(b.id);
+                    if(found!=activeCoverRequests_.end())request=found->second;
                 }
             }
             if (clearNow) {
-                const bool ok = coverRepository_.clear();
+                bool ok = false;
+                {
+                    std::lock_guard<std::mutex> repoLock(coverRepoMutex_);
+                    ok = coverRepository_.clear();
+                }
                 updateCoverCounters();
                 coverClearStatus_ = ok ? 2 : 3;
                 continue;
             }
-            if(metadataOnly) {
-                const bool collected=collectBookMetadata(b);
-                std::lock_guard<std::mutex> lock(queueMutex_);
-                if(!collected)metadataIndexedIds_.erase(b.id+":"+bookMetadataFingerprint(b));
-                if(metadataJobsInFlight_)--metadataJobsInFlight_;
-                continue;
-            }
             if(request.token==0)continue;
 
-            auto cached = coverRepository_.read(b);
+            std::optional<CoverImage> cached;
+            {
+                std::lock_guard<std::mutex> repoLock(coverRepoMutex_);
+                cached = coverRepository_.read(b);
+            }
             updateCoverCounters();
             if(cached) {
                 coverTelemetry_.count(CoverTelemetry::Counter::DiskHit);
@@ -863,12 +952,14 @@ private:
             }
             coverTelemetry_.count(CoverTelemetry::Counter::ThumbnailOpen);
             if(isComic(b.format))coverTelemetry_.count(CoverTelemetry::Counter::ArchiveOpen);
-            // Metadata extraction happens in the existing bounded cover worker,
-            // not on the UI thread. A book without an illustration can still
-            // have a real title and author in OPF/PDF metadata.
             collectBookMetadata(b,thumbDoc);
             if(b.format==Format::Epub && !px_document_has_embedded_cover(thumbDoc)) {
                 px_document_close(thumbDoc);
+                {
+                    std::lock_guard<std::mutex> lock(queueMutex_);
+                    if(noCoverFingerprints_.size()>=4096)noCoverFingerprints_.clear();
+                    noCoverFingerprints_.insert(b.id+":"+bookMetadataFingerprint(b));
+                }
                 finishCoverRequest(b.id,request,CoverState::NoEmbeddedCover,4);
                 continue;
             }
@@ -885,15 +976,21 @@ private:
                 lt.stride = img.stride;
                 lt.rgb.assign(img.rgb, img.rgb + (size_t)img.height * img.stride);
                 lt.requestToken=request.token;lt.libraryGeneration=request.libraryGeneration;
+                lt.state=CoverState::Loaded;
                 px_image_free(&img);
-                coverRepository_.write(b, CoverImage{lt.w,lt.h,lt.stride,lt.rgb});
-                updateCoverCounters();
+                CoverImage persistImg{lt.w, lt.h, lt.stride, lt.rgb};
                 lt.uploadReadyAt=std::chrono::steady_clock::now();
-
                 {
                     std::lock_guard<std::mutex> lock(completedMutex_);
                     completedThumbs_.push_back(std::move(lt));
                 }
+                {
+                    std::lock_guard<std::mutex> pLock(persistMutex_);
+                    if (persistQueue_.size() < 256) {
+                        persistQueue_.push_back({b, std::move(persistImg)});
+                    }
+                }
+                persistCv_.notify_one();
             } else {
                 failThumbnail(b.id,request,true);
                 logMessage(std::string("Cover decode failed: ")+err);
@@ -904,48 +1001,48 @@ private:
     }
 
     void processCompletedThumbnails() {
-        // A reader opening has priority over background library cover uploads.
-        // Never regroup the card under a finger between press and release.
-        if(coversPaused_ || !activeFingers_.empty() || pointerActive_)return;
-        std::vector<LoadedMetadata> metadata;
-        {
-            std::lock_guard<std::mutex> lock(completedMutex_);
-            const auto count=std::min<std::size_t>(32,completedMetadata_.size());
-            metadata.insert(metadata.end(),std::make_move_iterator(completedMetadata_.begin()),
-                            std::make_move_iterator(completedMetadata_.begin()+count));
-            completedMetadata_.erase(completedMetadata_.begin(),completedMetadata_.begin()+count);
-        }
-        bool metadataChanged=false;
-        if(libraryLookup_.size()!=books_.size())rebuildLibraryLookup();
-        for(const auto &md:metadata) {
-            const auto found=libraryLookup_.find(md.id);if(found==libraryLookup_.end())continue;
-            const auto *book=&books_[found->second];
-            const auto fingerprint=bookMetadataFingerprint(*book);
-            if(md.fingerprint!=fingerprint)continue;
-            auto entry=catalog_.get(md.id);
-            if(entry.sourceTitle==md.title && entry.sourceAuthor==md.author &&
-               entry.sourceSeries==md.series && entry.sourceSeriesIndex==md.seriesIndex &&
-               entry.metadataFingerprint==fingerprint)continue;
-            entry.sourceTitle=md.title;entry.sourceAuthor=md.author;entry.metadataFingerprint=fingerprint;
-            entry.sourceSeries=md.series;entry.sourceSeriesIndex=md.seriesIndex;
-            catalog_.put(md.id,entry);catalogSavePending_=true;metadataChanged=true;
-        }
-        if(metadataChanged){
-            float previous=listScroll_;std::string selected;
-            const bool focusedBook=navigationFocus_.active().rfind("book:",0)==0;
-            if(focusedBook)selected=navigationFocus_.active().substr(5);
-            else if(selectedBookIdx_>=0 && selectedBookIdx_<int(visibleBooks_.size()))selected=visibleBooks_[selectedBookIdx_].id;
-            updateVisibleBooks();
-            for(int i=0;i<int(visibleBooks_.size());++i) {
-                bool match=visibleBooks_[i].id==selected;
-                auto shelf=seriesShelves_.find(visibleBooks_[i].id);
-                if(shelf!=seriesShelves_.end())for(const auto &issue:shelf->second.issues)match=match || issue.id==selected;
-                if(match){selectedBookIdx_=i;break;}
+        if(coversPaused_)return;
+        if(activeFingers_.empty() && !pointerActive_) {
+            std::vector<LoadedMetadata> metadata;
+            {
+                std::lock_guard<std::mutex> lock(completedMutex_);
+                const auto count=std::min<std::size_t>(32,completedMetadata_.size());
+                metadata.insert(metadata.end(),std::make_move_iterator(completedMetadata_.begin()),
+                                std::make_move_iterator(completedMetadata_.begin()+count));
+                completedMetadata_.erase(completedMetadata_.begin(),completedMetadata_.begin()+count);
             }
-            listScroll_=std::clamp(previous,0.f,maxUiScroll());dirty_=true;
-            if(focusedBook && screen_==ScreenState::Library && !quickMenu_ && catalogPanel_==CatalogPanel::None &&
-               selectedBookIdx_>=0 && selectedBookIdx_<int(visibleBooks_.size())) {
-                rebuildFocus();navigationFocus_.select("book:"+visibleBooks_[selectedBookIdx_].id);
+            bool metadataChanged=false;
+            if(libraryLookup_.size()!=books_.size())rebuildLibraryLookup();
+            for(const auto &md:metadata) {
+                const auto found=libraryLookup_.find(md.id);if(found==libraryLookup_.end())continue;
+                const auto *book=&books_[found->second];
+                const auto fingerprint=bookMetadataFingerprint(*book);
+                if(md.fingerprint!=fingerprint)continue;
+                auto entry=catalog_.get(md.id);
+                if(entry.sourceTitle==md.title && entry.sourceAuthor==md.author &&
+                   entry.sourceSeries==md.series && entry.sourceSeriesIndex==md.seriesIndex &&
+                   entry.metadataFingerprint==fingerprint)continue;
+                entry.sourceTitle=md.title;entry.sourceAuthor=md.author;entry.metadataFingerprint=fingerprint;
+                entry.sourceSeries=md.series;entry.sourceSeriesIndex=md.seriesIndex;
+                catalog_.put(md.id,entry);catalogSavePending_=true;metadataChanged=true;
+            }
+            if(metadataChanged){
+                float previous=listScroll_;std::string selected;
+                const bool focusedBook=navigationFocus_.active().rfind("book:",0)==0;
+                if(focusedBook)selected=navigationFocus_.active().substr(5);
+                else if(selectedBookIdx_>=0 && selectedBookIdx_<int(visibleBooks_.size()))selected=visibleBooks_[selectedBookIdx_].id;
+                updateVisibleBooks();
+                for(int i=0;i<int(visibleBooks_.size());++i) {
+                    bool match=visibleBooks_[i].id==selected;
+                    auto shelf=seriesShelves_.find(visibleBooks_[i].id);
+                    if(shelf!=seriesShelves_.end())for(const auto &issue:shelf->second.issues)match=match || issue.id==selected;
+                    if(match){selectedBookIdx_=i;break;}
+                }
+                listScroll_=std::clamp(previous,0.f,maxUiScroll());dirty_=true;
+                if(focusedBook && screen_==ScreenState::Library && !quickMenu_ && catalogPanel_==CatalogPanel::None &&
+                   selectedBookIdx_>=0 && selectedBookIdx_<int(visibleBooks_.size())) {
+                    rebuildFocus();navigationFocus_.select("book:"+visibleBooks_[selectedBookIdx_].id);
+                }
             }
         }
         std::set<std::string> visibleCovers;
@@ -968,15 +1065,16 @@ private:
                  current=active!=activeCoverRequests_.end() && active->second.token==it->requestToken &&
                          active->second.libraryGeneration==it->libraryGeneration && it->libraryGeneration==libraryScanGeneration_;}
                 if(!current){finishCoverRequest(it->id,{it->requestToken,it->libraryGeneration},CoverState::NotRequested,3);it=completedThumbs_.erase(it);continue;}
-                // Cap renderer-thread texture uploads to two covers per frame.
-                if(toUpload.size()<2) {
+                if(toUpload.size()<6) {
                     toUpload.push_back(std::move(*it));it=completedThumbs_.erase(it);continue;
                 }
-                ++it;
+                break;
             }
         }
         if(toUpload.empty())return;
-        for (const auto &lt : toUpload) {
+        const auto uploadBudgetStart = std::chrono::steady_clock::now();
+        for (std::size_t idx = 0; idx < toUpload.size(); ++idx) {
+            const auto &lt = toUpload[idx];
             std::string key = "thumb_" + lt.id;
             if(lt.uploadReadyAt.time_since_epoch().count())
                 coverTelemetry_.uploadQueueWait(std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-lt.uploadReadyAt).count());
@@ -991,6 +1089,17 @@ private:
             }
             if(uploaded){coverTelemetry_.count(CoverTelemetry::Counter::UploadOk);finishCoverRequest(lt.id,{lt.requestToken,lt.libraryGeneration},lt.state,1);}
             else finishCoverRequest(lt.id,{lt.requestToken,lt.libraryGeneration},CoverState::Failed,2);
+            if (idx + 1 < toUpload.size()) {
+                const double elapsedMs = std::chrono::duration<double, std::milli>(
+                    std::chrono::steady_clock::now() - uploadBudgetStart).count();
+                if (elapsedMs >= 4.0) {
+                    std::lock_guard<std::mutex> lock(completedMutex_);
+                    for (std::size_t rem = toUpload.size(); rem > idx + 1; --rem) {
+                        completedThumbs_.insert(completedThumbs_.begin(), std::move(toUpload[rem - 1]));
+                    }
+                    break;
+                }
+            }
         }
     }
 
@@ -1393,7 +1502,7 @@ private:
             if(index==2) openSettings(true);
             if(index==3) scanBrowserDirectory();
             if(index==4) quickMenu_=helpMenu_=true;
-            if(index==5) exitRequested_=true;
+            if(index==5) openExitConfirm();
         } else {
             if(index==0) openSettings(true);
             if(index==1) openSettings(true,5);
@@ -1403,7 +1512,7 @@ private:
             if(index==5) { viewMode_=viewMode_==ViewMode::Grid?ViewMode::List:ViewMode::Grid; updateVisibleBooks(); persistAppSettings(); }
             if(index==6)startLibraryScan();
             if(index==7) quickMenu_=helpMenu_=true;
-            if(index==8) exitRequested_=true;
+            if(index==8) openExitConfirm();
             if(index==9)setCatalogPanel(CatalogPanel::Browse);
         }
         dirty_=true;
@@ -1458,6 +1567,184 @@ private:
         if(screen_==ScreenState::BookmarksModal) return bookmarkScroll_;
         return listScroll_;
     }
+    float libraryContentHeight(int w,bool hasScrollbar) const {
+        ui::LibraryLayout l(w,hasScrollbar);
+        const int rows=viewMode_==ViewMode::Grid?((int(visibleBooks_.size())+l.columns-1)/l.columns):int(visibleBooks_.size());
+        return float(viewMode_==ViewMode::Grid?rows*l.stepY:rows*112);
+    }
+    ui::VerticalScrollbar libraryScrollbar(int w,int h) const {
+        ui::LibraryLayout probe(w,false);
+        const float vpH=float(std::max(1,h-probe.top-28));
+        bool need=libraryContentHeight(w,false)>vpH;
+        ui::LibraryLayout l(w,need);
+        const float contentH=libraryContentHeight(w,need);
+        return ui::VerticalScrollbar::compute(l.scrollbarTrackArea(w,h),contentH,vpH,listScroll_);
+    }
+    void openExitConfirm() {
+        quickMenu_=helpMenu_=false;
+        exitConfirmOpen_=true;
+        clearLibraryUpHold();
+        navigationFocus_.clearContext("exit.confirm");
+        rebuildFocus();
+        navigationFocus_.select("exit.no");
+        dirty_=true;
+    }
+    SDL_Rect exitConfirmRect(int w,int h) const {
+        const int pw=std::min(560,w-48), ph=232;
+        return {(w-pw)/2,(h-ph)/2,pw,ph};
+    }
+    void renderExitConfirmModal(int w,int h,const ThemePalette &pal) {
+        SDL_SetRenderDrawBlendMode(renderer_,SDL_BLENDMODE_BLEND);
+        SDL_SetRenderDrawColor(renderer_,0,0,0,155);
+        SDL_Rect full{0,0,w,h};
+        SDL_RenderFillRect(renderer_,&full);
+        const auto panel=exitConfirmRect(w,h);
+        ui::elevated(renderer_,panel,pal);
+        typography_->renderText(renderer_,typography_->titleFont(),ui::label("PaperNX'ten çıkılsın mı?"),panel.x+24,panel.y+24,pal.fg,panel.w-48);
+        typography_->renderWrapped(renderer_,typography_->uiFont(),ui::label("Okuma ilerlemeniz ve kitaplık bilgileriniz korunacaktır."),
+                                   {panel.x+24,panel.y+72,panel.w-48,68},pal.muted);
+        const int bw=(panel.w-64)/2;
+        ui::button(renderer_,*typography_,{panel.x+24,panel.y+panel.h-76,bw,56},"Hayır",pal,false);
+        ui::button(renderer_,*typography_,{panel.x+40+bw,panel.y+panel.h-76,bw,56},"Evet",pal,false,false,true,false,false,false,true);
+    }
+    void enterLibraryHeader(bool selectCategory=false) {
+        if(!visibleBooks_.empty() && selectedBookIdx_>=0 && selectedBookIdx_<int(visibleBooks_.size())) {
+            lastLibraryBookId_=visibleBooks_[selectedBookIdx_].id;
+        }
+        libraryZone_=LibraryZone::Header;
+        rebuildFocus();
+        if(selectCategory) {
+            int col=0;
+            if(viewMode_==ViewMode::Grid && !visibleBooks_.empty()) {
+                int w=1280,h=720; getWindowSize(w,h);
+                ui::LibraryLayout l(w,libraryScrollbar(w,h).visible);
+                col=std::clamp(selectedBookIdx_%l.columns,0,5);
+            }
+            if(!navigationFocus_.select("category."+std::to_string(col))) navigationFocus_.select("category.0");
+        } else if(navigationFocus_.active().rfind("book:",0)==0 || navigationFocus_.active().empty()) {
+            navigationFocus_.select("category.0");
+        }
+        dirty_=true;
+    }
+    void returnToLibraryBooks() {
+        libraryZone_=LibraryZone::Books;
+        if(visibleBooks_.empty()) { rebuildFocus(); dirty_=true; return; }
+        int targetIdx=-1;
+        if(!lastLibraryBookId_.empty()) {
+            for(int i=0;i<int(visibleBooks_.size());++i) {
+                if(visibleBooks_[i].id==lastLibraryBookId_) { targetIdx=i; break; }
+            }
+        }
+        if(targetIdx<0) {
+            int w=1280,h=720; getWindowSize(w,h);
+            ui::LibraryLayout l(w,libraryScrollbar(w,h).visible);
+            if(viewMode_==ViewMode::Grid) targetIdx=std::clamp(int(listScroll_/l.stepY)*l.columns,0,int(visibleBooks_.size())-1);
+            else targetIdx=std::clamp(int(listScroll_/112),0,int(visibleBooks_.size())-1);
+        }
+        selectedBookIdx_=targetIdx;
+        lastLibraryBookId_=visibleBooks_[targetIdx].id;
+        rebuildFocus();
+        navigationFocus_.select("book:"+visibleBooks_[targetIdx].id);
+        dirty_=true;
+    }
+    void startLibraryUpHold() {
+        if(libraryZone_==LibraryZone::Books && !libraryUpHeld_) {
+            libraryUpHeld_=true;
+            libraryUpHoldConsumed_=false;
+            libraryUpHoldStart_=SDL_GetTicks();
+        }
+    }
+    void clearLibraryUpHold() {
+        libraryUpHeld_=false;
+        libraryUpHoldConsumed_=false;
+    }
+    void tickLibraryUpHold(Uint32 now) {
+        if(!libraryUpHeld_ || libraryUpHoldConsumed_) return;
+        if(libraryZone_!=LibraryZone::Books) { clearLibraryUpHold(); return; }
+        if(now-libraryUpHoldStart_>=600) {
+            libraryUpHoldConsumed_=true;
+            enterLibraryHeader(false);
+        }
+    }
+    void syncLibraryFocusToViewport() {
+        if(visibleBooks_.empty()) return;
+        int w=1280,h=720; getWindowSize(w,h);
+        ui::LibraryLayout l(w,libraryScrollbar(w,h).visible);
+        const int vpH=std::max(1,h-l.top-28);
+        const int cols=viewMode_==ViewMode::Grid?l.columns:1;
+        const int step=viewMode_==ViewMode::Grid?l.stepY:112;
+        const int itemH=viewMode_==ViewMode::Grid?l.cardHeight:104;
+        auto isVisible=[&](int idx) {
+            if(idx<0 || idx>=int(visibleBooks_.size())) return false;
+            const int row=idx/cols;
+            const float top=float(row*step)-listScroll_;
+            return top+itemH>8.f && top<float(vpH)-8.f;
+        };
+        if(isVisible(selectedBookIdx_)) {
+            if(libraryZone_==LibraryZone::Books) {
+                lastLibraryBookId_=visibleBooks_[selectedBookIdx_].id;
+                rebuildFocus();
+                navigationFocus_.select("book:"+lastLibraryBookId_);
+            }
+            return;
+        }
+        const int firstRow=std::max(0,int(std::ceil(listScroll_/float(step))));
+        int candidate=std::clamp(firstRow*cols,0,int(visibleBooks_.size())-1);
+        if(!isVisible(candidate)) {
+            const int midRow=std::max(0,int((listScroll_+vpH*0.5f)/float(step)));
+            candidate=std::clamp(midRow*cols,0,int(visibleBooks_.size())-1);
+        }
+        selectedBookIdx_=candidate;
+        lastLibraryBookId_=visibleBooks_[candidate].id;
+        if(libraryZone_==LibraryZone::Books) {
+            rebuildFocus();
+            navigationFocus_.select("book:"+lastLibraryBookId_);
+        }
+    }
+    bool moveLibraryBooks(int dx,int dy) {
+        if(visibleBooks_.empty()) return false;
+        int w=1280,h=720; getWindowSize(w,h);
+        ui::LibraryLayout l(w,libraryScrollbar(w,h).visible);
+        const int n=int(visibleBooks_.size());
+        selectedBookIdx_=std::clamp(selectedBookIdx_,0,n-1);
+        if(viewMode_==ViewMode::List) {
+            if(dy<0) {
+                if(selectedBookIdx_==0) {
+                    if(libraryUpHoldConsumed_) return true;
+                    enterLibraryHeader(false);
+                    return true;
+                }
+                --selectedBookIdx_;
+            } else if(dy>0) {
+                selectedBookIdx_=std::min(n-1,selectedBookIdx_+1);
+            }
+        } else {
+            const int cols=std::max(1,l.columns);
+            const int row=selectedBookIdx_/cols;
+            const int col=selectedBookIdx_%cols;
+            if(dy<0) {
+                if(row==0) {
+                    if(libraryUpHoldConsumed_) return true;
+                    enterLibraryHeader(true);
+                    return true;
+                }
+                selectedBookIdx_=std::clamp((row-1)*cols+col,0,n-1);
+            } else if(dy>0) {
+                const int nextRowStart=(row+1)*cols;
+                if(nextRowStart<n) {
+                    selectedBookIdx_=std::min(n-1,nextRowStart+col);
+                }
+            }
+            if(dx!=0) {
+                selectedBookIdx_=std::clamp(selectedBookIdx_+dx,0,n-1);
+            }
+        }
+        lastLibraryBookId_=visibleBooks_[selectedBookIdx_].id;
+        rebuildFocus();
+        navigationFocus_.select("book:"+lastLibraryBookId_);
+        focusReveal();
+        return true;
+    }
     float maxUiScroll() {
         int w,h; getWindowSize(w,h);
         if(quickMenu_) return std::max(0,int(quickActions().size())*60-quickActionViewport(quickSheet(w,h)).h);
@@ -1466,8 +1753,7 @@ private:
         if(screen_==ScreenState::FileBrowser) return std::max(0,int(browserEntries_.size())*64-(h-128));
         if(screen_==ScreenState::TocModal) return tocMaxScroll(w,h);
         if(screen_==ScreenState::BookmarksModal) return std::max(0,int(progressStore_.get(currentBookId_).bookmarks.size())*56-(h-280));
-        ui::LibraryLayout l(w); int rows=(int(visibleBooks_.size())+l.columns-1)/l.columns;
-        return std::max(0,(viewMode_==ViewMode::Grid?rows*l.stepY:int(visibleBooks_.size())*112)-(h-l.top-28));
+        return libraryScrollbar(w,h).maxScroll;
     }
     bool beginListTouch(float x,float y) {
         int w,h; getWindowSize(w,h); int px=int(x*w),py=int(y*h); bool capture=false;
@@ -2794,15 +3080,21 @@ private:
         // If not already in cache and not failed, enqueue for asynchronous background loading
         std::lock_guard<std::mutex> lock(queueMutex_);
         if(coverStates_[b.id]==CoverState::NoEmbeddedCover || coversPaused_) return nullptr;
+        const std::string fpKey = b.id + ":" + bookMetadataFingerprint(b);
+        if(noCoverFingerprints_.count(fpKey)) {
+            coverStates_[b.id]=CoverState::NoEmbeddedCover;
+            return nullptr;
+        }
         auto failed = failedThumbIds_.find(b.id);
         if (failed != failedThumbIds_.end() && failed->second <= std::chrono::steady_clock::now())
             failedThumbIds_.erase(failed);
-        if (failedThumbIds_.find(b.id) == failedThumbIds_.end() && queuedThumbIds_.size() < 32 &&
+        if (failedThumbIds_.find(b.id) == failedThumbIds_.end() && queuedThumbIds_.size() < 64 &&
             queuedThumbIds_.find(b.id) == queuedThumbIds_.end()) {
             queuedThumbIds_.insert(b.id);const auto token=coverTelemetry_.requested(b.id);
             activeCoverRequests_[b.id]={token,libraryScanGeneration_};
             coverStates_[b.id]=CoverState::Loading;
-            thumbQueue_.push_back(b);
+            if (b.id == lastLibraryBookId_) thumbQueue_.push_front(b);
+            else thumbQueue_.push_back(b);
             queueCv_.notify_one();
         }
         return nullptr;
@@ -3076,9 +3368,31 @@ private:
             int tw,th; getWindowSize(tw,th); ui::pointer(int(e.tfinger.x*tw),int(e.tfinger.y*th),true); dirty_=true;
             if (activeFingers_.empty()) { gestureTracker_.reset(); pdfDragging_ = false; multiTouch_ = false; }
             activeFingers_.insert(e.tfinger.fingerId);
-            if (activeFingers_.size() > 1) { zoomResetTracking_=false;panVelocityX_=panVelocityY_=0;cancelPageTurn(); libraryHold_=false; listTracking_=false; listVelocity_=0; multiTouch_ = true; scrollTracking_=false; scrollVelocity_=0; gestureTracker_.reset(); pdfDragging_ = false; return; }
+            if (activeFingers_.size() > 1) { scrollbarDragging_=false; zoomResetTracking_=false;panVelocityX_=panVelocityY_=0;cancelPageTurn(); libraryHold_=false; listTracking_=false; listVelocity_=0; multiTouch_ = true; scrollTracking_=false; scrollVelocity_=0; gestureTracker_.reset(); pdfDragging_ = false; return; }
             pressX_ = e.tfinger.x; pressY_ = e.tfinger.y;
-            if(screen_==ScreenState::Library&&!quickMenu_){libraryHoldIndex_=libraryBookAt(pressX_,pressY_);libraryHold_=libraryHoldIndex_>=0;libraryHoldConsumed_=false;libraryHoldStart_=SDL_GetTicks();libraryHoldX_=pressX_;libraryHoldY_=pressY_;}
+            if(screen_==ScreenState::Library && !quickMenu_ && catalogPanel_==CatalogPanel::None && choiceKind_<0 && colorEditing_<0 && !exitConfirmOpen_) {
+                const auto sb = libraryScrollbar(tw, th);
+                const ui::LibraryLayout layout(tw, sb.visible);
+                const int px = int(pressX_ * tw), py = int(pressY_ * th);
+                if (sb.visible && ui::contains(layout.scrollbarHitArea(tw, th), px, py)) {
+                    scrollbarDragging_ = true;
+                    scrollbarFinger_ = e.tfinger.fingerId;
+                    libraryHold_ = false;
+                    listTracking_ = false;
+                    listVelocity_ = 0;
+                    gestureTracker_.reset();
+                    if (py >= sb.thumb.y && py < sb.thumb.y + sb.thumb.h) {
+                        scrollbarGrabOffset_ = float(py) - (float(sb.thumb.y) + float(sb.thumb.h) * 0.5f);
+                    } else {
+                        scrollbarGrabOffset_ = 0.f;
+                        listScroll_ = sb.scrollForPointerY(py);
+                        syncLibraryFocusToViewport();
+                    }
+                    dirty_ = true;
+                    return;
+                }
+            }
+            if(screen_==ScreenState::Library&&!quickMenu_&&!exitConfirmOpen_){libraryHoldIndex_=libraryBookAt(pressX_,pressY_);libraryHold_=libraryHoldIndex_>=0;libraryHoldConsumed_=false;libraryHoldStart_=SDL_GetTicks();libraryHoldX_=pressX_;libraryHoldY_=pressY_;}
             scrollVelocity_=0; listVelocity_=0;panVelocityX_=panVelocityY_=0;
             if(screen_==ScreenState::Reader && !quickMenu_ && catalogPanel_==CatalogPanel::None && showZoomReset() && (ui::contains(zoomResetRect(tw,th),int(pressX_*tw),int(pressY_*th)) ||
                 (comic() && ui::contains(zoomTopRect(tw,th),int(pressX_*tw),int(pressY_*th))))) {
@@ -3107,6 +3421,16 @@ private:
             return;
         }
         if (e.type == SDL_FINGERMOTION) {
+            if(scrollbarDragging_ && e.tfinger.fingerId == scrollbarFinger_) {
+                int w,h; getWindowSize(w,h);
+                const auto sb = libraryScrollbar(w,h);
+                const int py = int(e.tfinger.y * h);
+                ui::pointer(int(e.tfinger.x * w), py, true);
+                listScroll_ = sb.scrollForPointerY(int(std::lround(float(py) - scrollbarGrabOffset_)));
+                syncLibraryFocusToViewport();
+                dirty_ = true;
+                return;
+            }
             if(libraryHold_){int w,h;getWindowSize(w,h);if(std::hypot((e.tfinger.x-libraryHoldX_)*w,(e.tfinger.y-libraryHoldY_)*h)>12)libraryHold_=false;}
             trace("finger_motion");
             if (multiTouch_) { scrollTracking_=false; scrollVelocity_=0; listTracking_=false; listVelocity_=0; return; }
@@ -3158,6 +3482,11 @@ private:
             return;
         }
         if (e.type == SDL_FINGERUP) {
+            if(scrollbarDragging_ && e.tfinger.fingerId == scrollbarFinger_) {
+                scrollbarDragging_=false; libraryHold_=false;
+                ui::pointer(0,0,false); activeFingers_.erase(e.tfinger.fingerId);
+                gestureTracker_.reset(); dirty_=true; return;
+            }
             libraryHold_=false;
             if(libraryHoldConsumed_){libraryHoldConsumed_=false;listTracking_=false;ui::pointer(0,0,false);activeFingers_.erase(e.tfinger.fingerId);gestureTracker_.reset();return;}
             trace("finger_up");
@@ -3174,6 +3503,7 @@ private:
                 moveListTouch(e.tfinger.y); listTracking_=false;
                 if(!listMoved_) { listVelocity_=0; handleTap(e.tfinger.x,e.tfinger.y); }
                 else if(SDL_GetTicks()-listTick_>100) listVelocity_=0;
+                if(listMoved_ && screen_==ScreenState::Library) syncLibraryFocusToViewport();
                 if(listMoved_ && screen_==ScreenState::TocModal && tocCount()>0) {
                     int w,h;getWindowSize(w,h);tocSelected_=std::clamp(int(tocScroll_)/tocStep()*tocColumns(w),0,tocCount()-1);
                     rebuildFocus();navigationFocus_.select("toc."+std::to_string(tocSelected_));
@@ -3254,6 +3584,18 @@ private:
         }
 
         // Controller & Keyboard Keydown
+        if (e.type == SDL_CONTROLLERBUTTONUP && e.cbutton.button == SDL_CONTROLLER_BUTTON_DPAD_UP) {
+            clearLibraryUpHold();
+            return;
+        }
+        if (e.type == SDL_KEYUP && e.key.keysym.sym == SDLK_UP) {
+            clearLibraryUpHold();
+            return;
+        }
+        if (e.type == SDL_KEYDOWN && e.key.repeat && screen_ == ScreenState::Library &&
+            !quickMenu_ && catalogPanel_ == CatalogPanel::None && choiceKind_ < 0 && colorEditing_ < 0 && !exitConfirmOpen_) {
+            return;
+        }
         if (e.type == SDL_KEYDOWN || e.type == SDL_CONTROLLERBUTTONDOWN) {
             handleButtons(e, running);
         }
@@ -3305,9 +3647,18 @@ private:
         trace("tap_decision");
         int w = 1280, h = 720;
         getWindowSize(w, h);
-        rebuildFocus();navigationFocus_.touch(int(x*w),int(y*h));
         int px = static_cast<int>(x * w);
         int py = static_cast<int>(y * h);
+        if(exitConfirmOpen_) {
+            const auto panel=exitConfirmRect(w,h);
+            const int bw=(panel.w-64)/2;
+            const SDL_Rect noRc{panel.x+24,panel.y+panel.h-76,bw,56};
+            const SDL_Rect yesRc{panel.x+40+bw,panel.y+panel.h-76,bw,56};
+            if(ui::contains(yesRc,px,py)) { exitConfirmOpen_=false; exitRequested_=true; dirty_=true; return; }
+            if(ui::contains(noRc,px,py) || !ui::contains(panel,px,py)) { exitConfirmOpen_=false; dirty_=true; return; }
+            return;
+        }
+        rebuildFocus();navigationFocus_.touch(px,py);
         if(catalogPanel_!=CatalogPanel::None){handleCatalogTap(px,py,w,h);return;}
         if((screen_==ScreenState::ReadingJournal||screen_==ScreenState::JournalPreview)&&!quickMenu_&&
            (screen_==ScreenState::JournalPreview || !(px>=w-80&&py<72))){
@@ -3358,23 +3709,28 @@ private:
         } else if (screen_ == ScreenState::BookmarksModal) {
             handleBookmarksModalTap(px, py, w, h);
         } else if (screen_ == ScreenState::Library) {
+            const auto sb = libraryScrollbar(w, h);
+            ui::LibraryLayout l(w, sb.visible);
+            if(py<l.top) libraryZone_=LibraryZone::Header;
             if(!openSeriesKey_.empty() && ui::contains({16,16,152,56},px,py)){closeSeriesShelf();return;}
             if(openSeriesKey_.empty() && w>=900 && ui::contains({208,16,180,56},px,py)){setCatalogPanel(CatalogPanel::Browse);return;}
             if(ui::contains({w-440,16,200,56},px,py)){enterJournal(false);return;}
-            ui::LibraryLayout l(w);
             for(int c=0;c<6;++c) if(ui::contains(categoryRect(c,w),px,py)) { category_=static_cast<Category>(c); updateVisibleBooks(); return; }
             if(ui::contains({w-216,16,112,56},px,py)) { toggleSearch(); return; }
             if(visibleBooks_.empty()) { if(books_.empty() && ui::contains({56,l.top+16+std::min(260,h-l.top-48)-72,260,56},px,py)) openBrowser(); return; }
             if(py<l.top || py>=h-28) return;
+            if(sb.visible && ui::contains(l.scrollbarHitArea(w,h),px,py)) return;
+            libraryZone_=LibraryZone::Books;
             int y=py-l.top+int(listScroll_),idx=-1; bool favorite=false;
             if(viewMode_==ViewMode::Grid) {
                 int col=(px-l.left)/l.stepX;
                 if(px<l.left || col>=l.columns || (px-l.left)%l.stepX>=l.cardWidth || y%l.stepY>=l.cardHeight) return;
                 idx=(y/l.stepY)*l.columns+col;
                 favorite=(px-l.left)%l.stepX>=l.cardWidth-72 && y%l.stepY>=10 && y%l.stepY<66;
-            } else { idx=y/112; favorite=px>=w-124; }
+            } else { idx=y/112; favorite=px>=w-124-l.rightReserve; }
             if(idx<0 || idx>=int(visibleBooks_.size())) return;
             selectedBookIdx_=idx;
+            lastLibraryBookId_=visibleBooks_[idx].id;
             if(openSeriesShelf(visibleBooks_[idx]))return;
             if(favorite) {
                 auto p=progressStore_.get(visibleBooks_[idx].id); p.favorite=!p.favorite;
@@ -3641,6 +3997,7 @@ private:
     }
 
     void handleButtons(const SDL_Event &e, bool &running) {
+        (void)running;
         bool pad = (e.type == SDL_CONTROLLERBUTTONDOWN);
         int key = pad ? e.cbutton.button : e.key.keysym.sym;
         auto match = [&](int k, int p) { return pad ? (key == p) : (key == k); };
@@ -3654,6 +4011,31 @@ private:
             return;
         }
 
+        if (exitConfirmOpen_) {
+            if (screen_ == ScreenState::Library && !quickMenu_ && catalogPanel_ == CatalogPanel::None &&
+            choiceKind_ < 0 && colorEditing_ < 0 && !exitConfirmOpen_ && match(SDLK_UP, SDL_CONTROLLER_BUTTON_DPAD_UP)) {
+            startLibraryUpHold();
+        }
+        if (match(SDLK_ESCAPE, SDL_CONTROLLER_BUTTON_B)) {
+                exitConfirmOpen_ = false;
+                dirty_ = true;
+                return;
+            }
+            if (match(SDLK_RETURN, SDL_CONTROLLER_BUTTON_A)) {
+                activateFocus();
+                return;
+            }
+            if (match(SDLK_LEFT, SDL_CONTROLLER_BUTTON_DPAD_LEFT)) { moveFocus(-1, 0); return; }
+            if (match(SDLK_RIGHT, SDL_CONTROLLER_BUTTON_DPAD_RIGHT)) { moveFocus(1, 0); return; }
+            if (match(SDLK_UP, SDL_CONTROLLER_BUTTON_DPAD_UP)) { moveFocus(0, -1); return; }
+            if (match(SDLK_DOWN, SDL_CONTROLLER_BUTTON_DPAD_DOWN)) { moveFocus(0, 1); return; }
+            return;
+        }
+
+        if (screen_ == ScreenState::Library && !quickMenu_ && catalogPanel_ == CatalogPanel::None &&
+            choiceKind_ < 0 && colorEditing_ < 0 && !exitConfirmOpen_ && match(SDLK_UP, SDL_CONTROLLER_BUTTON_DPAD_UP)) {
+            startLibraryUpHold();
+        }
         if (match(SDLK_ESCAPE, SDL_CONTROLLER_BUTTON_B)) {
             if(screen_==ScreenState::Library && !quickMenu_ && closeSeriesShelf())return;
             if(quickMenu_){quickMenu_=false;helpMenu_=false;dirty_=true;return;}
@@ -3682,8 +4064,14 @@ private:
                 if (readerToolbarFocusActive_) { readerToolbarFocusActive_=false;dirty_=true;return; }
                 if (toolbarVisible_) { toolbarVisible_ = false; dirty_ = true; return; }
                 closeBook();
+            } else if (screen_ == ScreenState::Library) {
+                if (libraryZone_ == LibraryZone::Books && !visibleBooks_.empty()) {
+                    enterLibraryHeader(false);
+                } else {
+                    openExitConfirm();
+                }
             } else {
-                running = false;
+                openExitConfirm();
             }
             dirty_ = true;
             return;
@@ -3908,6 +4296,7 @@ private:
             ui::button(renderer_,*typography_,{panel.x+panel.w/2+8,panel.y+348,(panel.w-64)/2,56},"Kaydet",pal,true);
         }
         renderChoices(w,h,pal);
+        if(exitConfirmOpen_) renderExitConfirmModal(w,h,pal);
         if(colorEditing_<0 && !updateDialog_)paintFocus();
         renderUpdateDialog(w,h,pal);
         if(rotation && orientationTarget_) {
@@ -3974,21 +4363,35 @@ private:
         ui::surface(renderer_,r,pal.header,8); SDL_RenderCopy(renderer_,thumb,nullptr,&dst);
     }
     std::set<std::string> prioritizeCovers(int w,int h) {
-        ui::LibraryLayout l(w); std::set<std::string> wanted;
-        int first=viewMode_==ViewMode::Grid?int(listScroll_/l.stepY)*l.columns:int(listScroll_/112);
-        int count=viewMode_==ViewMode::Grid?((h-l.top)/l.stepY+3)*l.columns:(h-l.top)/112+3;
-        for(int i=first;i<std::min(int(visibleBooks_.size()),first+count);++i) wanted.insert(visibleBooks_[i].id);
-        std::lock_guard<std::mutex> lock(queueMutex_);
-        for(auto it=thumbQueue_.begin();it!=thumbQueue_.end();) {
-            if(!wanted.count(it->id)) {
-                const auto active=activeCoverRequests_.find(it->id);
-                if(active!=activeCoverRequests_.end()) {
-                    const auto request=active->second;activeCoverRequests_.erase(active);
-                    queuedThumbIds_.erase(it->id);coverStates_[it->id]=CoverState::NotRequested;
-                    coverTelemetry_.discarded(it->id,request.token,false);
-                }
-                it=thumbQueue_.erase(it);
-            } else ++it;
+        const auto sb = libraryScrollbar(w, h);
+        ui::LibraryLayout l(w, sb.visible); std::set<std::string> wanted;
+        const int cols = viewMode_ == ViewMode::Grid ? l.columns : 1;
+        const int step = viewMode_ == ViewMode::Grid ? l.stepY : 112;
+        const int firstRow = std::max(0, int(listScroll_) / step);
+        const int visibleRows = std::max(1, (h - l.top - 28) / step + 2);
+        const int preStart = std::max(0, (firstRow - 1) * cols);
+        const int preEnd = std::min(int(visibleBooks_.size()), (firstRow + visibleRows + 2) * cols);
+        for (int i = preStart; i < preEnd; ++i) wanted.insert(visibleBooks_[i].id);
+        {
+            std::lock_guard<std::mutex> lock(queueMutex_);
+            for (auto it = thumbQueue_.begin(); it != thumbQueue_.end();) {
+                if (!wanted.count(it->id)) {
+                    const auto active = activeCoverRequests_.find(it->id);
+                    if (active != activeCoverRequests_.end()) {
+                        const auto request = active->second; activeCoverRequests_.erase(active);
+                        queuedThumbIds_.erase(it->id); coverStates_[it->id] = CoverState::NotRequested;
+                        coverTelemetry_.discarded(it->id, request.token, false);
+                    }
+                    it = thumbQueue_.erase(it);
+                } else ++it;
+            }
+        }
+        // Bounded scroll-aware prefetch for upcoming rows (outside lock so getOrRenderThumbnail stays lock-safe)
+        for (int i = preStart; i < preEnd; ++i) {
+            if (int(queuedThumbIds_.size()) >= 48) break;
+            if (!thumbCache_.get("thumb_" + visibleBooks_[i].id)) {
+                getOrRenderThumbnail(visibleBooks_[i]);
+            }
         }
         return wanted;
     }
@@ -4006,7 +4409,8 @@ private:
         if(searchActive_) typography_->renderText(renderer_,typography_->uiFont(),searchQuery_+"_",32,62,pal.accent,w-280);
         const char *cats[]={"Tüm kitaplar","Devam et","Son okunan","Favoriler","Okunmamış","Tamamlanan"};
         for(int i=0;i<6;++i) ui::button(renderer_,*typography_,categoryRect(i,w),cats[i],pal,static_cast<int>(category_)==i);
-        ui::LibraryLayout l(w);
+        const auto sb = libraryScrollbar(w, h);
+        ui::LibraryLayout l(w, sb.visible);
         if(visibleBooks_.empty()) {
             SDL_Rect empty{32,l.top+16,w-64,std::min(260,h-l.top-48)}; ui::elevated(renderer_,empty,pal);
             typography_->renderText(renderer_,typography_->titleFont(),ui::label(libraryScanner_.pending()?"Finding your books...":libraryEmptyMessage()),empty.x+24,empty.y+28,pal.fg,empty.w-48);
@@ -4014,16 +4418,17 @@ private:
             if(books_.empty()) ui::button(renderer_,*typography_,{empty.x+24,empty.y+empty.h-72,260,56},ui::label("Add books folder"),pal,true);
         } else {
             if(screen_==ScreenState::Library) prioritizeCovers(w,h);
-            SDL_Rect clip{0,l.top,w,h-l.top-28}; SDL_RenderSetClipRect(renderer_,&clip);
-            if(viewMode_==ViewMode::Grid) renderGrid(w,h,pal); else renderList(w,h,pal);
+            SDL_Rect clip{0,l.top,std::max(0,w-l.rightReserve),std::max(0,h-l.top-28)}; SDL_RenderSetClipRect(renderer_,&clip);
+            if(viewMode_==ViewMode::Grid) renderGrid(w,h,pal,l); else renderList(w,h,pal,l);
             SDL_RenderSetClipRect(renderer_,nullptr);
+            sb.render(renderer_,pal,scrollbarDragging_);
         }
-        if(libraryScanner_.pending())typography_->renderText(renderer_,typography_->smallFont(),ui::label("Scanning library..."),32,h-56,pal.accent,w-64);
-        if(!currentErrorMessage_.empty()) ui::button(renderer_,*typography_,{32,h-96,w-64,56},currentErrorMessage_,pal);
+        if(libraryScanner_.pending())typography_->renderText(renderer_,typography_->smallFont(),ui::label("Scanning library..."),32,h-56,pal.accent,w-64-l.rightReserve);
+        if(!currentErrorMessage_.empty()) ui::button(renderer_,*typography_,{32,h-96,w-64-l.rightReserve,56},currentErrorMessage_,pal);
         typography_->renderText(renderer_,typography_->smallFont(),(std::to_string(visibleBooks_.size())+(seriesShelves_.empty()?catLabel(" kitap · "," books · "):catLabel(" öğe · "," items · "))+"EPUB · PDF · CBZ · CBR"+catLabel(" · Çevrimdışı"," · Offline"))+" · "+APP_VERSION_FULL,32,h-25,pal.muted,w-64);
     }
-    void renderGrid(int w,int h,const ThemePalette &pal) {
-        ui::LibraryLayout l(w);
+    void renderGrid(int w,int h,const ThemePalette &pal,const ui::LibraryLayout &l) {
+        (void)w;
         int first=std::max(0,int(listScroll_/l.stepY)*l.columns);
         for(int i=first;i<int(visibleBooks_.size());++i) {
             int y=l.top+(i/l.columns)*l.stepY-int(listScroll_); if(y>=h-28) break;
@@ -4041,22 +4446,24 @@ private:
             if(!seriesShelves_.count(visibleBooks_[i].id))ui::favorite(renderer_,{x+l.cardWidth-64,y+10,56,56},pal,p.favorite);
         }
     }
-    void renderList(int w,int h,const ThemePalette &pal) {
-        ui::LibraryLayout l(w); int first=std::max(0,int(listScroll_/112));
+    void renderList(int w,int h,const ThemePalette &pal,const ui::LibraryLayout &l) {
+        int first=std::max(0,int(listScroll_/112));
+        const int cardW=std::max(120,w-64-l.rightReserve);
+        const int favX=32+cardW-84;
         for(int i=first;i<int(visibleBooks_.size());++i) {
             int y=l.top+i*112-int(listScroll_); if(y>=h-28) break;
             const auto &b=visibleBooks_[i]; auto p=progressStore_.get(b.id);
-            SDL_Rect card{32,y,w-64,104};
+            SDL_Rect card{32,y,cardW,104};
             ui::elevated(renderer_,card,pal);
 
             drawCover(b,{40,y+6,66,92},pal);
-            typography_->renderText(renderer_,typography_->uiFont(),libraryItemTitle(b),126,y+14,pal.fg,w-310);
+            typography_->renderText(renderer_,typography_->uiFont(),libraryItemTitle(b),126,y+14,pal.fg,std::max(40,cardW-246));
             auto subtitle=libraryItemSubtitle(b);
-            typography_->renderText(renderer_,typography_->smallFont(),subtitle.empty()?std::string(formatName(b.format))+catLabel(" kitap"," book"):subtitle,126,y+49,pal.muted,w-330);
+            typography_->renderText(renderer_,typography_->smallFont(),subtitle.empty()?std::string(formatName(b.format))+catLabel(" kitap"," book"):subtitle,126,y+49,pal.muted,std::max(40,cardW-266));
             const auto fraction=libraryItemFraction(b);
-            typography_->drawProgressBar(renderer_,126,y+82,w-350,5,fraction,pal.cardBorder,pal.accent);
-            typography_->renderText(renderer_,typography_->smallFont(),ui::label("%")+std::to_string(int(fraction*100)),w-192,y+44,pal.muted);
-            if(!seriesShelves_.count(b.id))ui::favorite(renderer_,{w-116,y+24,64,56},pal,p.favorite);
+            typography_->drawProgressBar(renderer_,126,y+82,std::max(40,cardW-286),5,fraction,pal.cardBorder,pal.accent);
+            typography_->renderText(renderer_,typography_->smallFont(),ui::label("%")+std::to_string(int(fraction*100)),favX-76,y+44,pal.muted);
+            if(!seriesShelves_.count(b.id))ui::favorite(renderer_,{favX,y+24,64,56},pal,p.favorite);
         }
     }
 

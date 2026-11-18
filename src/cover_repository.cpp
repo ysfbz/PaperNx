@@ -100,14 +100,19 @@ CoverRepository::CoverRepository(fs::path root, std::uintmax_t maxBytes, std::si
     : root_(std::move(root)), maxBytes_(maxBytes), maxEntries_(maxEntries) {}
 
 std::string CoverRepository::cacheKey(const Book &book) {
-    // Restat on the worker: stale library metadata must not resurrect old artwork.
-    std::error_code ec;
-    const auto path = fs::u8path(book.path);
-    auto bytes = fs::file_size(path, ec);
-    if (ec) bytes = book.bytes;
-    ec.clear();
-    auto stamp = fs::last_write_time(path, ec);
-    auto modified = ec ? book.modified : static_cast<std::int64_t>(stamp.time_since_epoch().count());
+    std::uintmax_t bytes = book.bytes;
+    std::int64_t modified = book.modified;
+    if (bytes == 0) {
+        std::error_code ec;
+        const auto path = fs::u8path(book.path);
+        const auto sz = fs::file_size(path, ec);
+        if (!ec) bytes = sz;
+        if (modified == 0) {
+            ec.clear();
+            const auto stamp = fs::last_write_time(path, ec);
+            if (!ec) modified = static_cast<std::int64_t>(stamp.time_since_epoch().count());
+        }
+    }
     const std::string identity = book.path + '\0' + book.id + '\0' +
         std::to_string(bytes) + ':' + std::to_string(modified) + (isComic(book.format)?":comic-cover-v2":"");
     std::uint64_t a = 14695981039346656037ull, b = 7809847782465536322ull;
@@ -171,6 +176,7 @@ void CoverRepository::initialize() {
         auto bytes = fs::file_size(p, ec); if (ec) break;
         if (bytes > headerSize + maxWidth * maxHeight * 3) { removeOwned(p); continue; }
         entries_[name.substr(0, 32)] = {bytes, ++clock_};
+        totalBytes_ += bytes;
         // Avoid O(N * cache-size) repeated eviction checks at startup.
         // Inventory remains bounded even for pathological directories.
         if (entries_.size() > maxEntries_ &&
@@ -179,12 +185,42 @@ void CoverRepository::initialize() {
     trim();
 }
 
+void CoverRepository::evictOldestIfNeeded(std::uintmax_t extraBytes) {
+    while (!entries_.empty() &&
+           ((extraBytes <= maxBytes_ ? totalBytes_ > maxBytes_ - extraBytes : true) ||
+            entries_.size() + (extraBytes > 0 ? 1 : 0) > maxEntries_)) {
+        auto oldest = std::min_element(entries_.begin(), entries_.end(),
+                                       [](const auto &a, const auto &b) { return a.second.used < b.second.used; });
+        totalBytes_ = (totalBytes_ >= oldest->second.bytes) ? (totalBytes_ - oldest->second.bytes) : 0;
+        removeOwned(root_ / (oldest->first + ".pnxc"));
+        entries_.erase(oldest);
+    }
+}
+
 std::optional<CoverImage> CoverRepository::read(const Book &book) {
-    initialize(); if (!available_ || !safeRoot(root_)) return {};
+    initialize(); if (!available_) return {};
     auto key = cacheKey(book); auto p = root_ / (key + ".pnxc");
     auto image = readFile(p, key);
-    if (image) { entries_[key] = {headerSize + image->rgb.size(), ++clock_}; ++hits_; }
-    else { ++misses_; removeOwned(p); entries_.erase(key); }
+    if (image) {
+        const std::uintmax_t sz = headerSize + image->rgb.size();
+        auto it = entries_.find(key);
+        if (it != entries_.end()) {
+            totalBytes_ = totalBytes_ - std::min(totalBytes_, it->second.bytes) + sz;
+            it->second = {sz, ++clock_};
+        } else {
+            entries_[key] = {sz, ++clock_};
+            totalBytes_ += sz;
+        }
+        ++hits_;
+    } else {
+        ++misses_;
+        removeOwned(p);
+        auto it = entries_.find(key);
+        if (it != entries_.end()) {
+            totalBytes_ -= std::min(totalBytes_, it->second.bytes);
+            entries_.erase(it);
+        }
+    }
     return image;
 }
 
@@ -192,21 +228,24 @@ bool CoverRepository::write(const Book &book, const CoverImage &image) {
     if (image.width <= 0 || image.height <= 0 || image.width > maxWidth || image.height > maxHeight ||
         image.stride != image.width * 3 || image.rgb.size() != std::size_t(image.stride * image.height) ||
         image.rgb.size() + headerSize > maxBytes_ || !maxEntries_) return false;
-    initialize(); if (!available_ || !safeRoot(root_)) return false;
+    initialize(); if (!available_) return false;
     const auto key = cacheKey(book);
     const auto final = root_ / (key + ".pnxc"), temp = root_ / (key + ".tmp"), backup = root_ / (key + ".bak");
-    if (readFile(final, key)) { entries_[key].used = ++clock_; return true; } // No repeated SD writes.
+    if (entries_.find(key) != entries_.end() && regular(final)) {
+        entries_[key].used = ++clock_;
+        return true; // Already persisted; avoid redundant SD reads/writes.
+    }
     std::error_code ec;
     for (const auto &p : {final, temp, backup}) if (fs::is_symlink(fs::symlink_status(p, ec))) return false;
     // Reserve space before writing the temporary so even replacement does not
     // exceed the disk budget. A corrupt prior entry has no recovery value.
-    removeOwned(final); entries_.erase(key);
-    const auto needed = headerSize + image.rgb.size();
-    std::uintmax_t total = 0; for (const auto &e : entries_) total += e.second.bytes;
-    while (!entries_.empty() && (total > maxBytes_ - needed || entries_.size() >= maxEntries_)) {
-        auto oldest = std::min_element(entries_.begin(), entries_.end(), [](const auto &a, const auto &b) { return a.second.used < b.second.used; });
-        total -= oldest->second.bytes; removeOwned(root_ / (oldest->first + ".pnxc")); entries_.erase(oldest);
+    removeOwned(final);
+    if (auto it = entries_.find(key); it != entries_.end()) {
+        totalBytes_ -= std::min(totalBytes_, it->second.bytes);
+        entries_.erase(it);
     }
+    const auto needed = headerSize + image.rgb.size();
+    evictOldestIfNeeded(needed);
     std::ofstream out(temp, std::ios::binary | std::ios::trunc);
     out.write("PNXC0001", 8); out.write(key.data(), key.size());
     put32(out, image.width); put32(out, image.height); put32(out, image.rgb.size()); put32(out, checksum(image.rgb));
@@ -218,25 +257,23 @@ bool CoverRepository::write(const Book &book, const CoverImage &image) {
     if (regular(final) && !renameOwned(final, backup)) { removeOwned(temp); return false; }
     if (!renameOwned(temp, final)) { renameOwned(backup, final); removeOwned(temp); return false; }
     removeOwned(backup);
-    entries_[key] = {headerSize + image.rgb.size(), ++clock_}; trim();
+    entries_[key] = {headerSize + image.rgb.size(), ++clock_};
+    totalBytes_ += headerSize + image.rgb.size();
+    trim();
     return entries_.find(key) != entries_.end();
 }
 
 void CoverRepository::trim() {
     if (!initialized_) { initialize(); return; }
-    if (!available_ || !safeRoot(root_)) return;
-    std::uintmax_t total = 0; for (const auto &entry : entries_) total += entry.second.bytes;
-    while (!entries_.empty() && (total > maxBytes_ || entries_.size() > maxEntries_)) {
-        auto oldest = std::min_element(entries_.begin(), entries_.end(), [](const auto &a, const auto &b) { return a.second.used < b.second.used; });
-        total -= oldest->second.bytes; removeOwned(root_ / (oldest->first + ".pnxc")); entries_.erase(oldest);
-    }
+    if (!available_) return;
+    evictOldestIfNeeded(0);
 }
 
 CoverCacheStats CoverRepository::stats() {
     initialize();
     CoverCacheStats result;
     result.entries = entries_.size();
-    for (const auto &entry : entries_) result.bytes += entry.second.bytes;
+    result.bytes = totalBytes_;
     result.hits = hits_;
     result.misses = misses_;
     return result;
@@ -271,6 +308,7 @@ bool CoverRepository::clear() {
     // Rebuild the index on the next access, including any files whose removal
     // failed. Keep cumulative diagnostic hit/miss counters for the session.
     entries_.clear();
+    totalBytes_ = 0;
     clock_ = 0;
     initialized_ = false;
     available_ = false;

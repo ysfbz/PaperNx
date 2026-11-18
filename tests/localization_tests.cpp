@@ -102,6 +102,12 @@ int main() {
     assert(localizeUiText("Tarama durumu ve günlük",1)=="Scan status & log");
     assert(localizeUiText("Rescan library",0)=="Kitaplığı yeniden tara");
     assert(localizeUiText("Kitaplığı yeniden tara",1)=="Rescan library");
+    assert(localizeUiText("Exit PaperNX?",0)=="PaperNX'ten çıkılsın mı?");
+    assert(localizeUiText("PaperNX'ten çıkılsın mı?",1)=="Exit PaperNX?");
+    assert(localizeUiText("Hayır",1)=="No");
+    assert(localizeUiText("Evet",1)=="Yes");
+    assert(localizeUiText("No",0)=="Hayır");
+    assert(localizeUiText("Yes",0)=="Evet");
 
     // Prefixes
     assert(localizeUiText("Son okuma: 2026-10-19",1)=="Last read: 2026-10-19");

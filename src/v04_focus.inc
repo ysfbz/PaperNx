@@ -5,7 +5,8 @@
         int w, h;
         getWindowSize(w, h);
         std::string context;
-        if (choiceKind_ >= 0) context = "choice." + std::to_string(choiceKind_);
+        if (exitConfirmOpen_) context = "exit.confirm";
+        else if (choiceKind_ >= 0) context = "choice." + std::to_string(choiceKind_);
         else if (catalogPanel_ != CatalogPanel::None) context = "catalog." + std::to_string(int(catalogPanel_));
         else if (quickMenu_) context = helpMenu_ ? "quick.help" : "quick";
         else if (screen_ == ScreenState::AaModal) context = "aa." + std::to_string(aaTab_);
@@ -21,7 +22,12 @@
             navigationFocus_.addClipped(id, {r.x, r.y, r.w, r.h}, {clip.x, clip.y, clip.w, clip.h}, enabled, std::move(alias));
         };
 
-        if (choiceKind_ >= 0) {
+        if (exitConfirmOpen_) {
+            const auto panel = exitConfirmRect(w, h);
+            const int bw = (panel.w - 64) / 2;
+            add("exit.no", {panel.x + 24, panel.y + panel.h - 76, bw, 56});
+            add("exit.yes", {panel.x + 40 + bw, panel.y + panel.h - 76, bw, 56});
+        } else if (choiceKind_ >= 0) {
             const auto cr = choiceContentRect(w, h);
             const auto options = choiceOptions();
             for (int i = 0; i < int(options.size()); ++i) {
@@ -94,24 +100,27 @@
             footer.x += footer.w + 16;
             add("reset", footer);
         } else if (screen_ == ScreenState::Library) {
-            ui::LibraryLayout l(w);
-            SDL_Rect libClip{0, l.top, w, std::max(0, h - l.top - 28)};
+            const auto sb = libraryScrollbar(w, h);
+            ui::LibraryLayout l(w, sb.visible);
+            const bool booksZone = (libraryZone_ == LibraryZone::Books) && !visibleBooks_.empty();
+            const bool headerZone = (libraryZone_ == LibraryZone::Header) || visibleBooks_.empty();
+            SDL_Rect libClip{0, l.top, std::max(0, w - l.rightReserve), std::max(0, h - l.top - 28)};
             for (int i = 0; i < int(visibleBooks_.size()); ++i) {
                 SDL_Rect r = viewMode_ == ViewMode::Grid
                     ? SDL_Rect{l.left + (i % l.columns) * l.stepX, l.top + (i / l.columns) * l.stepY - int(listScroll_), l.cardWidth, l.cardHeight}
-                    : SDL_Rect{32, l.top + i * 112 - int(listScroll_), w - 64, 104};
-                addClipped("book:" + visibleBooks_[i].id, r, libClip, true, "book." + std::to_string(i));
+                    : SDL_Rect{32, l.top + i * 112 - int(listScroll_), std::max(120, w - 64 - l.rightReserve), 104};
+                addClipped("book:" + visibleBooks_[i].id, r, libClip, booksZone, "book." + std::to_string(i));
             }
-            for (int i = 0; i < 6; ++i) add("category." + std::to_string(i), categoryRect(i, w));
+            for (int i = 0; i < 6; ++i) add("category." + std::to_string(i), categoryRect(i, w), headerZone);
             if (openSeriesKey_.empty()) {
-                if (w >= 900) add("library.browse", {208, 16, 180, 56});
+                if (w >= 900) add("library.browse", {208, 16, 180, 56}, headerZone);
             } else {
-                add("series.back", {16, 16, 152, 56});
+                add("series.back", {16, 16, 152, 56}, headerZone);
             }
-            add("library.journal", {w - 440, 16, 200, 56});
-            add("search", {w - 216, 16, 112, 56});
-            add("plus", {w - 80, 8, 64, 64});
-            if (books_.empty()) add("browse", {56, l.top + 16 + std::min(260, h - l.top - 48) - 72, 260, 56});
+            add("library.journal", {w - 440, 16, 200, 56}, headerZone);
+            add("search", {w - 216, 16, 112, 56}, headerZone);
+            add("plus", {w - 80, 8, 64, 64}, headerZone);
+            if (books_.empty()) add("browse", {56, l.top + 16 + std::min(260, h - l.top - 48) - 72, 260, 56}, headerZone);
         } else if (screen_ == ScreenState::FileBrowser) {
             SDL_Rect browserClip{24, 112, std::max(0, w - 48), std::max(0, h - 128)};
             for (int i = 0; i < int(browserEntries_.size()); ++i) {
@@ -204,14 +213,17 @@
         } else if (id.rfind("tab.", 0) == 0 || id == "scope" || id == "close" || id == "save" || id == "reset") {
             if (screen_ == ScreenState::AaModal) aaRow_ = -1;
         } else if (id.rfind("book:", 0) == 0) {
+            libraryZone_ = LibraryZone::Books;
             const std::string bookId = id.substr(5);
+            lastLibraryBookId_ = bookId;
             for (int i = 0; i < int(visibleBooks_.size()); ++i) {
                 if (visibleBooks_[i].id == bookId) {
                     selectedBookIdx_ = i;
                     break;
                 }
             }
-            ui::LibraryLayout l(w);
+            const auto sb = libraryScrollbar(w, h);
+            ui::LibraryLayout l(w, sb.visible);
             int columns = viewMode_ == ViewMode::Grid ? l.columns : 1;
             int step = viewMode_ == ViewMode::Grid ? l.stepY : 112;
             reveal(listScroll_, float(selectedBookIdx_ / columns * step), float(viewMode_ == ViewMode::Grid ? l.cardHeight : 104), float(h - l.top - 28));
@@ -241,6 +253,12 @@
 
     bool moveFocus(int dx, int dy) {
         if (updateDialog_ || colorEditing_ >= 0) return false;
+        if (exitConfirmOpen_) {
+            rebuildFocus();
+            navigationFocus_.move(dx, dy);
+            dirty_ = true;
+            return true;
+        }
         if (screen_ == ScreenState::Reader && !quickMenu_ && catalogPanel_ == CatalogPanel::None && choiceKind_ < 0) {
             // D-pad Left/Right turns pages until the toolbar is deliberately focused.
             if (!(toolbarVisible_ || appSettings_.get().toolbar)) {
@@ -263,6 +281,18 @@
             }
         }
         if (screen_ == ScreenState::AaModal && settingsEditing_ && catalogPanel_ == CatalogPanel::None && !quickMenu_ && choiceKind_ < 0) return false;
+        if (screen_ == ScreenState::Library && !quickMenu_ && catalogPanel_ == CatalogPanel::None && choiceKind_ < 0) {
+            if (libraryZone_ == LibraryZone::Books && !visibleBooks_.empty()) {
+                return moveLibraryBooks(dx, dy);
+            }
+            rebuildFocus();
+            if (!navigationFocus_.move(dx, dy) && dy > 0 && !visibleBooks_.empty()) {
+                returnToLibraryBooks();
+                return true;
+            }
+            dirty_ = true;
+            return true;
+        }
         rebuildFocus();
         navigationFocus_.move(dx, dy);
         focusReveal();
@@ -271,6 +301,19 @@
 
     bool activateFocus() {
         if (updateDialog_ || colorEditing_ >= 0) return false;
+        if (exitConfirmOpen_) {
+            rebuildFocus();
+            const auto id = navigationFocus_.active();
+            if (id == "exit.yes") {
+                exitConfirmOpen_ = false;
+                exitRequested_ = true;
+                dirty_ = true;
+                return true;
+            }
+            exitConfirmOpen_ = false;
+            dirty_ = true;
+            return true;
+        }
         if (screen_ == ScreenState::Reader && !quickMenu_ && catalogPanel_ == CatalogPanel::None && choiceKind_ < 0 && !readerToolbarFocusActive_) {
             return false;
         }
@@ -372,14 +415,16 @@
 
     void paintFocus() {
         if (updateDialog_ || colorEditing_ >= 0) return;
-        if (screen_ == ScreenState::Reader && !quickMenu_ && catalogPanel_ == CatalogPanel::None && choiceKind_ < 0 && !readerToolbarFocusActive_) {
-            return;
-        }
-        if (screen_ == ScreenState::ReadingJournal && !quickMenu_ && catalogPanel_ == CatalogPanel::None && choiceKind_ < 0) {
-            return;
-        }
-        if (screen_ == ScreenState::JournalPreview && !quickMenu_ && catalogPanel_ == CatalogPanel::None && choiceKind_ < 0) {
-            return;
+        if (!exitConfirmOpen_) {
+            if (screen_ == ScreenState::Reader && !quickMenu_ && catalogPanel_ == CatalogPanel::None && choiceKind_ < 0 && !readerToolbarFocusActive_) {
+                return;
+            }
+            if (screen_ == ScreenState::ReadingJournal && !quickMenu_ && catalogPanel_ == CatalogPanel::None && choiceKind_ < 0) {
+                return;
+            }
+            if (screen_ == ScreenState::JournalPreview && !quickMenu_ && catalogPanel_ == CatalogPanel::None && choiceKind_ < 0) {
+                return;
+            }
         }
         rebuildFocus();
         const auto pal = palette();

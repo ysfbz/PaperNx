@@ -16,9 +16,11 @@ Controls overview for touch gestures and Nintendo Switch controllers (Joy-Con an
 | Numeric setting | Independent minus/plus | A edit; Left/Right adjust; A confirm; B cancel/restore |
 | Palette/swatches | Tap preset or swatch, preview/confirm | Move focus, A select/confirm, B cancel |
 | TOC/bookmarks | + → named action; select row | Focus/A; B back |
+| Library navigation | Tap or drag list/grid & right-edge scrollbar | `BOOKS`/`HEADER` zones (D-pad / Left stick; first row Up or 600 ms hold Up → Header; Down returns) |
+| Library vertical scroll | Drag viewport or right-edge scrollbar thumb/track | Right analog stick (continuous) |
 | Return to library | + → Return to library | B after frontmost modal closes |
 | Portrait orientation | Settings → Application → Display Orientation | Focus setting and activate |
-| Exit application | + → Exit | Root back/exit route |
+| Exit application | + → Exit (confirms via modal) | `B` in `BOOKS` → `HEADER`; `B` in `HEADER` → Exit confirmation modal (defaults to **No**) |
 
 ### Comic and page-navigation behavior
 - **Page curl:** In paginated mode, a horizontal page-turn drag follows the finger and either commits or cancels on release; the animation can be disabled in Reader Settings → Navigation. Zoomed comics reserve page-edge gestures for turning while interior dragging pans the image. Continuous-reading mode scrolls rather than curls.

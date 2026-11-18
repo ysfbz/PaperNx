@@ -259,6 +259,7 @@ struct AppTest {
             renderAndAssertSingleFocus(app, 1);
         }
 
+        app.returnToLibraryBooks();
         const std::string targetId = app.visibleBooks_[2].id;
         app.rebuildFocus();
         assert(app.navigationFocus_.select("book:" + targetId));
@@ -286,6 +287,192 @@ struct AppTest {
         assert(app.screen_ == ScreenState::Library);
     }
 
+    static void testLibraryUxZonesExitScrollAndCovers(PaperNxApp &app) {
+        app.screen_ = ScreenState::Library;
+        app.quickMenu_ = false;
+        app.catalogPanel_ = PaperNxApp::CatalogPanel::None;
+        app.exitConfirmOpen_ = false;
+        app.exitRequested_ = false;
+        app.category_ = Category::All;
+        app.searchQuery_.clear();
+        app.catalogFilter_.reset();
+        app.openSeriesKey_.clear();
+        app.viewMode_ = ViewMode::Grid;
+        app.updateVisibleBooks();
+        app.listScroll_ = 0;
+        app.returnToLibraryBooks();
+        assert(app.libraryZone_ == PaperNxApp::LibraryZone::Books);
+        assert(app.visibleBooks_.size() >= 28);
+
+        // 1. Grid navigation: single step moves exact neighbor & missing last row picks nearest valid book
+        app.selectedBookIdx_ = 0;
+        app.rebuildFocus();
+        assert(app.navigationFocus_.select("book:" + app.visibleBooks_[0].id));
+        dispatchPad(app, SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
+        assert(app.selectedBookIdx_ == 1);
+        assert(app.libraryZone_ == PaperNxApp::LibraryZone::Books);
+        renderAndAssertSingleFocus(app, 1);
+        saveShot(app, "modern-covers-grid");
+
+        const int cols = ui::LibraryLayout(1280, app.libraryScrollbar(1280, 720).visible).columns;
+        dispatchPad(app, SDL_CONTROLLER_BUTTON_DPAD_DOWN);
+        assert(app.selectedBookIdx_ == 1 + cols);
+        assert(app.libraryZone_ == PaperNxApp::LibraryZone::Books);
+
+        // Short Up from row > 0 navigates within BOOKS zone (never jumps to HEADER)
+        dispatchPad(app, SDL_CONTROLLER_BUTTON_DPAD_UP);
+        assert(app.selectedBookIdx_ == 1);
+        assert(app.libraryZone_ == PaperNxApp::LibraryZone::Books);
+
+        // Instant HEADER transition when on first row (row 0) + short Up
+        dispatchPad(app, SDL_CONTROLLER_BUTTON_DPAD_UP);
+        assert(app.libraryZone_ == PaperNxApp::LibraryZone::Header);
+        renderAndAssertSingleFocus(app, 1);
+
+        // Return to BOOKS from HEADER via Down; restores book focus & scroll
+        assert(app.navigationFocus_.select("category.0"));
+        dispatchPad(app, SDL_CONTROLLER_BUTTON_DPAD_DOWN);
+        assert(app.libraryZone_ == PaperNxApp::LibraryZone::Books);
+        assert(app.selectedBookIdx_ == 1);
+
+        // 2. Incomplete last row clamping
+        const int lastIdx = int(app.visibleBooks_.size()) - 1;
+        const int rowAboveLast = std::max(0, lastIdx - cols);
+        app.selectedBookIdx_ = rowAboveLast;
+        app.lastLibraryBookId_ = app.visibleBooks_[rowAboveLast].id;
+        app.rebuildFocus();
+        assert(app.navigationFocus_.select("book:" + app.lastLibraryBookId_));
+        dispatchPad(app, SDL_CONTROLLER_BUTTON_DPAD_DOWN);
+        assert(app.selectedBookIdx_ >= rowAboveLast + 1 && app.selectedBookIdx_ <= lastIdx);
+
+        // 3. Long-press Up (600 ms) from lower row jumps directly to HEADER preserving scroll, no repeat while held
+        app.selectedBookIdx_ = std::min(lastIdx, cols * 3);
+        app.lastLibraryBookId_ = app.visibleBooks_[app.selectedBookIdx_].id;
+        app.focusReveal();
+        {
+            bool running = true;
+            SDL_Event down{};
+            down.type = SDL_CONTROLLERBUTTONDOWN;
+            down.cbutton.button = SDL_CONTROLLER_BUTTON_DPAD_UP;
+            app.handleEvent(down, running);
+            assert(app.libraryZone_ == PaperNxApp::LibraryZone::Books);
+            const float scrollBeforeHold = app.listScroll_;
+            app.libraryUpHoldStart_ = SDL_GetTicks() - 620;
+            app.tickLibraryUpHold(SDL_GetTicks());
+            assert(app.libraryZone_ == PaperNxApp::LibraryZone::Header);
+            assert(std::abs(app.listScroll_ - scrollBeforeHold) < 1.f);
+            // Still held: must not retrigger
+            app.tickLibraryUpHold(SDL_GetTicks());
+            assert(app.libraryZone_ == PaperNxApp::LibraryZone::Header);
+            SDL_Event up{};
+            up.type = SDL_CONTROLLERBUTTONUP;
+            up.cbutton.button = SDL_CONTROLLER_BUTTON_DPAD_UP;
+            app.handleEvent(up, running);
+        }
+
+        // Return to BOOKS keeps scroll & restores book
+        assert(app.navigationFocus_.select("category.0"));
+        dispatchPad(app, SDL_CONTROLLER_BUTTON_DPAD_DOWN);
+        assert(app.libraryZone_ == PaperNxApp::LibraryZone::Books);
+
+        // 4. List view single-step + instant header on index 0
+        app.viewMode_ = ViewMode::List;
+        app.listScroll_ = 0;
+        app.selectedBookIdx_ = 0;
+        app.lastLibraryBookId_ = app.visibleBooks_[0].id;
+        app.rebuildFocus();
+        assert(app.navigationFocus_.select("book:" + app.lastLibraryBookId_));
+        dispatchPad(app, SDL_CONTROLLER_BUTTON_DPAD_DOWN);
+        assert(app.selectedBookIdx_ == 1);
+        renderAndAssertSingleFocus(app, 1);
+        saveShot(app, "library-scrollbar-list");
+        dispatchPad(app, SDL_CONTROLLER_BUTTON_DPAD_UP);
+        assert(app.selectedBookIdx_ == 0);
+        dispatchPad(app, SDL_CONTROLLER_BUTTON_DPAD_UP);
+        assert(app.libraryZone_ == PaperNxApp::LibraryZone::Header);
+        dispatchPad(app, SDL_CONTROLLER_BUTTON_DPAD_DOWN);
+        assert(app.libraryZone_ == PaperNxApp::LibraryZone::Books);
+
+        // 5. Right stick precision nonlinear scrolling & drift immunity
+        app.listScroll_ = 0;
+        app.clearHeldControls();
+        // Inside deadzone (~23%): zero scroll movement
+        dispatchAxis(app, SDL_CONTROLLER_AXIS_RIGHTY, 5000);
+        app.controllerInputTick_ = SDL_GetTicks() - 40;
+        app.tickControllerInput();
+        assert(app.listScroll_ == 0.f);
+        // Gentle push -> slow scroll; full push -> fast scroll
+        dispatchAxis(app, SDL_CONTROLLER_AXIS_RIGHTY, 12000);
+        app.controllerInputTick_ = SDL_GetTicks() - 40;
+        app.tickControllerInput();
+        const float gentleDelta = app.listScroll_;
+        assert(gentleDelta > 0.f && gentleDelta < 20.f);
+
+        app.listScroll_ = 0;
+        dispatchAxis(app, SDL_CONTROLLER_AXIS_RIGHTY, 32767);
+        app.controllerInputTick_ = SDL_GetTicks() - 40;
+        app.tickControllerInput();
+        const float fullDelta = app.listScroll_;
+        assert(fullDelta > gentleDelta * 3.f);
+        assert(app.libraryZone_ == PaperNxApp::LibraryZone::Books); // never jumps to header
+        // Release stick -> stops immediately
+        dispatchAxis(app, SDL_CONTROLLER_AXIS_RIGHTY, 0);
+        const float stoppedAt = app.listScroll_;
+        app.controllerInputTick_ = SDL_GetTicks() - 40;
+        app.tickControllerInput();
+        assert(app.listScroll_ == stoppedAt);
+
+        // 6. Scrollbar drag & track tap + no accidental book open
+        const auto sb = app.libraryScrollbar(1280, 720);
+        assert(sb.visible);
+        const float trackX = float(sb.track.x + sb.track.w / 2) / 1280.f;
+        const float trackBottomY = float(sb.track.y + sb.track.h - 6) / 720.f;
+        bool running = true;
+        {
+            SDL_Event down{}; down.type = SDL_FINGERDOWN; down.tfinger.fingerId = 77;
+            down.tfinger.x = trackX; down.tfinger.y = float(sb.thumb.y + sb.thumb.h / 2) / 720.f;
+            app.handleEvent(down, running);
+            assert(app.scrollbarDragging_);
+            SDL_Event mot{}; mot.type = SDL_FINGERMOTION; mot.tfinger.fingerId = 77;
+            mot.tfinger.x = trackX; mot.tfinger.y = trackBottomY;
+            app.handleEvent(mot, running);
+            assert(app.listScroll_ > stoppedAt);
+            assert(!app.doc_); // never opens a book while dragging scrollbar
+            SDL_Event up{}; up.type = SDL_FINGERUP; up.tfinger.fingerId = 77;
+            up.tfinger.x = trackX; up.tfinger.y = trackBottomY;
+            app.handleEvent(up, running);
+            assert(!app.scrollbarDragging_ && !app.doc_);
+        }
+        renderAndAssertSingleFocus(app, 1);
+
+        // 7. B button -> Header -> Exit confirmation modal (default No, B cancels, Yes sets exitRequested_)
+        app.viewMode_ = ViewMode::Grid;
+        app.listScroll_ = 0;
+        app.returnToLibraryBooks();
+        assert(app.libraryZone_ == PaperNxApp::LibraryZone::Books);
+        dispatchPad(app, SDL_CONTROLLER_BUTTON_B);
+        assert(app.libraryZone_ == PaperNxApp::LibraryZone::Header && !app.exitConfirmOpen_);
+        dispatchPad(app, SDL_CONTROLLER_BUTTON_B);
+        assert(app.exitConfirmOpen_);
+        assert(app.navigationFocus_.focused("exit.no"));
+        renderAndAssertSingleFocus(app, 1);
+        saveShot(app, "exit-confirm-modal");
+        dispatchPad(app, SDL_CONTROLLER_BUTTON_B);
+        assert(!app.exitConfirmOpen_ && !app.exitRequested_);
+
+        // Quick Menu exit action also opens confirmation instead of exiting immediately
+        app.toggleQuickMenu();
+        assert(app.quickMenu_);
+        app.activateQuickAction(8); // "PaperNX'ten çık"
+        assert(!app.quickMenu_ && app.exitConfirmOpen_);
+        assert(app.navigationFocus_.focused("exit.no"));
+        dispatchPad(app, SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
+        assert(app.navigationFocus_.focused("exit.yes"));
+        dispatchPad(app, SDL_CONTROLLER_BUTTON_A);
+        assert(!app.exitConfirmOpen_ && app.exitRequested_);
+        app.exitRequested_ = false;
+    }
+
     static void run(const fs::path &root) {
         fs::remove_all(root);
         fs::create_directories(root / "books");
@@ -294,14 +481,15 @@ struct AppTest {
 
         std::vector<Book> initial;
         for (int i = 1; i <= 25; ++i) {
-            const fs::path dst = root / "books" / ("baseline_" + (i < 10 ? "0" + std::to_string(i) : std::to_string(i)) + ".epub");
-            fs::copy_file("tests/fixtures/sample_book.epub", dst);
+            const std::string tag = std::string(1, char('a' + (i - 1))) + "_doc";
+            const fs::path dst = root / "books" / ("item_" + tag + ".pdf");
+            fs::copy_file("tests/fixtures/sample_doc.pdf", dst);
             Book b;
             b.path = dst.u8string();
             b.bytes = fs::file_size(dst);
-            b.format = Format::Epub;
+            b.format = Format::Pdf;
             b.id = documentId(b.path, b.bytes);
-            b.title = "Baseline " + std::to_string(i);
+            b.title = "Item " + tag;
             initial.push_back(b);
         }
         assert(InventoryRepository(root / "data" / "library-index.txt").save(initial));
@@ -399,6 +587,7 @@ struct AppTest {
             testQuickMenuUnifiedFocusAndClipping(app);
             testQuickMenuOverflowPixelClip(app);
             testAaModalCatalogAndAlternatingInputs(app);
+            testLibraryUxZonesExitScrollAndCovers(app);
         }
 
         {

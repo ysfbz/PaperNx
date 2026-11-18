@@ -63,8 +63,12 @@ void tickReadingStats() {
     }
 }
 int libraryBookAt(float x,float y) {
-    int w,h;getWindowSize(w,h);ui::LibraryLayout l(w);const int px=int(x*w),py=int(y*h);
+    int w,h;getWindowSize(w,h);
+    const auto sb=libraryScrollbar(w,h);
+    ui::LibraryLayout l(w,sb.visible);
+    const int px=int(x*w),py=int(y*h);
     if(py<l.top||py>=h-28)return -1;
+    if(sb.visible && ui::contains(l.scrollbarHitArea(w,h),px,py))return -1;
     const int pos=py-l.top+int(listScroll_);int index=-1;
     if(viewMode_==ViewMode::Grid){const int col=(px-l.left)/l.stepX;
         if(px<l.left||col>=l.columns||(px-l.left)%l.stepX>=l.cardWidth||pos%l.stepY>=l.cardHeight)return -1;

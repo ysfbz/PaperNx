@@ -244,7 +244,14 @@ static void v03Workflow(const fs::path &parent) {
             app.pageCache_.clear(); auto start=std::chrono::steady_clock::now(); app.render(); coldMs.push_back(milliseconds(start));
             start=std::chrono::steady_clock::now(); app.render(); cachedMs.push_back(milliseconds(start));
         }
-        v03BackLibrary(app); v03Plus(app); v03MenuItem(app,8); assert(app.exitRequested_);
+        v03BackLibrary(app); v03Plus(app); v03MenuItem(app,8);
+        assert(app.exitConfirmOpen_ && !app.exitRequested_);
+        {
+            bool running=true;
+            SDL_Event r{}; r.type=SDL_CONTROLLERBUTTONDOWN; r.cbutton.button=SDL_CONTROLLER_BUTTON_DPAD_RIGHT; app.handleEvent(r,running);
+            SDL_Event a{}; a.type=SDL_CONTROLLERBUTTONDOWN; a.cbutton.button=SDL_CONTROLLER_BUTTON_A; app.handleEvent(a,running);
+        }
+        assert(app.exitRequested_);
     }
     // Empty-library settings never require a MuPDF document.
     {

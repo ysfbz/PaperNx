@@ -159,7 +159,51 @@ struct SettingsLayout {
     SDL_Rect control(int i) const { return {content.x,content.y+i*64,content.w,56}; }
 };
 struct LibraryLayout {
-    int columns,cardWidth,cardHeight=330,top=174,stepX,stepY=350,left=32;
-    LibraryLayout(int w) { top=w<900?238:174; columns=std::max(1,(w-48)/224); stepX=(w-64)/columns; cardWidth=stepX-20; }
+    int columns,cardWidth,cardHeight=330,top=174,stepX,stepY=350,left=32,rightReserve=0,scrollbarW=10,scrollbarHitW=38;
+    LibraryLayout(int w,bool hasScrollbar=false) {
+        top=w<900?238:174;
+        rightReserve=hasScrollbar?28:0;
+        const int usable=std::max(224,w-48-rightReserve);
+        columns=std::max(1,usable/224);
+        stepX=std::max(160,(w-64-rightReserve)/columns);
+        cardWidth=stepX-20;
+    }
+    SDL_Rect scrollbarTrackArea(int w,int h) const {
+        return {w-scrollbarW-8,top,scrollbarW,std::max(0,h-top-32)};
+    }
+    SDL_Rect scrollbarHitArea(int w,int h) const {
+        return {w-scrollbarHitW,top,scrollbarHitW,std::max(0,h-top-28)};
+    }
+};
+struct VerticalScrollbar {
+    bool visible{false};
+    SDL_Rect track{0,0,0,0};
+    SDL_Rect thumb{0,0,0,0};
+    float maxScroll{0.f};
+    static VerticalScrollbar compute(SDL_Rect trackArea,float contentHeight,float viewportHeight,float scroll) {
+        VerticalScrollbar sb;
+        sb.track=trackArea;
+        sb.maxScroll=std::max(0.f,contentHeight-viewportHeight);
+        if(sb.maxScroll<=1.f || trackArea.h<48 || trackArea.w<=0 || contentHeight<=0.f) return sb;
+        sb.visible=true;
+        const int minThumb=std::min(trackArea.h,44);
+        const int thumbH=std::clamp(int(std::lround(trackArea.h*(viewportHeight/contentHeight))),minThumb,trackArea.h);
+        const float ratio=std::clamp(scroll/sb.maxScroll,0.f,1.f);
+        const int travel=std::max(0,trackArea.h-thumbH);
+        sb.thumb={trackArea.x,trackArea.y+int(std::lround(ratio*travel)),trackArea.w,thumbH};
+        return sb;
+    }
+    float scrollForPointerY(int py) const {
+        if(!visible || maxScroll<=0.f) return 0.f;
+        const int travel=std::max(1,track.h-thumb.h);
+        const float ratio=std::clamp(float(py-track.y-thumb.h/2)/float(travel),0.f,1.f);
+        return ratio*maxScroll;
+    }
+    void render(SDL_Renderer *r,const ThemePalette &pal,bool dragging=false) const {
+        if(!visible) return;
+        surface(r,track,blendColor(pal.bg,pal.cardBorder,45),track.w/2);
+        const SDL_Color thumbCol=dragging?pal.accent:blendColor(pal.muted,pal.fg,35);
+        surface(r,thumb,thumbCol,thumb.w/2);
+    }
 };
 } // namespace papernx::ui

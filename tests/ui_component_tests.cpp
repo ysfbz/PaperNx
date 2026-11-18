@@ -130,7 +130,7 @@ int main() {
         for(auto ink:ui::coverInks)assert(contrast(rgb(ink.paper),rgb(ink.ink))>=4.5);
         for(int w:{64,180,360}){auto r=ui::portraitCoverRect({0,0,w,206});assert(r.w<=w && r.h<=206 && std::abs(r.h-r.w*1.4f)<2);}
         Book book;book.id="stable-identity";book.title="A thoughtfully designed local book";book.author="PaperNX";book.format=Format::Epub;
-        const auto index=ui::coverVariant(book.id);assert(index==ui::coverVariant(book.id) && index<6);
+        const auto index=ui::coverVariant(book.id);assert(index==ui::coverVariant(book.id) && index<std::size(ui::coverInks));
         for(auto state:{CoverState::Loading,CoverState::NoEmbeddedCover,CoverState::Failed})ui::fallbackCover(renderer,type,{20,0,180,140},book,state,g_palettes[0]);
         // Ellipsis is clipped to the actual control width, including on cache hits.
         for(int repeat=0;repeat<2;++repeat) {

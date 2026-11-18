@@ -80,8 +80,12 @@ struct AppTest {
         assert(app.catalog_.get(app.visibleBooks_.front().id).sourceSeriesIndex=="9");
         assert(app.catalog_.get(app.visibleBooks_[1].id).sourceSeriesIndex=="10");
         assert(app.catalog_.get(app.visibleBooks_.back().id).sourceSeriesIndex=="22");
-        assert(app.maxUiScroll()>0);sameSticks(app);
-        app.rebuildFocus();app.navigationFocus_.select("book.0");axis(app,32767);assert(app.selectedBookIdx_>0);
+        assert(app.maxUiScroll()>0);
+        // Right stick performs continuous scroll on Library without modal; Left stick navigates focus.
+        app.clearHeldControls();app.rebuildFocus();app.navigationFocus_.select("book.0");
+        axis(app,32767,SDL_CONTROLLER_AXIS_LEFTY);assert(app.selectedBookIdx_>0);
+        app.clearHeldControls();app.listScroll_=0;app.selectedBookIdx_=0;app.rebuildFocus();app.navigationFocus_.select("book.0");
+        axis(app,32767,SDL_CONTROLLER_AXIS_RIGHTY);assert(app.listScroll_>0);
         auto position=app.listScroll_;axis(app,0);assert(app.listScroll_==position);
         app.listScroll_=0;snapshot(app,"series-issues");
         const Book issue=app.visibleBooks_[1];app.openLibraryItem(1);assert(app.doc_ && app.currentBookId_==issue.id);

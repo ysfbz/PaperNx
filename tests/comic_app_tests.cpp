@@ -98,7 +98,16 @@ struct AppTest {
         app.getOrRenderThumbnail(cbz);const Uint32 coverDeadline=SDL_GetTicks()+3000;
         while(!app.thumbCache_.get("thumb_"+cbz.id) && SDL_GetTicks()<coverDeadline) {SDL_Delay(10);app.processCompletedThumbnails();}
         assert(app.thumbCache_.get("thumb_"+cbz.id));
-        const auto cachedCover=app.coverRepository_.read(cbz);assert(cachedCover);
+        decltype(app.coverRepository_.read(cbz)) cachedCover;
+        while(SDL_GetTicks()<coverDeadline) {
+            {
+                std::lock_guard<std::mutex> lock(app.coverRepoMutex_);
+                cachedCover=app.coverRepository_.read(cbz);
+            }
+            if(cachedCover) break;
+            SDL_Delay(10);
+        }
+        assert(cachedCover);
         const auto *pixel=cachedCover->rgb.data()+(cachedCover->height/4)*cachedCover->stride+(cachedCover->width/4)*3;
         assert(std::abs(int(pixel[1])-185)<8); // ComicInfo FrontCover, not the first page.
         app.searchQuery_.clear();app.updateVisibleBooks();

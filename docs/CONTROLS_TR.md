@@ -24,7 +24,9 @@ Güncel dokunmatik ve oyun kumandası (Joy-Con / Pro Controller) kontrolleri aş
 - **Uygulama Ayarları:**
   - **Dil (Language):** İngilizce ve Türkçe arayüz seçimi; tercih anında kaydedilir ve yeniden başlatmalarda korunur.
   - **Ekran Yönü (Display Orientation):** Yatay (Landscape), Dikey Saat Yönü (Portrait CW) ve Dikey Saat Yönü Tersi (Portrait CCW).
-- **Arayüzden Çıkış / Geri:** **B** tuşu (önce aktif modal/menüleri kapatır, kütüphaneye döner veya uygulamadan çıkar).
+- **Kitaplık Gezinme (`BOOKS` / `HEADER`):** D-pad veya Sol Analog ile kitap kartları arasında tek basışta gezinme. İlk satır/ilk kitaptayken Yukarı basınca veya alt satırlarda Yukarı ~600 ms basılı tutulunca üst navigasyon (`HEADER`) bölgesine geçilir; Aşağı tuşu son odaklanan kitaba ve kaydırma konumuna geri döner.
+- **Kitaplık Kaydırma:** **Sağ Analog Çubuk (Yukarı/Aşağı)** ile kesintisiz dikey kaydırma veya sağ kenardaki sürüklenebilir kaydırma çubuğu (`VerticalScrollbar`) ile doğrudan kaydırma.
+- **Arayüzden Çıkış / Geri:** **B** tuşu önce açık modal/menüyü kapatır; kitaplık `BOOKS` bölgesinden `HEADER` bölgesine geçer; `HEADER` bölgesinde veya `+ → Çıkış` seçildiğinde varsayılan odak **Hayır** olan çıkış onay penceresini açar.
 
 ### Çizgi roman ve sayfa gezintisi
 - **3D sayfa çevirme:** Sayfalı modda yatay sürükleme ile kıvrılma parmağı izler; bırakınca eşiklere göre tamamlanır veya geri döner. Okuma Ayarları → Navigasyon üzerinden kapatılabilir. Yakınlaştırılmış çizgi romanlarda sayfa kenarından sürükleme çevirme, iç alandan sürükleme kaydırma içindir.

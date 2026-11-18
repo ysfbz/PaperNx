@@ -60,7 +60,7 @@ int main() {
         const auto coldMs=std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now()-coldStarted).count();
         const auto coldStats=cold.stats();
         assert(coldStats.misses==std::uint64_t(count) && coldStats.hits==0);
-        assert(coldStats.entries<=512 && coldStats.bytes<=cacheBudget);
+        assert(coldStats.entries<=2048 && coldStats.bytes<=cacheBudget);
 
         CoverRepository warm(cacheRoot,cacheBudget);
         std::uint64_t warmReopens=0,warmOpens=0,firstWarmMs=0;
@@ -72,7 +72,7 @@ int main() {
         const auto warmMs=std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now()-warmStarted).count();
         const auto warmStats=warm.stats();
         assert(warmStats.hits+warmStats.misses==std::uint64_t(count));
-        assert(warmReopens==warmStats.misses && warmOpens==warmReopens && warmStats.entries<=512 && warmStats.bytes<=cacheBudget);
+        assert(warmReopens==warmStats.misses && warmOpens==warmReopens && warmStats.entries<=2048 && warmStats.bytes<=cacheBudget);
         std::cout<<count<<" real EPUB/PDF/CBZ/CBR documents, "<<cacheBudget/(1024u*1024u)<<" MiB disk budget: cold first cover="<<firstColdMs
                  <<" ms, cold fill="<<coldMs<<" ms, opens="<<coldOpens<<", metadata reads on same open="<<metadataReads
                  <<", cache="<<coldStats.entries<<" entries/"<<coldStats.bytes<<" bytes; warm first cover="<<firstWarmMs
