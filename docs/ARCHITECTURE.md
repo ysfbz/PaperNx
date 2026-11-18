@@ -1,11 +1,11 @@
 # PaperNX — Mimari notlar
 
-Bu doküman PaperNX v0.9.3 mimari tasarım kararlarını ve sistem bileşenlerini içerir. Güncel bilinen sınırlar için [KNOWN_ISSUES.md](KNOWN_ISSUES.md), derleme ve kurulum için [BUILD_SWITCH.md](BUILD_SWITCH.md) esas alınmalıdır.
+Bu doküman PaperNX v0.9.4 mimari tasarım kararlarını ve sistem bileşenlerini içerir. Güncel bilinen sınırlar için [KNOWN_ISSUES.md](KNOWN_ISSUES.md), derleme ve kurulum için [BUILD_SWITCH.md](BUILD_SWITCH.md) esas alınmalıdır.
 
 PaperNX çevrimdışı, bellek tasarruflu bir C++17 uygulamasıdır:
-- `src/main.cpp`: SDL olay döngüsü, ekran durum makinesi, dokunmatik hareketler ve kumanda yönlendirme ayrıştırması.
-- `src/core.cpp`: Dosya tarama, meta veri ayrıştırma, doğal alfabetik/sayısal sıralama (`compareNatural`) ve kalıcı veri depoları.
-- `src/library_index.cpp` / `src/library_scan.inc`: UI dışı çoklu kök taraması ve disposable envanter önbelleği. Dosya keşfi PaperNX `scanRoots()` yolunu kullanır; sonuçlar SDL olay döngüsünde yayımlanır. Envanter ayrı `ProgressStore` dosyasında `PAPERNX-LIBRARY-1` marker’ı taşır; yalnız marker bulunmayan eski cache biçimi okunur, marker’ı eksik/geçersiz olan sürümlü cache kullanılmaz ve güvenle yeniden taranır. Envanter, korunmuş scanner geçmişi ve tarama kapalıyken progress’ten kitap keşfi yalnızca doğrudan düzenli dosyaları kabul eder; POSIX’te `regularBookFileSize()` `O_NOFOLLOW | O_NONBLOCK` açılışı ve `fstat()` ile doğrular, Windows’ta filesystem metadata fallback’i kullanır. Bu doğrulama kullanıcı progress kayıtlarını değiştirmez.
+- `src/main.cpp` / `src/v04_focus.inc`: SDL olay döngüsü, ekran durum makinesi, dokunmatik hareketler ve tek yetkili `FocusManager` yönlendirme/kırpma denetimi.
+- `src/fs_adapter.cpp` / `src/core.cpp`: Switch `sdmc:/` uyumlu dosya sistemi soyutlaması (`FsOps`, sıfır inode koruması, `normalizeScanRoot`), dosya tarama, meta veri ayrıştırma, doğal alfabetik/sayısal sıralama (`compareNatural`) ve kalıcı veri depoları.
+- `src/library_index.cpp` / `src/library_scan.inc`: Hata toleranslı çoklu kök taraması (`traverseRootsDetailed`), atomik `PAPERNX-LIBRARY-1` envanter önbelleği ve kısmi tarama keşifleri için ayrı `PAPERNX-DISCOVERY-1` katmanı (`library-discoveries.txt`). Dosya keşfi POSIX’te `O_NOFOLLOW | O_NONBLOCK` + `fstat()` veya Switch’te `libnx`/`stat` üzerinden yalnızca doğrudan düzenli dosyaları kabul eder ve kullanıcı progress kayıtlarını değiştirmez.
 - `src/self_update.cpp` / `src/self_update_ui.inc`: Sabit PaperNX GitHub kaynağına libcurl TLS erişimi, NRO doğrulama ve kullanıcı onaylı aşamalı kurulum. CA trust dosyası `romfs/cacert.pem` içindedir.
 - `include/papernx/theme.hpp`: Okuma ve uygulama ekranlarının ortak tema token'ları; Light, Dark, Follow Reading ve vurgu paletleri burada çözülür.
 - `src/main.cpp`: App settings girişlerini yönlendirir; yazılımsal dimmer her platformda çalışır ve Switch arka ışığı uygun handheld/service koşullarında geçici olarak değiştirilip eski değerine döndürülür.

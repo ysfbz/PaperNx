@@ -102,9 +102,11 @@ CoverRepository::CoverRepository(fs::path root, std::uintmax_t maxBytes, std::si
 std::string CoverRepository::cacheKey(const Book &book) {
     // Restat on the worker: stale library metadata must not resurrect old artwork.
     std::error_code ec;
-    auto bytes = fs::file_size(book.path, ec);
+    const auto path = fs::u8path(book.path);
+    auto bytes = fs::file_size(path, ec);
     if (ec) bytes = book.bytes;
-    auto stamp = fs::last_write_time(book.path, ec);
+    ec.clear();
+    auto stamp = fs::last_write_time(path, ec);
     auto modified = ec ? book.modified : static_cast<std::int64_t>(stamp.time_since_epoch().count());
     const std::string identity = book.path + '\0' + book.id + '\0' +
         std::to_string(bytes) + ':' + std::to_string(modified) + (isComic(book.format)?":comic-cover-v2":"");

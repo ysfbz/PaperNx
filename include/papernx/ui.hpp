@@ -14,6 +14,7 @@ struct Tokens {
 inline int pointerX=0,pointerY=0;
 inline bool pointerDown=false;
 inline int language=1;
+inline std::uint64_t focusRingDrawCount=0;
 inline std::string label(const std::string &text) { return localizeUiText(text,language); }
 inline void pointer(int x,int y,bool down) { pointerX=x; pointerY=y; pointerDown=down; }
 inline bool contains(SDL_Rect r, int x, int y) { return x>=r.x && x<r.x+r.w && y>=r.y && y<r.y+r.h; }
@@ -35,6 +36,7 @@ inline void elevated(SDL_Renderer *r,SDL_Rect rect,const ThemePalette &pal) {
     SDL_RenderDrawRect(r,&rect);
 }
 inline void focusRing(SDL_Renderer *r,SDL_Rect rect,const ThemePalette &pal,bool editing=false) {
+    ++focusRingDrawCount;
     // Two contrasting outlines stay visible on selected accent fills and on
     // surrounding surfaces. Shape communicates focus independently of hue.
     SDL_SetRenderDrawColor(r,pal.bg.r,pal.bg.g,pal.bg.b,255);

@@ -1,7 +1,7 @@
 // Included inside PaperNxApp: catalog overlays use the shared native UI components.
 static std::string catLabel(const std::string &tr,const std::string &en){return ui::language==1?en:tr;}
 enum class CatalogPanel { None, Actions, Details, Metadata, Collections, CollectionActions,
-    Browse, Values, Hidden, Statistics, DeleteConfirm, Text };
+    Browse, Values, Hidden, Statistics, DeleteConfirm, Text, ScanReport };
 CatalogStore catalog_{root_/"data"/"catalog.txt"};
 bool catalogSavePending_{false};
 Uint32 catalogSaveRetryAt_{0};
@@ -57,8 +57,8 @@ void tickReadingStats() {
     journal_.tick(now,std::time(nullptr),localReadingDay(),currentBookId_,journalTitle_,journalAuthor_,fraction,visible);
     if(now-statsSaveAt_>=60000){
         readingStats_.save();
-        if(journal_.hasUnsavedChanges()&&!journal_.save())
-            currentErrorMessage_="Reading journal not saved: "+journal_.diagnostic();
+        if(journal_.hasUnsavedChanges()&&!journal_.save()){
+            currentErrorMessage_="Reading journal not saved: "+journal_.diagnostic();currentErrorIsFromScan_=false;}
         statsSaveAt_=now;
     }
 }
@@ -72,7 +72,14 @@ int libraryBookAt(float x,float y) {
     }else index=pos/112;
     return index>=0&&index<int(visibleBooks_.size())?index:-1;
 }
-void setCatalogPanel(CatalogPanel p){catalogPanel_=p;catalogFocus_=0;catalogScroll_=0;listVelocity_=0;dirty_=true;if(p==CatalogPanel::DeleteConfirm){rebuildFocus();navigationFocus_.select("catalog.row.0");}}
+void setCatalogPanel(CatalogPanel p){
+    catalogPanel_=p;catalogFocus_=0;catalogScroll_=0;listVelocity_=0;dirty_=true;
+    if(p!=CatalogPanel::None){
+        navigationFocus_.clearContext("catalog."+std::to_string(int(p)));
+        rebuildFocus();
+        if(p==CatalogPanel::DeleteConfirm)navigationFocus_.select("catalog.row.0");
+    }
+}
 void openBookActions(const Book &book){if(screen_==ScreenState::Library && openSeriesShelf(book))return;actionBook_=book;quickMenu_=false;setCatalogPanel(CatalogPanel::Actions);}
 void tickLibraryHold(){
     if(libraryHold_&&SDL_GetTicks()-libraryHoldStart_>=550){libraryHold_=false;libraryHoldConsumed_=true;
@@ -80,7 +87,7 @@ void tickLibraryHold(){
         if(libraryHoldIndex_>=0&&libraryHoldIndex_<int(visibleBooks_.size())){selectedBookIdx_=libraryHoldIndex_;openBookActions(visibleBooks_[libraryHoldIndex_]);}}
 }
 bool saveCatalogChange(const std::function<void()> &change){
-    auto previous=catalog_;change();if(!catalog_.save()){currentErrorMessage_="Catalog could not be saved: "+catalog_.diagnostic();catalog_=std::move(previous);dirty_=true;return false;}
+    auto previous=catalog_;change();if(!catalog_.save()){currentErrorMessage_="Catalog could not be saved: "+catalog_.diagnostic();currentErrorIsFromScan_=false;catalog_=std::move(previous);dirty_=true;return false;}
     catalogSavePending_=false;
     updateVisibleBooks();dirty_=true;return true;
 }
@@ -107,7 +114,8 @@ std::vector<std::pair<int,std::string>> catalogRows() const {
             rows.push_back({int(rows.size()),std::string(member?"[x] ":"[ ] ")+c.second});}
         rows.push_back({-2,catLabel("Koleksiyonları yönet","Manage Collections")});
     }else if(catalogPanel_==CatalogPanel::CollectionActions){rows={{0,catLabel("Yeniden adlandır","Rename Collection")},{1,catLabel("Koleksiyonu kaldır","Delete Collection")}};
-    }else if(catalogPanel_==CatalogPanel::Browse){rows={{0,catLabel("Tüm kitaplar","All Books")},{1,catLabel("Yazarlar","Authors")},{2,catLabel("Türler","Genres")},{3,catLabel("Koleksiyonlar","Collections")},{4,catLabel("Seriler","Series")},{5,catLabel("Gizlenen kitaplar","Hidden Books")},{6,catLabel("Okuma istatistikleri","Reading Statistics")},{7,catLabel("Koleksiyon oluştur","Create Collection")},{8,catLabel("Dosya t\u00fcr\u00fc","File Format")}};
+    }else if(catalogPanel_==CatalogPanel::Browse){rows={{0,catLabel("Tüm kitaplar","All Books")},{1,catLabel("Yazarlar","Authors")},{2,catLabel("Türler","Genres")},{3,catLabel("Koleksiyonlar","Collections")},{4,catLabel("Seriler","Series")},{5,catLabel("Gizlenen kitaplar","Hidden Books")},{6,catLabel("Okuma istatistikleri","Reading Statistics")},{7,catLabel("Koleksiyon oluştur","Create Collection")},{8,catLabel("Dosya t\u00fcr\u00fc","File Format")},{9,catLabel("Tarama durumu ve günlük","Scan status & log")}};
+    }else if(catalogPanel_==CatalogPanel::ScanReport){rows={{0,catLabel("Kitaplığı yeniden tara","Rescan library")},{1,catLabel("Kapat","Close")}};
     }else if(catalogPanel_==CatalogPanel::Values){
         for(const auto &g:catalog_.groups(books_,catalogGroup_)){auto name=g.first;
             if(catalogGroup_==CatalogGroup::Collections){auto found=catalog_.collections().find(g.first);if(found!=catalog_.collections().end())name=found->second;}
@@ -124,11 +132,12 @@ std::string catalogHeading() const {
     case CatalogPanel::Collections:return catLabel("Koleksiyonlar","Collections");case CatalogPanel::CollectionActions:return catLabel("Koleksiyon yönet","Manage Collection");
     case CatalogPanel::Browse:return catLabel("Kitaplık gezgini","Browse Library");case CatalogPanel::Values:return catLabel("Grup seçin","Select a group");
     case CatalogPanel::Hidden:return catLabel("Gizlenen kitaplar","Restore Hidden Books");case CatalogPanel::Statistics:return catLabel("Okuma istatistikleri","Reading Statistics");
-    case CatalogPanel::DeleteConfirm:return catLabel("Kalıcı silinsin mi?","Delete Permanently?");case CatalogPanel::Text:return catLabel("Düzenle","Edit");default:return {};}
+    case CatalogPanel::DeleteConfirm:return catLabel("Kalıcı silinsin mi?","Delete Permanently?");case CatalogPanel::ScanReport:return catLabel("Tarama durumu ve günlük","Scan status & log");case CatalogPanel::Text:return catLabel("Düzenle","Edit");default:return {};}
 }
 SDL_Rect catalogPanelRect(int w,int h)const{return {std::max(16,(w-900)/2),32,std::min(900,w-32),h-64};}
 int catalogContentTop(const SDL_Rect &r)const{
     if(catalogPanel_==CatalogPanel::Details)return r.y+std::min(420,r.h-160);
+    if(catalogPanel_==CatalogPanel::ScanReport)return r.y+std::min(420,r.h-160);
     if(catalogPanel_==CatalogPanel::DeleteConfirm)return r.y+220;
     if(catalogPanel_==CatalogPanel::Statistics)return r.y+180;
     return r.y+88;
@@ -136,7 +145,7 @@ int catalogContentTop(const SDL_Rect &r)const{
 void closeCatalogPanel(){
     if(catalogPanel_==CatalogPanel::Text){SDL_StopTextInput();setCatalogPanel(textReturn_);return;}
     if(catalogPanel_==CatalogPanel::Metadata||catalogPanel_==CatalogPanel::Details||catalogPanel_==CatalogPanel::Collections||catalogPanel_==CatalogPanel::DeleteConfirm)setCatalogPanel(CatalogPanel::Actions);
-    else if(catalogPanel_==CatalogPanel::Values||catalogPanel_==CatalogPanel::Hidden||catalogPanel_==CatalogPanel::Statistics||catalogPanel_==CatalogPanel::CollectionActions)setCatalogPanel(CatalogPanel::Browse);
+    else if(catalogPanel_==CatalogPanel::Values||catalogPanel_==CatalogPanel::Hidden||catalogPanel_==CatalogPanel::Statistics||catalogPanel_==CatalogPanel::CollectionActions||catalogPanel_==CatalogPanel::ScanReport)setCatalogPanel(CatalogPanel::Browse);
     else setCatalogPanel(CatalogPanel::None);
 }
 void commitCatalogText(){
@@ -177,15 +186,15 @@ void activateCatalogRow(int index){
             progressDirty_=true;
             if(!progressStore_.save()) {
                 progressStore_.put(actionBook_.id,oldProgress);
-                currentErrorMessage_="Reading status unchanged: progress write failed.";
+                currentErrorMessage_="Reading status unchanged: progress write failed.";currentErrorIsFromScan_=false;
             } else if(!saveCatalogChange([&]{
                     auto e=catalog_.get(actionBook_.id);
                     e.status=newStatus;catalog_.put(actionBook_.id,e);
                })) {
                 progressStore_.put(actionBook_.id,oldProgress);
                 progressDirty_=!progressStore_.save();
-                if(progressDirty_)
-                    currentErrorMessage_="Status rollback failed. Check SD card before changing books.";
+                if(progressDirty_) {
+                    currentErrorMessage_="Status rollback failed. Check SD card before changing books.";currentErrorIsFromScan_=false;}
             } else {
                 progressDirty_=false;
                 catalogFocus_=action;
@@ -212,16 +221,20 @@ void activateCatalogRow(int index){
         if(action==6)setCatalogPanel(CatalogPanel::Statistics);
         if(action==7)requestCatalogText(5,"");
         if(action==8){catalogGroup_=CatalogGroup::Formats;setCatalogPanel(CatalogPanel::Values);}
+        if(action==9)setCatalogPanel(CatalogPanel::ScanReport);
+    }else if(catalogPanel_==CatalogPanel::ScanReport){
+        if(action==0){setCatalogPanel(CatalogPanel::None);startLibraryScan();}
+        else closeCatalogPanel();
     }else if(catalogPanel_==CatalogPanel::Values){auto groups=catalog_.groups(books_,catalogGroup_);auto it=groups.begin();std::advance(it,index);if(it!=groups.end()){catalogFilter_=catalogGroup_;catalogFilterValue_=it->first;selectedCollection_=it->first;category_=Category::All;updateVisibleBooks();setCatalogPanel(CatalogPanel::None);}
     }else if(catalogPanel_==CatalogPanel::Hidden){std::vector<Book> hidden;for(const auto &b:books_)if(catalog_.get(b.id).hidden)hidden.push_back(b);if(index<int(hidden.size()))saveCatalogChange([&]{auto e=catalog_.get(hidden[index].id);e.hidden=false;catalog_.put(hidden[index].id,e);});
     }else if(catalogPanel_==CatalogPanel::CollectionActions){if(action==0){auto it=catalog_.collections().find(selectedCollection_);if(it!=catalog_.collections().end())requestCatalogText(6,it->second);}else {saveCatalogChange([&]{catalog_.deleteCollection(selectedCollection_);});catalogFilter_.reset();setCatalogPanel(CatalogPanel::Browse);}
-    }else if(catalogPanel_==CatalogPanel::Statistics){int goal=readingStats_.dailyGoal();if(action==0||action==2)goal+=5;if(action==1)goal-=5;if(action==3)goal=0;readingStats_.setDailyGoal(std::clamp(goal,0,720));if(!readingStats_.save())currentErrorMessage_="Reading goal could not be saved";
+    }else if(catalogPanel_==CatalogPanel::Statistics){int goal=readingStats_.dailyGoal();if(action==0||action==2)goal+=5;if(action==1)goal-=5;if(action==3)goal=0;readingStats_.setDailyGoal(std::clamp(goal,0,720));if(!readingStats_.save()){currentErrorMessage_="Reading goal could not be saved";currentErrorIsFromScan_=false;}
     }else if(catalogPanel_==CatalogPanel::DeleteConfirm){if(action==0){setCatalogPanel(CatalogPanel::Actions);return;}
         std::string error;
         fs::path allowed=root_/"books";
         if(!catalog_.validateDeletion(actionBook_,allowed,error)&&!browserRoot_.empty())allowed=browserRoot_;
         if(catalog_.deleteBookFile(actionBook_,allowed,true,error)){books_.erase(std::remove_if(books_.begin(),books_.end(),[&](const Book &b){return b.id==actionBook_.id;}),books_.end());updateVisibleBooks();setCatalogPanel(CatalogPanel::None);}
-        else currentErrorMessage_=error;
+        else {currentErrorMessage_=error;currentErrorIsFromScan_=false;}
     }
     dirty_=true;
 }
@@ -256,10 +269,8 @@ bool handleCatalogEvent(const SDL_Event &e){
         if(m(SDLK_ESCAPE,SDL_CONTROLLER_BUTTON_B)){closeCatalogPanel();return true;}
         if(m(SDLK_UP,SDL_CONTROLLER_BUTTON_DPAD_UP)||m(SDLK_DOWN,SDL_CONTROLLER_BUTTON_DPAD_DOWN)||m(SDLK_LEFT,SDL_CONTROLLER_BUTTON_DPAD_LEFT)||m(SDLK_RIGHT,SDL_CONTROLLER_BUTTON_DPAD_RIGHT)){moveFocus(m(SDLK_LEFT,SDL_CONTROLLER_BUTTON_DPAD_LEFT)?-1:m(SDLK_RIGHT,SDL_CONTROLLER_BUTTON_DPAD_RIGHT)?1:0,m(SDLK_UP,SDL_CONTROLLER_BUTTON_DPAD_UP)?-1:m(SDLK_DOWN,SDL_CONTROLLER_BUTTON_DPAD_DOWN)?1:0);return true;}
         if(m(SDLK_RETURN,SDL_CONTROLLER_BUTTON_A)){activateFocus();return true;}
-        if(catalogPanel_==CatalogPanel::Text){if(m(SDLK_RETURN,SDL_CONTROLLER_BUTTON_A))commitCatalogText();else if(!pad&&key==SDLK_BACKSPACE&&!inputText_.empty()){auto pos=inputText_.size()-1;while(pos>0&&(static_cast<unsigned char>(inputText_[pos])&0xc0)==0x80)--pos;inputText_.resize(pos);}dirty_=true;return true;}
-        if(m(SDLK_UP,SDL_CONTROLLER_BUTTON_DPAD_UP))moveCatalogFocus(-1);else if(m(SDLK_DOWN,SDL_CONTROLLER_BUTTON_DPAD_DOWN))moveCatalogFocus(1);
-        else if(m(SDLK_RETURN,SDL_CONTROLLER_BUTTON_A))activateCatalogRow(catalogFocus_);
-        else if(m(SDLK_x,SDL_CONTROLLER_BUTTON_X)&&catalogPanel_==CatalogPanel::Values&&catalogGroup_==CatalogGroup::Collections){auto g=catalog_.groups(books_,catalogGroup_);auto it=g.begin();std::advance(it,std::min(catalogFocus_,int(g.size())));if(it!=g.end()){selectedCollection_=it->first;setCatalogPanel(CatalogPanel::CollectionActions);}}
+        if(catalogPanel_==CatalogPanel::Text){if(!pad&&key==SDLK_BACKSPACE&&!inputText_.empty()){auto pos=inputText_.size()-1;while(pos>0&&(static_cast<unsigned char>(inputText_[pos])&0xc0)==0x80)--pos;inputText_.resize(pos);}dirty_=true;return true;}
+        if(m(SDLK_x,SDL_CONTROLLER_BUTTON_X)&&catalogPanel_==CatalogPanel::Values&&catalogGroup_==CatalogGroup::Collections&&catalogFocus_>=0){auto g=catalog_.groups(books_,catalogGroup_);auto it=g.begin();std::advance(it,std::min(catalogFocus_,int(g.size())));if(it!=g.end()){selectedCollection_=it->first;setCatalogPanel(CatalogPanel::CollectionActions);}}
         return true;
     }
     if(e.type==SDL_CONTROLLERAXISMOTION||e.type==SDL_MULTIGESTURE)return true;
@@ -314,6 +325,29 @@ void renderCatalogPanel(int w,int h,const ThemePalette &pal){
     if(catalogPanel_==CatalogPanel::DeleteConfirm){typography_->renderWrapped(renderer_,typography_->uiFont(),catLabel("Bu kitap dosyası SD karttan kalıcı olarak silinecek. Bu işlem geri alınamaz.\n","This book file will be permanently deleted from SD storage. This cannot be undone.\n")+fs::path(actionBook_.path).filename().string()+"\n"+actionBook_.path,{r.x+20,r.y+80,r.w-40,132},pal.fg);}
     if(catalogPanel_==CatalogPanel::Statistics){const auto today=readingStats_.dayMilliseconds(localReadingDay())/60000;const auto total=readingStats_.totalMilliseconds()/60000;
         typography_->renderWrapped(renderer_,typography_->uiFont(),catLabel("Bugün: ","Today: ")+std::to_string(today)+catLabel(" dk\nToplam: "," min\nTotal: ")+std::to_string(total)+catLabel(" dk · Hedef: "," min · Goal: ")+std::to_string(readingStats_.dailyGoal())+catLabel(" dk"," min"),{r.x+20,r.y+80,r.w-40,96},pal.fg);}
+    if(catalogPanel_==CatalogPanel::ScanReport){
+        std::string report;
+        if(!lastScanResult_){
+            report=catLabel("Henüz kitaplık taraması yapılmadı.","No library scan has run yet.");
+        }else{
+            const auto &res=*lastScanResult_;
+            report=lastScanSummary_+"\n"+catLabel("Nesil: #","Generation: #")+std::to_string(res.generation)+" · "+
+                catLabel("Eklenen: ","Added: ")+std::to_string(res.addedCount)+" · "+
+                catLabel("Güncellenen: ","Updated: ")+std::to_string(res.updatedCount)+"\n"+
+                catLabel("Günlük: ","Log: ")+(root_/"data"/"library-scan.log").u8string()+"\n";
+            for(const auto &rs:res.rootStatuses){
+                report+=(rs.available?(rs.completedCleanly?"[OK] ":"[!] "):"[X] ")+rs.rootPath+
+                    " ("+std::to_string(rs.booksFound)+")\n";
+            }
+            for(std::size_t i=0;i<std::min<std::size_t>(res.unreadableFiles.size(),3);++i){
+                report+=catLabel("Okunamayan: ","Unreadable: ")+res.unreadableFiles[i].path+" ("+res.unreadableFiles[i].message+")\n";
+            }
+            for(std::size_t i=0;i<std::min<std::size_t>(res.inaccessibleDirs.size(),3);++i){
+                report+=catLabel("Klasör hatası: ","Folder error: ")+res.inaccessibleDirs[i].path+" ("+res.inaccessibleDirs[i].message+")\n";
+            }
+        }
+        typography_->renderWrapped(renderer_,typography_->smallFont(),report,{r.x+20,r.y+88,r.w-40,catalogContentTop(r)-r.y-96},pal.fg);
+    }
     const auto rows=catalogRows();const int top=catalogContentTop(r);SDL_Rect clip{r.x+12,top,r.w-24,std::max(0,r.y+r.h-16-top)};SDL_RenderSetClipRect(renderer_,&clip);
     for(int i=0;i<int(rows.size());++i){SDL_Rect row{r.x+20,top+i*64-int(catalogScroll_),r.w-40,56};if(row.y+row.h<clip.y||row.y>clip.y+clip.h)continue;
         const bool danger=(catalogPanel_==CatalogPanel::Actions&&rows[i].first==9)||(catalogPanel_==CatalogPanel::DeleteConfirm&&rows[i].first==1);
@@ -321,7 +355,7 @@ void renderCatalogPanel(int w,int h,const ThemePalette &pal){
         if(manage)row.w-=132;
         const auto status=catalog_.get(actionBook_.id).status;
         const bool statusSelected=catalogPanel_==CatalogPanel::Actions && ((rows[i].first==2&&status==ReadingStatus::Reading)||(rows[i].first==3&&status==ReadingStatus::NotStarted)||(rows[i].first==4&&status==ReadingStatus::Completed));
-        ui::menuRow(renderer_,*typography_,row,rows[i].second,pal,statusSelected,i==catalogFocus_ && catalogPanel_==CatalogPanel::Actions,danger);
+        ui::menuRow(renderer_,*typography_,row,rows[i].second,pal,statusSelected,false,danger);
         if(manage)ui::button(renderer_,*typography_,{row.x+row.w+8,row.y,124,56},catLabel("Düzenle","Manage"),pal);}
     if(rows.empty())typography_->renderText(renderer_,typography_->uiFont(),catLabel("Henüz öğe yok","No items"),r.x+24,top+24,pal.muted,r.w-48);
     SDL_RenderSetClipRect(renderer_,nullptr);

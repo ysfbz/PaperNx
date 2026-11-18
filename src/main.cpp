@@ -241,7 +241,7 @@ public:
         ui::language=appSettings_.get().language;
         viewMode_=appSettings_.get().libraryLayout ? ViewMode::List : ViewMode::Grid;
         sort_=static_cast<Sort>(appSettings_.get().sort);
-        books_ = loadLibraryInventory(root_/"data"/"library-index.txt");
+        books_ = loadMergedLibraryInventory(root_/"data"/"library-index.txt");
         restoreLibraryLabels(!appSettings_.get().scanOnLaunch);
 
         SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS, "0");
@@ -300,11 +300,11 @@ public:
 #endif
         autoUpdateCheckPending_=appSettings_.get().automaticUpdateCheck;
     }
-    void showStartupMessage(std::string message) {currentErrorMessage_=std::move(message);dirty_=true;}
+    void showStartupMessage(std::string message) {currentErrorMessage_=std::move(message);currentErrorIsFromScan_=false;dirty_=true;}
     void confirmBootAfterFirstRender() {
         if(bootFrameConfirmed_)return;
         bootFrameConfirmed_=true;std::string error;
-        if(!updater_->confirmBoot(error)){logMessage("Update startup confirmation: "+error);currentErrorMessage_=error;dirty_=true;}
+        if(!updater_->confirmBoot(error)){logMessage("Update startup confirmation: "+error);currentErrorMessage_=error;currentErrorIsFromScan_=false;dirty_=true;}
     }
 
     bool startUpdateNetwork() {
@@ -419,11 +419,11 @@ public:
                 if(startUpdateNetwork())updater_->check();
                 else updater_->reportError("Network services are unavailable");
             }
-            if(appSavePending_ && !dirty_ && SDL_GetTicks()>=appSaveRetryAt_) {appSavePending_=!appSettings_.save();if(appSavePending_){appSaveRetryAt_=SDL_GetTicks()+3000;currentErrorMessage_="Settings could not be saved";dirty_=true;}}
+            if(appSavePending_ && !dirty_ && SDL_GetTicks()>=appSaveRetryAt_) {appSavePending_=!appSettings_.save();if(appSavePending_){appSaveRetryAt_=SDL_GetTicks()+3000;currentErrorMessage_="Settings could not be saved";currentErrorIsFromScan_=false;dirty_=true;}}
             // Persist newly extracted metadata only after the first responsive reader frame.
             if(catalogSavePending_ && !dirty_ && !pageTurnAnimation_.active && SDL_GetTicks()>=catalogSaveRetryAt_) {
                 catalogSavePending_=!catalog_.save();
-                if(catalogSavePending_) {catalogSaveRetryAt_=SDL_GetTicks()+3000;currentErrorMessage_="Book metadata could not be saved";dirty_=true;}
+                if(catalogSavePending_) {catalogSaveRetryAt_=SDL_GetTicks()+3000;currentErrorMessage_="Book metadata could not be saved";currentErrorIsFromScan_=false;dirty_=true;}
             }
 
         }
@@ -932,8 +932,9 @@ private:
         }
         if(metadataChanged){
             float previous=listScroll_;std::string selected;
-            const bool focusedBook=navigationFocus_.active().rfind("book.",0)==0;
-            if(selectedBookIdx_>=0 && selectedBookIdx_<int(visibleBooks_.size()))selected=visibleBooks_[selectedBookIdx_].id;
+            const bool focusedBook=navigationFocus_.active().rfind("book:",0)==0;
+            if(focusedBook)selected=navigationFocus_.active().substr(5);
+            else if(selectedBookIdx_>=0 && selectedBookIdx_<int(visibleBooks_.size()))selected=visibleBooks_[selectedBookIdx_].id;
             updateVisibleBooks();
             for(int i=0;i<int(visibleBooks_.size());++i) {
                 bool match=visibleBooks_[i].id==selected;
@@ -942,8 +943,9 @@ private:
                 if(match){selectedBookIdx_=i;break;}
             }
             listScroll_=std::clamp(previous,0.f,maxUiScroll());dirty_=true;
-            if(focusedBook && screen_==ScreenState::Library && !quickMenu_ && catalogPanel_==CatalogPanel::None) {
-                rebuildFocus();navigationFocus_.select("book."+std::to_string(selectedBookIdx_));
+            if(focusedBook && screen_==ScreenState::Library && !quickMenu_ && catalogPanel_==CatalogPanel::None &&
+               selectedBookIdx_>=0 && selectedBookIdx_<int(visibleBooks_.size())) {
+                rebuildFocus();navigationFocus_.select("book:"+visibleBooks_[selectedBookIdx_].id);
             }
         }
         std::set<std::string> visibleCovers;
@@ -1209,7 +1211,7 @@ private:
                     renderedStyle_=preparedStyle_; layoutWidth_=preparedWidth_; layoutHeight_=preparedHeight_;
                     loadToc(); saveCurrentPosition(); ++completedLayouts_;
                 } else {
-                    applyStyle(renderedStyle_); currentErrorMessage_="Düzen hazırlanamadı: "+preparedError_;
+                    applyStyle(renderedStyle_); currentErrorMessage_="Düzen hazırlanamadı: "+preparedError_; currentErrorIsFromScan_=false;
                 }
                 layoutPending_=false; dirty_=true;
             }
@@ -1330,7 +1332,11 @@ private:
            (screen_==ScreenState::ReadingJournal && journalUI_.hasSubpage()) ||
            coverClearConfirm_ || screen_==ScreenState::TocModal || screen_==ScreenState::BookmarksModal || screen_==ScreenState::JournalPreview)
             return false;
-        quickMenu_=true;helpMenu_=false;quickScroll_=0;quickFocus_=0;listVelocity_=scrollVelocity_=0;dirty_=true;
+        quickMenu_=true;helpMenu_=false;quickScroll_=0;quickFocus_=0;listVelocity_=scrollVelocity_=0;
+        navigationFocus_.clearContext("quick");
+        rebuildFocus();
+        navigationFocus_.select("quick.0");
+        dirty_=true;
         return true;
     }
     void toggleLandscapeSpreads() {
@@ -1341,27 +1347,22 @@ private:
         appSettings_.put(prefs);persistAppSettings();applyReaderLayoutOptions();
     }
     SDL_Rect quickSheet(int w,int h) const {
-        int width=std::min(460,w-32),height=std::min(h-96,QUICK_HEADER_HEIGHT+int(quickActions().size())*60);
+        int width=std::min(460,w-32),height=std::min(h-96,QUICK_HEADER_HEIGHT+int(quickActions().size())*60+8);
         if(helpMenu_) height=std::min(560,h-96);
         return {w-width-16,80,width,height};
     }
-    void handleQuickMenuTap(int px,int py,int w,int h) {
-        auto r=quickSheet(w,h);
-        if(helpMenu_ || !ui::contains(r,px,py)) { quickMenu_=helpMenu_=false; dirty_=true; return; }
-        // Fixed header shortcuts remain visible while the long action list scrolls.
-        if(ui::contains(quickPageShortcut(r),px,py)) {quickMenu_=false;toggleLandscapeSpreads();return;}
-        if(ui::contains(quickOrientationShortcut(r),px,py)){
-            quickMenu_=false;openChoice(1,appSettings_.get().displayOrientation);return;
-        }
-        int index=int(py-r.y-QUICK_HEADER_HEIGHT+quickScroll_)/60;
+    SDL_Rect quickActionViewport(SDL_Rect r) const {
+        return {r.x+4,r.y+QUICK_HEADER_HEIGHT,std::max(0,r.w-8),std::max(0,r.h-QUICK_HEADER_HEIGHT-8)};
+    }
+    void activateQuickAction(int index) {
         auto actions=quickActions();
-        if(py<r.y+QUICK_HEADER_HEIGHT || index<0 || index>=int(actions.size())) return;
+        if(index<0 || index>=int(actions.size())) return;
         std::string action=actions[index]; quickMenu_=false;
         if(action==ui::label("Add this folder")){addBrowserFolder();return;}
         if(action==ui::label("Check for update")){checkForUpdate();return;}
         if(screen_==ScreenState::ReadingJournal){
             if(index==0){screen_=journalReturn_;dirty_=true;}
-            else journalUI_.tap(w-200,40,w,h,journal_);
+            else {int w,h;getWindowSize(w,h);journalUI_.tap(w-200,40,w,h,journal_);}
             return;
         }
         if(action==catLabel("Günlüğüm","My journal")){enterJournal(false);return;}
@@ -1399,13 +1400,26 @@ private:
             if(index==2) openBrowser();
             if(index==3) toggleSearch();
             if(index==4) { sort_=static_cast<Sort>((static_cast<int>(sort_)+1)%5); updateVisibleBooks(); persistAppSettings(); }
-            if(index==5) { viewMode_=viewMode_==ViewMode::Grid?ViewMode::List:ViewMode::Grid; listScroll_=0; persistAppSettings(); }
+            if(index==5) { viewMode_=viewMode_==ViewMode::Grid?ViewMode::List:ViewMode::Grid; updateVisibleBooks(); persistAppSettings(); }
             if(index==6)startLibraryScan();
             if(index==7) quickMenu_=helpMenu_=true;
             if(index==8) exitRequested_=true;
             if(index==9)setCatalogPanel(CatalogPanel::Browse);
         }
         dirty_=true;
+    }
+    void handleQuickMenuTap(int px,int py,int w,int h) {
+        auto r=quickSheet(w,h);
+        if(helpMenu_ || !ui::contains(r,px,py)) { quickMenu_=helpMenu_=false; dirty_=true; return; }
+        // Fixed header shortcuts remain visible while the long action list scrolls.
+        if(ui::contains(quickPageShortcut(r),px,py)) {quickMenu_=false;toggleLandscapeSpreads();return;}
+        if(ui::contains(quickOrientationShortcut(r),px,py)){
+            quickMenu_=false;openChoice(1,appSettings_.get().displayOrientation);return;
+        }
+        const auto vp=quickActionViewport(r);
+        if(!ui::contains(vp,px,py)) return;
+        int index=int(py-r.y-QUICK_HEADER_HEIGHT+quickScroll_)/60;
+        activateQuickAction(index);
     }
     void renderQuickMenu(int w,int h,const ThemePalette &pal) {
         auto r=quickSheet(w,h); ui::elevated(renderer_,r,pal);
@@ -1429,9 +1443,9 @@ private:
             for(const auto &line:lines) { typography_->renderText(renderer_,typography_->smallFont(),lineIndex++<metadataLines?line:ui::label(line),r.x+20,y,pal.fg,r.w-40); y+=38; }
             SDL_RenderSetClipRect(renderer_,nullptr);
         } else {
-            SDL_Rect clip{r.x,r.y+QUICK_HEADER_HEIGHT,r.w,r.h-QUICK_HEADER_HEIGHT}; SDL_RenderSetClipRect(renderer_,&clip);
+            const SDL_Rect clip=quickActionViewport(r); SDL_RenderSetClipRect(renderer_,&clip);
             auto actions=quickActions(); for(int i=0;i<int(actions.size());++i)
-                ui::menuRow(renderer_,*typography_,{r.x+12,r.y+QUICK_HEADER_HEIGHT+i*60-int(quickScroll_),r.w-24,56},actions[i],pal,false,i==quickFocus_);
+                ui::menuRow(renderer_,*typography_,{r.x+12,r.y+QUICK_HEADER_HEIGHT+i*60-int(quickScroll_),r.w-24,56},actions[i],pal,false,false);
             SDL_RenderSetClipRect(renderer_,nullptr);
         }
     }
@@ -1446,7 +1460,7 @@ private:
     }
     float maxUiScroll() {
         int w,h; getWindowSize(w,h);
-        if(quickMenu_) return std::max(0,int(quickActions().size())*60-(quickSheet(w,h).h-QUICK_HEADER_HEIGHT));
+        if(quickMenu_) return std::max(0,int(quickActions().size())*60-quickActionViewport(quickSheet(w,h)).h);
         if(screen_==ScreenState::ReadingJournal) return float(journalUI_.maxScrollY());
         if(screen_==ScreenState::AaModal) return std::max(0,settingsRows()*64-ui::SettingsLayout(w,h).content.h);
         if(screen_==ScreenState::FileBrowser) return std::max(0,int(browserEntries_.size())*64-(h-128));
@@ -1551,6 +1565,9 @@ private:
     }
 
     void updateVisibleBooks() {
+        std::string focusedBookId;
+        if(navigationFocus_.active().rfind("book:",0)==0) focusedBookId=navigationFocus_.active().substr(5);
+        else if(selectedBookIdx_>=0 && selectedBookIdx_<int(visibleBooks_.size())) focusedBookId=visibleBooks_[selectedBookIdx_].id;
         auto candidates=catalog_.visible(books_);
         if(catalogFilter_)candidates=catalog_.filter(candidates,*catalogFilter_,catalogFilterValue_);
         if(!openSeriesKey_.empty()) {
@@ -1568,10 +1585,24 @@ private:
         }
         visibleBooks_ = searchEx(candidates, progressStore_, searchQuery_, sort_, category);
         arrangeSeries();
+        if(!focusedBookId.empty()) {
+            for(int i=0;i<int(visibleBooks_.size());++i) {
+                bool match=visibleBooks_[i].id==focusedBookId;
+                auto shelf=seriesShelves_.find(visibleBooks_[i].id);
+                if(shelf!=seriesShelves_.end())for(const auto &issue:shelf->second.issues)match=match || issue.id==focusedBookId;
+                if(match){selectedBookIdx_=i;break;}
+            }
+        }
         if (selectedBookIdx_ >= static_cast<int>(visibleBooks_.size())) {
             selectedBookIdx_ = std::max(0, static_cast<int>(visibleBooks_.size()) - 1);
         }
         scrollOffset_ = 0; listScroll_=0; listVelocity_=0;
+        if(screen_==ScreenState::Library && !quickMenu_ && catalogPanel_==CatalogPanel::None && choiceKind_<0) {
+            rebuildFocus();
+            if(!focusedBookId.empty() && selectedBookIdx_>=0 && selectedBookIdx_<int(visibleBooks_.size())) {
+                navigationFocus_.select("book:"+visibleBooks_[selectedBookIdx_].id);
+            }
+        }
         dirty_ = true;
     }
 
@@ -1626,7 +1657,7 @@ private:
         if (!doc_) {
             coversPaused_=false; queueCv_.notify_one();
             currentBookId_.clear();
-            currentErrorMessage_ = std::string("Kitap açılamadı: ") + err;
+            currentErrorMessage_ = std::string("Kitap açılamadı: ") + err; currentErrorIsFromScan_=false;
             logMessage(currentErrorMessage_);
             screen_ = ScreenState::Library;
             dirty_ = true;
@@ -1818,7 +1849,7 @@ private:
         if (progressStore_.save()) {
             progressDirty_ = false;
             saveRetrySeconds_ = 3;
-            if (!lastSaveFailure_.empty()) { currentErrorMessage_.clear(); dirty_ = true; }
+            if (!lastSaveFailure_.empty()) { currentErrorMessage_.clear(); currentErrorIsFromScan_=false; dirty_ = true; }
             lastSaveFailure_.clear();
             return true;
         }
@@ -1827,7 +1858,7 @@ private:
         if (detail != lastSaveFailure_) {
             logMessage(detail);
             lastSaveFailure_ = detail;
-            currentErrorMessage_ = "Kaydedilemedi. SD kartı kontrol edin; kayıt yeniden denenecek.";
+            currentErrorMessage_ = "Kaydedilemedi. SD kartı kontrol edin; kayıt yeniden denenecek."; currentErrorIsFromScan_=false;
             dirty_ = true;
         }
         return false;
@@ -2324,7 +2355,7 @@ private:
             saveCurrentPosition();
         } else {
             applyStyle(previous);
-            currentErrorMessage_ = std::string("Yeniden boyutlandırma hatası: ") + err;
+            currentErrorMessage_ = std::string("Yeniden boyutlandırma hatası: ") + err; currentErrorIsFromScan_=false;
             logMessage(currentErrorMessage_);
         }
         dirty_ = true;
@@ -2779,25 +2810,38 @@ private:
 
     void scanBrowserDirectory() {
         browserEntries_.clear();
-        std::error_code ec;
-        if (!fs::exists(browserPath_, ec)) return;
+        const auto &ops = defaultFsOps();
+        const auto dirInfo = ops.statPath(browserPath_, true);
+        if (!dirInfo.exists || !dirInfo.isDirectory) return;
 
-        fs::directory_iterator it(browserPath_, fs::directory_options::skip_permission_denied, ec), end;
-        for (; !ec && it != end && browserEntries_.size() < 10000; it.increment(ec)) {
-            const auto &entry = *it;
-            if (entry.is_symlink(ec)) continue;
-            if (entry.is_directory(ec)) {
-                browserEntries_.push_back({entry.path(), true, 0});
-            } else if (entry.is_regular_file(ec)) {
-                auto fmt = detectFormat(entry.path().string());
-                if (fmt != Format::Unsupported) {
-                    browserEntries_.push_back({entry.path(), false, entry.file_size(ec)});
-                }
+        std::vector<FsDirEntry> entries;
+        int listErr = 0;
+        std::uint32_t listNative = 0;
+        ops.listDirectory(browserPath_, entries, listErr, listNative);
+        for (const auto &item : entries) {
+            if (browserEntries_.size() >= 10000) break;
+            const fs::path entryPath = browserPath_ / fs::u8path(item.name);
+            FsDirEntry::Kind kind = item.kind;
+            if (kind == FsDirEntry::Kind::Unknown) {
+                const auto st = ops.statPath(entryPath, false);
+                if (!st.exists || st.isSymlink) continue;
+                if (st.isDirectory) kind = FsDirEntry::Kind::Directory;
+                else if (st.isRegularFile) kind = FsDirEntry::Kind::Regular;
+                else continue;
+            }
+            if (kind == FsDirEntry::Kind::Symlink || kind == FsDirEntry::Kind::Other) continue;
+            if (kind == FsDirEntry::Kind::Directory) {
+                browserEntries_.push_back({entryPath, true, 0});
+            } else if (kind == FsDirEntry::Kind::Regular) {
+                if (detectFormat(entryPath) == Format::Unsupported) continue;
+                const auto safeSize = regularBookFileSize(browserPath_, entryPath);
+                if (!safeSize) continue;
+                browserEntries_.push_back({entryPath, false, *safeSize});
             }
         }
         std::sort(browserEntries_.begin(), browserEntries_.end(), [](const BrowserEntry &a, const BrowserEntry &b) {
             if (a.isDirectory != b.isDirectory) return a.isDirectory > b.isDirectory;
-            int n=naturalCompare(a.path.filename().string(),b.path.filename().string());return n?n<0:a.path<b.path;
+            int n=naturalCompare(a.path.filename().u8string(),b.path.filename().u8string());return n?n<0:a.path.u8string()<b.path.u8string();
         });
         browserSelected_ = 0;
         browserOffset_ = 0; browserScroll_=0;
@@ -2814,11 +2858,21 @@ private:
 #endif
         browserPath_ = browserRoot_;
         if(!appSettings_.get().defaultBrowserPath.empty()) {
-            std::error_code ec; auto candidate=fs::u8path(appSettings_.get().defaultBrowserPath);
-            auto canonical=fs::weakly_canonical(candidate,ec); auto base=fs::weakly_canonical(browserRoot_,ec);
-            if(!ec && fs::is_directory(canonical,ec) && !ec) {
-                auto relative=canonical.lexically_relative(base);
-                if(!relative.empty() && *relative.begin()!="..") browserPath_=canonical;
+            std::error_code ec;
+            const bool deviceMode =
+#ifdef __SWITCH__
+                true;
+#else
+                isDevicePath(browserRoot_);
+#endif
+            auto candidate=normalizeScanRoot(fs::u8path(appSettings_.get().defaultBrowserPath),ec,deviceMode);
+            if(!ec) {
+                std::error_code baseEc;
+                auto base=normalizeScanRoot(browserRoot_,baseEc,deviceMode);
+                if(!baseEc) {
+                    const auto st=defaultFsOps().statPath(candidate,true);
+                    if(st.exists && st.isDirectory && containsPathSafe(base,candidate,defaultFsOps())) browserPath_=candidate;
+                }
             }
         }
         scanBrowserDirectory();
@@ -2835,10 +2889,10 @@ private:
         } else {
             // Open selected book directly
             Book b;
-            b.path = entry.path.string();
-            b.format = detectFormat(b.path);
+            b.path = entry.path.u8string();
+            b.format = detectFormat(entry.path);
             b.id = documentId(b.path, entry.size);
-            b.title = entry.path.stem().string();
+            b.title = defaultTitle(entry.path);
             b.bytes = entry.size;
             auto found = std::find_if(books_.begin(), books_.end(), [&](const Book &book) { return book.id == b.id; });
             if (found == books_.end()) books_.push_back(b);
@@ -2864,8 +2918,8 @@ private:
         if(row==9) {
 #ifdef __SWITCH__
             backlightAvailable_=setSystemBrightness(preferences.systemBrightness);
-            if(!backlightAvailable_)currentErrorMessage_=catLabel("El cihazı parlaklık servisi kullanılamıyor; yazılımsal dimmer kullanılabilir.",
-                "Handheld brightness control is unavailable; software dimming remains available.");
+            if(!backlightAvailable_){currentErrorMessage_=catLabel("El cihazı parlaklık servisi kullanılamıyor; yazılımsal dimmer kullanılabilir.",
+                "Handheld brightness control is unavailable; software dimming remains available.");currentErrorIsFromScan_=false;}
 #endif
         }
         if(save)persistAppSettings();
@@ -3266,6 +3320,7 @@ private:
         // Dismiss any active error banner on tap
         if (!currentErrorMessage_.empty()) {
             currentErrorMessage_.clear();
+            currentErrorIsFromScan_ = false;
             dirty_ = true;
         }
 
@@ -3439,8 +3494,8 @@ private:
                 persistAppSettings();
 #ifdef __SWITCH__
                 backlightAvailable_=setSystemBrightness(p.systemBrightness);
-                if(!backlightAvailable_)currentErrorMessage_=catLabel("El cihazı parlaklık servisi kullanılamıyor; yazılımsal dimmer kullanılabilir.",
-                    "Handheld brightness control is unavailable; software dimming remains available.");
+                if(!backlightAvailable_){currentErrorMessage_=catLabel("El cihazı parlaklık servisi kullanılamıyor; yazılımsal dimmer kullanılabilir.",
+                    "Handheld brightness control is unavailable; software dimming remains available.");currentErrorIsFromScan_=false;}
 #endif
                 dirty_=true;return;
             }
@@ -3637,11 +3692,7 @@ private:
         if(match(SDLK_PLUS,SDL_CONTROLLER_BUTTON_START)) {toggleQuickMenu();return;}
 
         if (match(SDLK_RETURN, SDL_CONTROLLER_BUTTON_A)) {
-            if(quickMenu_){
-                rebuildFocus();const auto focused=navigationFocus_.active();
-                if(focused=="quick.pages" || focused=="quick.orientation") {activateFocus();return;}
-                int w,h;getWindowSize(w,h);auto rc=quickSheet(w,h);handleQuickMenuTap(rc.x+28,rc.y+QUICK_HEADER_HEIGHT+quickFocus_*60-int(quickScroll_)+24,w,h);return;
-            }
+            if(quickMenu_){activateFocus();return;}
             if(screen_==ScreenState::JournalPreview){enterJournal(true);return;}
             if(screen_==ScreenState::ReadingJournal){journalAction(journalUI_.activate(0,0,journal_));return;}
             if(activateFocus())return;
@@ -3693,13 +3744,16 @@ private:
         }
         if (screen_ == ScreenState::AaModal && match(SDLK_y, SDL_CONTROLLER_BUTTON_Y)) {
             if (doc_ && !px_document_is_epub(doc_)) { zoomPdf(1.0f); return; }
-            aaRow_ = (aaRow_ + 1) % std::max(1,settingsRows());
+            const int nextRow = (std::max(0, aaRow_) + 1) % std::max(1,settingsRows());
+            rebuildFocus();
+            navigationFocus_.select(aaTab_==2 && nextRow<5 ? "theme."+std::to_string(nextRow*2) : "setting."+std::to_string(nextRow));
+            focusReveal();
             dirty_ = true; return;
         }
         if (screen_ == ScreenState::AaModal && doc_ && !px_document_is_epub(doc_) && match(SDLK_f, SDL_CONTROLLER_BUTTON_X)) {
             setPdfView((extraStyle_.pdfViewMode + 1) % 3); return;
         }
-        if(screen_==ScreenState::AaModal && !settingsEditing_ && (match(SDLK_PAGEUP,SDL_CONTROLLER_BUTTON_LEFTSHOULDER)||match(SDLK_PAGEDOWN,SDL_CONTROLLER_BUTTON_RIGHTSHOULDER))){aaTab_=std::clamp(aaTab_+(match(SDLK_PAGEUP,SDL_CONTROLLER_BUTTON_LEFTSHOULDER)?-1:1),0,5);aaRow_=0;settingsScroll_=0;dirty_=true;return;}
+        if(screen_==ScreenState::AaModal && !settingsEditing_ && (match(SDLK_PAGEUP,SDL_CONTROLLER_BUTTON_LEFTSHOULDER)||match(SDLK_PAGEDOWN,SDL_CONTROLLER_BUTTON_RIGHTSHOULDER))){aaTab_=std::clamp(aaTab_+(match(SDLK_PAGEUP,SDL_CONTROLLER_BUTTON_LEFTSHOULDER)?-1:1),0,5);aaRow_=0;settingsScroll_=0;rebuildFocus();navigationFocus_.select(aaTab_==2?"theme.0":"setting.0");focusReveal();dirty_=true;return;}
         if (screen_ == ScreenState::ReadingJournal) {
             if (match(SDLK_PAGEUP, SDL_CONTROLLER_BUTTON_LEFTSHOULDER)) { journalUI_.prevTab(); dirty_ = true; return; }
             if (match(SDLK_PAGEDOWN, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER)) { journalUI_.nextTab(); dirty_ = true; return; }
@@ -3725,11 +3779,20 @@ private:
             if (match(SDLK_EQUALS, -1)) reflowEpub(currentFontSize_ + 2);
             if (match(SDLK_MINUS, -1)) reflowEpub(currentFontSize_ - 2);
         } else if (screen_ == ScreenState::Library) {
+            auto activeBookIdx=[&]() {
+                const auto active=navigationFocus_.active();
+                if(active.rfind("book:",0)==0) {
+                    const auto id=active.substr(5);
+                    for(int i=0;i<int(visibleBooks_.size());++i)if(visibleBooks_[i].id==id)return i;
+                }
+                return std::clamp(selectedBookIdx_,0,std::max(0,int(visibleBooks_.size())-1));
+            };
             if (match(SDLK_f, SDL_CONTROLLER_BUTTON_LEFTSTICK) && !visibleBooks_.empty()) {
-                if(openSeriesShelf(visibleBooks_[selectedBookIdx_]))return;
-                auto p = progressStore_.get(visibleBooks_[selectedBookIdx_].id);
+                const int idx=activeBookIdx();
+                if(openSeriesShelf(visibleBooks_[idx]))return;
+                auto p = progressStore_.get(visibleBooks_[idx].id);
                 p.favorite = !p.favorite;
-                progressStore_.put(visibleBooks_[selectedBookIdx_].id, p);
+                progressStore_.put(visibleBooks_[idx].id, p);
                 progressDirty_ = true; updateVisibleBooks();
             }
             if (match(SDLK_PAGEUP, SDL_CONTROLLER_BUTTON_LEFTSHOULDER)) {
@@ -3739,13 +3802,15 @@ private:
                 category_ = static_cast<Category>((static_cast<int>(category_) + 1) % 6); updateVisibleBooks();
             }
             if (match(SDLK_x, SDL_CONTROLLER_BUTTON_X)) {
-                if(!visibleBooks_.empty())openBookActions(visibleBooks_[selectedBookIdx_]);
+                if(!visibleBooks_.empty())openBookActions(visibleBooks_[activeBookIdx()]);
             }
             if(match(SDLK_y,SDL_CONTROLLER_BUTTON_Y))setCatalogPanel(CatalogPanel::Browse);
 
             if (match(SDLK_t, -1)) { currentTheme_ = (currentTheme_ + 1) % g_paletteCount; dirty_ = true; }
             if (match(SDLK_MINUS, SDL_CONTROLLER_BUTTON_BACK)) {
                 viewMode_ = (viewMode_ == ViewMode::Grid) ? ViewMode::List : ViewMode::Grid;
+                updateVisibleBooks();
+                focusReveal();
                 dirty_ = true;
             }
         }
@@ -3760,6 +3825,7 @@ private:
 
     // Rendering Screens
     void render() {
+        ui::focusRingDrawCount = 0;
         pollUpdates();
         trace("frame_begin");frameStartCounter_=SDL_GetPerformanceCounter();
         processLibraryScan();processPagePreviews();tickPageNavigation();
@@ -3776,7 +3842,7 @@ private:
             }
             if(!orientationTarget_ || SDL_SetRenderTarget(renderer_,orientationTarget_)!=0) {
                 SDL_SetRenderTarget(renderer_,nullptr);auto a=appSettings_.get();a.displayOrientation=0;appSettings_.put(a);persistAppSettings();
-                currentErrorMessage_="Portrait output unavailable; landscape restored";pageCache_.clear();
+                currentErrorMessage_="Portrait output unavailable; landscape restored";currentErrorIsFromScan_=false;pageCache_.clear();
                 if(doc_ && px_document_is_epub(doc_)){++layoutGeneration_;layoutPending_=true;layoutDue_=SDL_GetTicks()+100;}
                 else if(doc_)setPdfView(extraStyle_.pdfViewMode);
                 render();return;
@@ -3827,7 +3893,6 @@ private:
             ui::button(renderer_,*typography_,{w-80,8,64,64},quickMenu_?"×":"+",pal,quickMenu_);
         if(quickMenu_) renderQuickMenu(w,h,pal);
         renderCatalogPanel(w,h,pal);
-        if(colorEditing_<0 && choiceKind_<0)paintFocus();
         if(colorEditing_>=0) {
             auto panel=colorPanel(w,h);ui::elevated(renderer_,panel,pal);
             typography_->renderText(renderer_,typography_->titleFont(),ui::label(colorEditing_?"Arka plan rengi":"Metin rengi"),panel.x+24,panel.y+16,pal.fg);
@@ -3843,6 +3908,7 @@ private:
             ui::button(renderer_,*typography_,{panel.x+panel.w/2+8,panel.y+348,(panel.w-64)/2,56},"Kaydet",pal,true);
         }
         renderChoices(w,h,pal);
+        if(colorEditing_<0 && !updateDialog_)paintFocus();
         renderUpdateDialog(w,h,pal);
         if(rotation && orientationTarget_) {
             SDL_SetRenderTarget(renderer_,nullptr);
@@ -4101,7 +4167,7 @@ private:
             if(numeric)text=text.substr(5);
             auto plus=text.find("    +");if(plus!=std::string::npos)text=text.substr(0,plus);
             auto split=text.find(": ");
-            if(numeric && split!=std::string::npos) ui::settingsRow(renderer_,*typography_,r,text.substr(0,split),text.substr(split+2),pal,false,settingsEditing_ && n==aaRow_);
+            if(numeric && split!=std::string::npos) ui::settingsRow(renderer_,*typography_,r,text.substr(0,split),text.substr(split+2),pal,false,false);
             else {
                 ui::preferenceRow(renderer_,*typography_,r,text,pal,selected);
             }
@@ -4138,11 +4204,11 @@ private:
             row(7,catLabel("Tema renklerine sıfırla","Reset theme colors"));
             auto softwareRow=l.control(8);softwareRow.y-=int(settingsScroll_);
             ui::settingsSliderRow(renderer_,*typography_,softwareRow,
-                catLabel("Yazılımsal parlaklık","Software brightness"),appSettings_.get().softwareBrightness,50,100,pal,aaRow_==8);
+                catLabel("Yazılımsal parlaklık","Software brightness"),appSettings_.get().softwareBrightness,50,100,pal,false);
             auto systemRow=l.control(9);systemRow.y-=int(settingsScroll_);
             const auto systemLabel=catLabel("Sistem parlaklığı (El cihazı)","System brightness (Handheld)")+" · "+
                 (backlightAvailable_?catLabel("Etkin","Active"):catLabel("Yazılım fallback","Software fallback"));
-            ui::settingsSliderRow(renderer_,*typography_,systemRow,systemLabel,appSettings_.get().systemBrightness,10,100,pal,aaRow_==9);
+            ui::settingsSliderRow(renderer_,*typography_,systemRow,systemLabel,appSettings_.get().systemBrightness,10,100,pal,false);
             row(10,catLabel("Parlaklığı sıfırla (%100)","Reset brightness (100%)"));
         } else if(aaTab_==3) {
             row(0,"Sayfalı Mod · Yatay gezinme",extraStyle_.readingMode==0);

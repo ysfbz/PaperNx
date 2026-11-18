@@ -2,7 +2,7 @@
   <img src="assets/branding/PaperNX-icon-512.png" alt="PaperNX Logo" width="160">
 </p>
 
-<h1 align="center">PaperNX v0.9.3</h1>
+<h1 align="center">PaperNX v0.9.4</h1>
 
 <p align="center">
   <strong>Native, offline EPUB, PDF, CBZ and CBR reader for the Nintendo Switch.</strong>
@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-AGPL_3.0-blue.svg" alt="AGPL-3.0 License"></a>
-  <a href="https://github.com/ysfbz/PaperNx/releases/tag/v0.9.3"><img src="https://img.shields.io/badge/Release-v0.9.3-brightgreen.svg" alt="Release v0.9.3"></a>
+  <a href="https://github.com/ysfbz/PaperNx/releases/tag/v0.9.4"><img src="https://img.shields.io/badge/Release-v0.9.4-brightgreen.svg" alt="Release v0.9.4"></a>
   <img src="https://img.shields.io/badge/Platform-Nintendo_Switch-e60012.svg" alt="Platform Nintendo Switch">
   <img src="https://img.shields.io/badge/Language-C%2B%2B17%20%2F%20C11-00599C.svg" alt="Language C++17 / C11">
   <img src="https://img.shields.io/badge/GUI-SDL2-black.svg" alt="GUI SDL2">
@@ -20,7 +20,7 @@
 ---
 
 > [!IMPORTANT]
-> The v0.9.3 source passes the host C++/CTest suite (32/32) and Switch AArch64/NRO metadata validation. Physical Switch behavior remains unverified.
+> The v0.9.4 source passes the host C++/CTest suite (34/34), sanitizer checks, and Switch AArch64/NRO metadata validation. Physical Switch behavior remains unverified; see [docs/HOTFIX_v0.9.4.md](docs/HOTFIX_v0.9.4.md) for details.
 
 ## Overview
 
@@ -59,18 +59,18 @@ All books, comic archives, cover art caches, reading progress, and personal read
 
 ### Clean Install
 
-1. Download the release archive [`PaperNX-switch-v0.9.3.zip`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.3/PaperNX-switch-v0.9.3.zip).
+1. Download the release archive [`PaperNX-switch-v0.9.4.zip`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.4/PaperNX-switch-v0.9.4.zip).
 2. Extract the archive directly to the root of your Switch microSD card (`sdmc:/`).
 3. Place your `.epub`, `.pdf`, `.cbz`, and `.cbr` files into `sdmc:/switch/PaperNX/books/` (or use the built-in file browser to access any directory).
 4. Launch **PaperNX** from the Homebrew Menu.
 
-#### Release Checksums (v0.9.3)
+#### Release Checksums (v0.9.4)
 
 | Artifact | SHA256 sidecar |
 |---|---|
-| [`PaperNX.nro`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.3/PaperNX.nro) | [`PaperNX.nro.sha256`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.3/PaperNX.nro.sha256) |
-| [`PaperNX-switch-v0.9.3.zip`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.3/PaperNX-switch-v0.9.3.zip) | [`PaperNX-switch-v0.9.3.zip.sha256`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.3/PaperNX-switch-v0.9.3.zip.sha256) |
-| [`PaperNX-licenses-v0.9.3.zip`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.3/PaperNX-licenses-v0.9.3.zip) | [`PaperNX-licenses-v0.9.3.zip.sha256`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.3/PaperNX-licenses-v0.9.3.zip.sha256) |
+| [`PaperNX.nro`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.4/PaperNX.nro) | [`PaperNX.nro.sha256`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.4/PaperNX.nro.sha256) |
+| [`PaperNX-switch-v0.9.4.zip`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.4/PaperNX-switch-v0.9.4.zip) | [`PaperNX-switch-v0.9.4.zip.sha256`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.4/PaperNX-switch-v0.9.4.zip.sha256) |
+| [`PaperNX-licenses-v0.9.4.zip`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.4/PaperNX-licenses-v0.9.4.zip) | [`PaperNX-licenses-v0.9.4.zip.sha256`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.4/PaperNX-licenses-v0.9.4.zip.sha256) |
 
 ```text
 sdmc:/switch/PaperNX/
@@ -81,7 +81,7 @@ sdmc:/switch/PaperNX/
 
 ### Upgrading from a Previous Version
 
-Back up `books/` and `data/`, close PaperNX, then extract the verified v0.9.3 Switch ZIP to the microSD root (`sdmc:/`) and replace `sdmc:/switch/PaperNX/PaperNX.nro` with the included NRO. Keep a copy of the previous NRO until the new version has launched successfully. In-app updates use the same verified staging flow and require manual replacement; PaperNX does not install or restart into the candidate itself.
+Back up `books/` and `data/`, close PaperNX, then extract the verified v0.9.4 Switch ZIP to the microSD root (`sdmc:/`) and replace `sdmc:/switch/PaperNX/PaperNX.nro` with the included NRO. Keep a copy of the previous NRO until the new version has launched successfully. In-app updates use the same verified staging flow and require manual replacement; PaperNX does not install or restart into the candidate itself.
 
 > [!IMPORTANT]
 > The official release package contains only the application, fonts, and an empty `books/` placeholder. It never contains books, `data/`, settings, progress, bookmarks, Reading Journal records, or logs. The ZIP therefore does not overwrite those user files. Back up `books/` and `data/` before upgrading.
@@ -126,13 +126,13 @@ git clone https://github.com/ysfbz/PaperNx.git
 cd PaperNx
 
 # Build the Switch NRO binary and release distribution
-docker compose run --rm -e PAPERNX_RELEASE_VERSION=v0.9.3 switch bash -lc 'scripts/verify-switch.sh'
+docker compose run --rm -e PAPERNX_RELEASE_VERSION=v0.9.4 switch bash -lc 'scripts/verify-switch.sh'
 ```
 
-The resulting artifacts are written to `dist/v0.9.3/`:
+The resulting artifacts are written to `dist/v0.9.4/`:
 - `PaperNX.nro`: Nintendo Switch executable with embedded RomFS assets
-- `PaperNX-switch-v0.9.3.zip`: Clean microSD distribution package
-- `PaperNX-licenses-v0.9.3.zip`: Project attribution and third-party license notices
+- `PaperNX-switch-v0.9.4.zip`: Clean microSD distribution package
+- `PaperNX-licenses-v0.9.4.zip`: Project attribution and third-party license notices
 
 ### Build & Test on Desktop (Linux / macOS / WSL)
 
@@ -149,7 +149,7 @@ PaperNX is free software developed by **Yusuf Buzrul with AI assistance** and li
 
 Code origins and redistribution obligations, including components incorporated from community contributions, are documented in [docs/LICENSES.md](docs/LICENSES.md).
 
-This software includes third-party libraries and fonts under permissive and copyleft licenses. The [`PaperNX-licenses-v0.9.3.zip`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.3/PaperNX-licenses-v0.9.3.zip) contains their notices and source attributions; see [LICENSES.md](docs/LICENSES.md) and [SOURCE_ATTRIBUTION.md](docs/SOURCE_ATTRIBUTION.md).
+This software includes third-party libraries and fonts under permissive and copyleft licenses. The [`PaperNX-licenses-v0.9.4.zip`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.4/PaperNX-licenses-v0.9.4.zip) contains their notices and source attributions; see [LICENSES.md](docs/LICENSES.md) and [SOURCE_ATTRIBUTION.md](docs/SOURCE_ATTRIBUTION.md).
 
 ---
 
@@ -184,7 +184,7 @@ Tüm kitaplarınız, çizgi roman arşivleriniz, kapak önbelleğiniz, okuma ge�
 
 ### Kurulum
 
-1. Güncel sürüm arşivini [`PaperNX-switch-v0.9.3.zip`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.3/PaperNX-switch-v0.9.3.zip) indirin.
+1. Güncel sürüm arşivini [`PaperNX-switch-v0.9.4.zip`](https://github.com/ysfbz/PaperNx/releases/download/v0.9.4/PaperNX-switch-v0.9.4.zip) indirin.
 2. Arşivi Switch microSD kartınızın ana dizinine (`sdmc:/`) çıkartın.
 3. `.epub`, `.pdf`, `.cbz` ve `.cbr` dosyalarınızı `sdmc:/switch/PaperNX/books/` dizinine yerleştirin.
 4. Homebrew Menu üzerinden **PaperNX** uygulamasını başlatın.
@@ -211,7 +211,7 @@ Tüm temel özellikler dokunmatik ekran üzerinden doğrudan yönetilebilir. Fiz
 
 ### Lisans ve Telif Hakkı
 
-PaperNX, **Yusuf Buzrul** tarafından yapay zekâ desteğiyle geliştirilmiştir ve **[GNU Affero General Public License v3.0 (AGPL-3.0)](LICENSE)** kapsamında lisanslanmıştır. Kullanılan üçüncü taraf kütüphanelerin lisansları `PaperNX-licenses-v0.9.3.zip` içinde sunulmaktadır.
+PaperNX, **Yusuf Buzrul** tarafından yapay zekâ desteğiyle geliştirilmiştir ve **[GNU Affero General Public License v3.0 (AGPL-3.0)](LICENSE)** kapsamında lisanslanmıştır. Kullanılan üçüncü taraf kütüphanelerin lisansları `PaperNX-licenses-v0.9.4.zip` içinde sunulmaktadır.
 
 - Yusuf Buzrul tarafından yapay zekâ desteğiyle geliştirilmiştir.
 - Geliştirici profili: [https://github.com/ysfbz](https://github.com/ysfbz)
